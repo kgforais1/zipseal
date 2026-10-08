@@ -34,7 +34,7 @@ def _check_entries(
             digest.update(chunk)
         record = next(expected, None)
         name = raw_name.decode("utf-8", "replace")
-        if record is None or name != record.arcname:
+        if record is None or raw_name != record.arcname.encode("utf-8"):
             raise VerifyError(f"{label}: unexpected entry {name!r}")
         if digest.digest() != record.sha256:
             raise VerifyError(f"{label}: {name} does not match its source")

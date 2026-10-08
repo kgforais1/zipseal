@@ -202,7 +202,7 @@ def test_planted_partial_symlink_not_followed(tree: Path, tmp_path: Path) -> Non
     victim = tmp_path / "victim.txt"
     victim.write_text("do not touch")
     (tmp_path / "out/bundle-part01.zip.partial").symlink_to(victim)
-    with pytest.raises(WriteError, match="refusing to write through"):
+    with pytest.raises(WriteError, match="earlier, interrupted run|refusing to write through"):
         archive([tree], out)
     assert victim.read_text() == "do not touch"
 
@@ -266,3 +266,76 @@ def test_non_ascii_password_interop(tree: Path, tmp_path: Path, pw: str) -> None
     )
     assert proc.returncode == 0, proc.stderr
     assert (dest / "src/a.txt").read_text() == "hello\n"
+
+
+def test_partial_planted_after_preflight_not_followed(
+    tree: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The O_EXCL | O_NOFOLLOW open is the last line of defence after preflight."""
+    import zipseal.output as output_mod
+
+    out = tmp_path / "out/bundle.zip"
+    victim = tmp_path / "victim.txt"
+    victim.write_text("do not touch")
+    real = output_mod.Output.new_partial
+
+    def plant(self, number):  # type: ignore[no-untyped-def]
+        path = real(self, number)
+        path.symlink_to(victim)
+        return path
+
+    monkeypatch.setattr(output_mod.Output, "new_partial", plant)
+    with pytest.raises(WriteError, match="refusing to write through"):
+        archive([tree], out)
+    assert victim.read_text() == "do not touch"
+
+
+def test_leftover_partial_fails_preflight(tree: Path, tmp_path: Path) -> None:
+    (tmp_path / "out/bundle-part03.zip.partial").write_text("crashed run")
+    with pytest.raises(WriteError, match="earlier, interrupted run"):
+        archive([tree], tmp_path / "out/bundle.zip")
+    assert (tmp_path / "out/bundle-part03.zip.partial").read_text() == "crashed run"
+
+
+def test_symlinked_ancestor_is_followed_by_default(tmp_path: Path) -> None:
+    make_tree(tmp_path, {"real/data/a.txt": "a"})
+    (tmp_path / "link").symlink_to(tmp_path / "real")
+    (tmp_path / "out").mkdir()
+    out = tmp_path / "out/b.zip"
+    archive([tmp_path / "link/data"], out)
+    assert extract(out) == {"data/a.txt": b"a"}
+
+
+def test_name_that_looks_like_a_zip64_locator(tmp_path: Path) -> None:
+    """A file name ending in a fake Zip64 locator must not break verification."""
+    name = "x" * 3 + "PK\x06\x07" + "y" * 5  # lands exactly 20 bytes before the EOCD
+    src = tmp_path / "src"
+    src.mkdir()
+    (src / name).write_text("z")
+    (tmp_path / "out").mkdir()
+    out = tmp_path / "out/b.zip"
+    archive([src / name], out)
+    assert extract(out) == {name: b"z"}
+
+
+def test_nothing_to_archive_exits_2(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    from zipseal import cli
+
+    (tmp_path / "real.txt").write_text("x")
+    (tmp_path / "link.txt").symlink_to(tmp_path / "real.txt")
+    code = cli.main(
+        [str(tmp_path / "link.txt"), "-o", str(tmp_path / "o.zip"), "--generate-password"]
+    )
+    assert code == 2
+    assert "nothing to archive" in capsys.readouterr().err
+    assert not (tmp_path / "o.zip").exists()
+
+
+def test_no_progress_lines_when_not_a_tty(tree: Path, tmp_path: Path) -> None:
+    import io as _io
+
+    err = _io.StringIO()
+    args = args_for([tree], tmp_path / "out/b.zip")
+    with collect_for(args) as c:
+        write_archive(args, c, lambda _: Password(PASSWORD), err=err)
+    assert "writing part" not in err.getvalue()

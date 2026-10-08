@@ -20,3 +20,7 @@ All notable user-facing changes are documented here. The format follows
   each file.
 - `--dry-run`, `--exclude`, `--follow-symlinks`, `--level`, `--force` and
   `--no-verify`.
+
+### Fixed
+
+- A file name containing bytes that look like a Zip64 locator no longer makes verification fail.

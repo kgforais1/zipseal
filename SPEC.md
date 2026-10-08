@@ -230,8 +230,11 @@ delegates that file to `7zz -v`.
   is rejected by type instead of blocking the open. The writer also counts
   the bytes it reads. A swapped file or folder, a file replaced by a symlink
   or FIFO, or a size change all fail.
-- Traversal has two policies. By default every component, including the
-  input root, is opened with `O_NOFOLLOW`. With `--follow-symlinks`,
+- Traversal has two policies. The folder that holds each input is opened
+  by its path as given, so symlinks above the input (such as macOS's `/tmp`)
+  resolve normally. From the input itself downwards, by default, every
+  component is opened with `O_NOFOLLOW`, and an input that is itself a
+  symlink is skipped with a warning. With `--follow-symlinks`,
   components are opened without `O_NOFOLLOW`, so symlinks resolve. The
   identity of what they resolve to is still checked against the record.
 - Final names are published without clobbering. Each `.partial` is

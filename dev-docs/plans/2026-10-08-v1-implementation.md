@@ -519,6 +519,14 @@ local parts already written (`written_local`). Two ways to get it:
   policies, `O_NONBLOCK` leaf opens, directory identity checks, the
   empty-part pre-check including manifest and outer costs, and wording
   fixes.
+- 2026-10-08, implementation reviews of `feat/v1`. Glyph Cluster (Kilo)
+  found one real low issue (password-file permissions read from a second
+  lookup), fixed. NVIDIA GLM 5.3 (OpenCode) found 2 medium and 6 low, all
+  fixed: the root-folder symlink policy now matches `SPEC.md` §6.5; a real
+  ZipCrypto archive test; the Zip64 locator probe gated on Zip64 use (a
+  crafted file name could fail verification); leftover `.partial` files
+  caught in preflight; one summary line; rollback reports parts it could not
+  remove; raw-byte name comparison; and exit 2 when nothing is archived.
 - 2026-10-08, StepFun 3.7 Flash (free, via Kilo). The review did not run,
   because the free tier returned a balance error twice.
 

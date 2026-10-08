@@ -92,3 +92,23 @@ def test_7zz_zip64_entry_count(tmp_path: Path) -> None:
     [r] = archive([src], tmp_path / "out/b.zip")
     proc = sevenzip("t", f"-p{PASSWORD}", str(r.path))
     assert proc.returncode == 0 and "Files: 65536" in proc.stdout, proc.stdout[-500:]
+
+
+def test_zipcrypto_archive_fails_verification(src: Path, tmp_path: Path) -> None:
+    """The encryption allow-list rejects ZipCrypto even with the right password."""
+    import hashlib
+
+    from zipseal.errors import VerifyError
+    from zipseal.passwords import Password
+    from zipseal.verify import verify_part
+    from zipseal.write import EntryRecord
+
+    out = tmp_path / "out/zc.zip"
+    proc = subprocess.run(
+        ["7zz", "a", "-tzip", "-mem=ZipCrypto", f"-p{PASSWORD}", str(out), str(src / "a.txt")],
+        capture_output=True, text=True,
+    )  # fmt: skip
+    assert proc.returncode == 0, proc.stdout
+    record = EntryRecord("a.txt", 6, False, hashlib.sha256(b"hello\n").digest())
+    with pytest.raises(VerifyError, match="ZipCrypto"):
+        verify_part(out, Password(PASSWORD), [record])

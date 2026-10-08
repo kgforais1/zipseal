@@ -25,6 +25,9 @@ class Output:
         self._part_re = re.compile(
             re.escape(self.stem) + r"-part\d+-of-\d+" + re.escape(self.suffix)
         )
+        self._partial_re = re.compile(
+            re.escape(self.stem) + r"-part\d+" + re.escape(self.suffix) + r"\.partial"
+        )
 
     # ── before writing ────────────────────────────────────────────────────────
 
@@ -44,6 +47,15 @@ class Output:
         """Fail early if outputs exist (without --force) or the folder cannot hold them."""
         if not self.dir.is_dir():
             raise WriteError(f"{self.dir}: output folder does not exist")
+        leftovers = [
+            self.dir / n for n in sorted(os.listdir(self.dir)) if self._partial_re.fullmatch(n)
+        ]
+        if leftovers:
+            listing = "\n".join(f"  {p}" for p in leftovers)
+            raise WriteError(
+                "partial files from an earlier, interrupted run are in the way. Check them, "
+                f"then delete them:\n{listing}"
+            )
         if not self.force:
             clash = self.existing()
             if clash:
@@ -150,7 +162,11 @@ class Output:
             try:
                 os.unlink(final)
             except OSError:
-                pass
+                print(
+                    f"zipseal: warning: could not remove {final}; it is a complete, "
+                    "verified part of the failed run",
+                    file=self.warn,
+                )
         for backup, final in backups:
             try:
                 os.rename(backup, final)

@@ -59,7 +59,7 @@ would leave it in your shell history and visible to other users.
 |---|---|
 | 0 | Success. |
 | 1 | Usage error, such as a bad option or mismatched passwords. |
-| 2 | Input error, such as a missing path, a name collision, or a file too large for `--max-size`. |
+| 2 | Input error, such as a missing path, a name collision, a file too large for `--max-size`, or nothing left to archive after skips and excludes. |
 | 3 | Write or verify failure. Nothing is left behind. |
 | 130 | Interrupted with Ctrl-C. Nothing is left behind. |
 
@@ -69,4 +69,6 @@ would leave it in your shell history and visible to other users.
   then given its final name. A failure removes every `.partial` file.
 - zipseal never overwrites a file it did not expect, even one created while
   it was running.
+- If an earlier run was killed and left `.partial` files, the next run stops
+  before writing and lists them. Check them, then delete them.
 - If a source file changes or is swapped while zipseal runs, the run stops.

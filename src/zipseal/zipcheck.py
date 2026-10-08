@@ -44,6 +44,7 @@ class CentralEntry:
     uncompressed: int
     offset: int
     aes: bytes
+    raw_name: bytes = b""
 
 
 ReadAt = Callable[[int, int], bytes]
@@ -89,7 +90,9 @@ def read_central(read_at: ReadAt, length: int, label: str) -> tuple[list[Central
     end = eocd_pos
     count = n_total
     zip64_used = MAX16 in (disk, cd_disk, n_total) or MAX32 in (cd_size, cd_offset)
-    if eocd_pos >= ZIP64_LOCATOR.size:
+    # Only look for a locator when the EOCD says Zip64 is in use: the 20 bytes before
+    # the EOCD are otherwise the end of the last central entry, which a file name controls.
+    if zip64_used and eocd_pos >= ZIP64_LOCATOR.size:
         loc = ZIP64_LOCATOR.unpack(
             _exact(read_at, eocd_pos - ZIP64_LOCATOR.size, ZIP64_LOCATOR.size, label)
         )
@@ -158,7 +161,15 @@ def read_central(read_at: ReadAt, length: int, label: str) -> tuple[list[Central
             raise VerifyError(f"{where}: name is not UTF-8") from None
         entries.append(
             CentralEntry(
-                name, flags, method, crc, comp, uncomp, offset, extra.get(AES_EXTRA_ID, b"")
+                name,
+                flags,
+                method,
+                crc,
+                comp,
+                uncomp,
+                offset,
+                extra.get(AES_EXTRA_ID, b""),
+                name_bytes,
             )
         )
     if pos != len(blob):
@@ -182,7 +193,7 @@ def check_locals(read_at: ReadAt, entries: list[CentralEntry], cd_offset: int, l
         if sig != LOCAL_SIG:
             raise VerifyError(f"{where}: bad local header signature")
         head = _exact(read_at, c.offset + LOCAL.size, n_len + x_len, where)
-        if head[:n_len].decode("utf-8", "replace") != c.name:
+        if head[:n_len] != c.raw_name:
             raise VerifyError(f"{where}: local and central names differ")
         if flags != c.flags or method != c.method:
             raise VerifyError(f"{where}: local and central flags or method differ")

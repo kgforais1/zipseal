@@ -8,7 +8,7 @@ from typing import NoReturn, TextIO
 
 from zipseal import __version__, passwords
 from zipseal.collect import Collection, collect
-from zipseal.errors import EXIT_INTERRUPT, EXIT_OK, UsageError, ZipsealError
+from zipseal.errors import EXIT_INTERRUPT, EXIT_OK, InputError, UsageError, ZipsealError
 from zipseal.passwords import Password
 from zipseal.pipeline import estimate_parts, write_archive
 from zipseal.sizes import parse_size
@@ -188,12 +188,20 @@ def run(args: argparse.Namespace) -> int:
         follow_symlinks=args.follow_symlinks,
         output=args.output,
     ) as collection:
+        if not collection.entries:
+            raise InputError("nothing to archive: every input was skipped or excluded")
         if args.dry_run:
             print_dry_run(collection, args, sys.stdout)
             return EXIT_OK
         results = write_archive(args, collection, get_password)
-        for r in results:
-            print(f"zipseal: wrote {r.path} ({r.size:,} bytes)", file=sys.stderr)
+        total = sum(r.size for r in results)
+        noun = "part" if len(results) == 1 else "parts"
+        names = ", ".join(r.path.name for r in results)
+        print(
+            f"zipseal: wrote {len(results)} {noun} ({total:,} bytes) in "
+            f"{results[0].path.parent}: {names}",
+            file=sys.stderr,
+        )
         return EXIT_OK
 
 
