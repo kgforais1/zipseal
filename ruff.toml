@@ -1,0 +1,22 @@
+# Ruff configuration. The pre-commit hook and any future CI lint step both read
+# this file, so local and CI results agree.
+
+target-version = "py311"
+line-length = 100
+extend-exclude = [".context"]
+
+[lint]
+select = [
+    "E", "W",  # pycodestyle
+    "F",       # pyflakes
+    "I",       # isort
+    "B",       # bugbear
+    "UP",      # pyupgrade
+    "S",       # bandit: this tool handles passwords and encryption
+]
+
+[lint.per-file-ignores]
+"tests/**" = ["S101", "S105", "S106"]  # asserts and fixture passwords are fine in tests
+
+[format]
+quote-style = "double"

@@ -1,0 +1,4 @@
+config:
+  MD013: false # Prose and tables wrap freely.
+  MD040: false # Usage blocks have no meaningful language.
+  MD060: false # Tables use compact pipe style.

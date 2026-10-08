@@ -1,0 +1,59 @@
+# ── Scratch and agent state ──────────────────────────────────────────────────
+.context/
+.agent-state/
+.claude/settings.local.json
+.claude/*.local.json
+.claude/worktrees/
+.worktrees/
+
+# ── zipseal outputs and inputs ───────────────────────────────────────────────
+# Never commit archives, partial writes, or real input data. Tests generate
+# their fixtures in pytest's tmp_path.
+*.zip
+*.7z
+*.z[0-9][0-9]
+*.[0-9][0-9][0-9]
+*.partial
+sample-data/
+scratch/
+
+# ── Python ───────────────────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+.venv/
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+.hypothesis/
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
+
+# ── Secrets ──────────────────────────────────────────────────────────────────
+# Password files are a supported input (--password-file). Keep them out.
+.env
+.env.*
+!.env.example
+.envrc
+*.pass
+*.password
+password*.txt
+*.pem
+*.key
+
+# ── Editors and OS ───────────────────────────────────────────────────────────
+.vscode/settings.json
+.idea/
+*.swp
+*~
+.DS_Store
+._*
+Thumbs.db
+
+# ── Logs and temp ────────────────────────────────────────────────────────────
+*.log
+tmp/
