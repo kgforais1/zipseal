@@ -53,7 +53,8 @@ dev-docs/plans/       active plans; finished ones move to plans/archive/
 dev-docs/investigations/  dated research and spike write-ups
 hooks/scripts/        repo policy checks run by pre-commit
 .context/             scratch and handoffs (gitignored)
-sample-data/          local inputs for manual runs (gitignored)
+sample-data/          local inputs and sample archives (gitignored)
+scripts/make_samples.py  rebuilds sample-data/ with synthetic inputs
 ```
 
 ## Security rules
@@ -69,7 +70,8 @@ These rules are the point of the tool. Treat a violation as a bug.
   failure. Create outputs with mode `0600`.
 - Never commit real input data or generated archives. `.gitignore` blocks
   `*.zip`, `*.partial` and volume files. Tests build their inputs in `tmp_path`.
-  For manual runs, put inputs in `sample-data/` (gitignored).
+  For manual runs, use `uv run python scripts/make_samples.py`, which builds
+  synthetic inputs and sample archives in `sample-data/` (gitignored).
 - Test passwords must be obviously fake, such as `test-password`. If gitleaks
   flags a fixture anyway, add a `# gitleaks:allow` comment on that line, and
   say why in the commit message. Never allowlist a whole folder.

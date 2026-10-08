@@ -17,6 +17,7 @@ select = [
 
 [lint.per-file-ignores]
 "tests/**" = ["S101", "S105", "S106", "S603", "S607"]  # asserts, fixture passwords, running tar
+"scripts/**" = ["S105", "S311", "S603", "S607"]  # sample password, seeded noise, running zipseal
 
 [format]
 quote-style = "double"
