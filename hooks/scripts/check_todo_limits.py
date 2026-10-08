@@ -41,8 +41,8 @@ def is_backlog_path(path: Path) -> bool:
 
 
 def default_targets(repo_root: Path) -> list[Path]:
-    candidate = repo_root / BACKLOG_PATH
-    return [candidate] if candidate.is_file() else []
+    # Return the repo-relative path, so is_backlog_path() accepts it.
+    return [Path(BACKLOG_PATH)] if (repo_root / BACKLOG_PATH).is_file() else []
 
 
 def check(filepath: Path) -> tuple[list[str], list[str]]:

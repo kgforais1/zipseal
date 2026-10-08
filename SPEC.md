@@ -116,14 +116,16 @@ The compressed size of a file is not known until it has been compressed. The
 tool therefore uses a worst-case bound when it decides where a file goes, and
 it counts the real bytes once the file is written.
 
-Each entry is written with an explicit method. It uses `ZIP_32` unless one
-of these holds, in which case it uses `ZIP_64`:
+Each entry is written with an explicit method. Files use `ZIP_32` and
+directories use `NO_COMPRESSION_32(0, 0)`, unless one of these holds. Then
+files use `ZIP_64` and directories use `NO_COMPRESSION_64(0, 0)`:
 
 - the entry's bound, or the part's running offset plus that bound, could
   pass `0xFFFFFFFF`;
 - the entry is the part's 65,535th entry or later. With explicit `ZIP_32`,
-  `stream-zip` fails at 65,536 entries. Switching later entries to `ZIP_64`
-  makes it write Zip64 end records instead (tested 2026-10-08);
+  `stream-zip` fails at 65,536 entries, whether they are files or
+  directories. Switching later entries to a 64-bit method makes it write
+  Zip64 end records instead (tested 2026-10-08);
 - the reserved central directory could pass `0xFFFFFFFF` bytes.
 
 `ZIP_AUTO` is not used, because it ignores the caller's compressor and does
@@ -176,9 +178,11 @@ between each file's bound and its real size. Already-compressed inputs
 unfilled. That is acceptable for v1. A later `--tight` mode could compress
 each file to a temporary file first and use its exact size.
 
-Because part boundaries depend on real compressed sizes, the part count is
-only known at the end. The writer uses temporary names and renames the parts
-to `-partNN-of-MM.zip` once `MM` is known.
+Under `--order path` without `--manifest`, part boundaries depend on real
+compressed sizes, so the part count is only known at the end. In the
+upfront-assignment modes of §6.3, the part count is known before writing.
+Either way the writer uses temporary names and renames the parts to
+`-partNN-of-MM.zip` only after every part verifies (§6.5).
 
 ### 6.3 Ordering
 
@@ -188,7 +192,9 @@ first-fit-decreasing and usually produces fewer parts, but it scatters
 related files. Both orders are deterministic, so the same input gives the
 same split.
 
-`--order path` assigns parts while streaming, using real compressed sizes.
+`--order path` assigns parts while streaming. Each decision uses the exact
+bytes written so far plus worst-case bounds for the next entry, per the
+§6.2 rule.
 `--order size` and `--manifest` instead assign every entry to a part from
 bounds alone, before anything is written, and never re-split. First-fit
 needs to see all parts at once, and a manifest must list every part before
@@ -196,8 +202,11 @@ part 1 is written. Packing is looser in those modes.
 
 ### 6.4 Files larger than the cap
 
-In v1, any single file whose bound exceeds `--max-size` stops the run before
-anything is written. The error names the file and suggests the 7-Zip spanned
+In v1, the run stops before anything is written if any single entry cannot
+fit in an empty part. "Fit" uses the full §6.2 admission total for that
+entry alone in a new part. Under `--manifest` that total includes the
+manifest's bound. Under `--hide-names` it includes the outer layer from §6.7.
+So admission can never fail on an empty part. The error names the file and suggests the 7-Zip spanned
 command from §2. A later version could add `--oversize=volumes`, which
 delegates that file to `7zz -v`.
 
@@ -210,13 +219,18 @@ delegates that file to `7zz -v`.
 - `.partial` files are opened with `O_CREAT | O_EXCL | O_NOFOLLOW`, so a
   planted file or symlink is never written through.
 - A source that changes between collection and reading stops the run.
-  Collection records each file's device, inode, type and size. Reading opens
-  the file relative to a directory descriptor held since collection, one
-  path component at a time with `O_NOFOLLOW`, then checks `fstat` against the
-  record. The writer also counts the bytes it reads. A swapped file, a file
-  replaced by a symlink, a swapped parent folder, or a size change all fail.
-  With `--follow-symlinks`, components may be symlinks, but the identity
-  check still applies.
+  Collection records the device, inode and type of every file and of every
+  directory on the path to it, plus each file's size. Reading starts from a
+  directory descriptor held since collection. It opens the path one
+  component at a time and `fstat`s each one against the record before going
+  further. The leaf is opened with `O_NONBLOCK`, so a file swapped for a FIFO
+  is rejected by type instead of blocking the open. The writer also counts
+  the bytes it reads. A swapped file or folder, a file replaced by a symlink
+  or FIFO, or a size change all fail.
+- Traversal has two policies. By default every component, including the
+  input root, is opened with `O_NOFOLLOW`. With `--follow-symlinks`,
+  components are opened without `O_NOFOLLOW`, so symlinks resolve. The
+  identity of what they resolve to is still checked against the record.
 - Final names are published without clobbering. Each `.partial` is
   hard-linked to its final name with `os.link`, which fails if the name
   exists, and then the `.partial` is removed. A file that appears at a final
@@ -224,9 +238,12 @@ delegates that file to `7zz -v`.
   not support hard links, the run fails with exit 3 before writing.
 - With `--force`, each existing final name is first renamed to a private
   backup name in the same folder. Then the new part is published. If any
-  step fails, the run removes what it published and restores every backup,
-  so the previous outputs survive. Backups are deleted only after every part
-  is published.
+  step fails before every part is published, the run removes what it
+  published and restores every backup, so the previous outputs survive.
+- Publishing the last part is the commit point. After it, nothing is rolled
+  back. The run then deletes the backups. If a deletion fails, the run keeps
+  the new outputs and any remaining backups, prints a warning naming the
+  leftover backups, and still exits 0.
 - Output files are created with mode `0600`.
 
 ### 6.6 Verification
@@ -243,12 +260,23 @@ that each part's size on disk is at most `--max-size`.
 `stream-unzip` reads only the local entries. It stops at the first
 central-directory signature and ignores everything after it, so an archive
 with a corrupt central directory or end record would still pass. Verification
-therefore also checks the structure itself. It opens each part with the
-standard library's `zipfile`, which parses the end records and central
-directory, and checks that the entry count, names and local-header offsets
-match what the writer recorded. Under `--hide-names` the inner zip is checked
-the same way: verification keeps the inner stream's trailing bytes, which
-hold its central directory and end records, and parses them.
+therefore also checks the structure itself, with its own small parser in
+`zipcheck.py`. The writer records, for every entry, its name, method,
+general-purpose flags, compressed and uncompressed sizes, CRC field, AES
+extra field, Zip64 extra field and local-header offset. The parser reads the
+end of central directory record, and the Zip64 end record and locator when
+present. It checks that their entry counts agree, and that the central
+directory's offset and size lie inside the file and end exactly where the
+end records begin. It then parses every central entry and compares every
+recorded field. Any difference fails verification.
+
+The standard library's `zipfile` is not enough on its own. It accepts a
+central entry whose sizes or CRC were changed. Tests still use it as an
+independent cross-check.
+
+Under `--hide-names` the inner zip is checked the same way. Verification
+keeps the inner stream's trailing bytes, which hold its central directory
+and end records, and runs the same parser over them.
 
 ### 6.7 Hiding file names (`--hide-names`)
 

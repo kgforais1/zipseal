@@ -137,6 +137,7 @@ src/zipseal/collect.py  FileEntry, walk, excludes, symlinks, collisions
 src/zipseal/plan.py     bound(), part assignment for path and size order
 src/zipseal/write.py    stream one part, count bytes, .partial files, 0600
 src/zipseal/verify.py   decrypt, HMAC, SHA-256 and path-set checks
+src/zipseal/zipcheck.py parse end records and central directory; compare with writer records
 src/zipseal/output.py   part naming, existing-output checks, final rename, cleanup
 src/zipseal/errors.py   exception types mapped to exit codes
 tests/conftest.py       tree builders, password fixture, 7zz skip marker
@@ -165,8 +166,13 @@ dev-docs/investigations/2026-10-08-stream-zip-spike.md   the findings above, in 
 - [ ] Add `basedpyright` to `.pre-commit-config.yaml` as a local hook running
       `uv run basedpyright` with `pass_filenames: false` and
       `files: ^(src|tests)/`, so it always checks the whole package.
-- [ ] Copy the "Decisions made in this plan" table into the relevant
-      `SPEC.md` sections.
+- [ ] Copy the decisions-table rows that are not yet in `SPEC.md` into the
+      relevant sections: single-part naming, output inside an input,
+      `--force` scope, the existing-output check, `--dry-run` part count,
+      timestamp clamping, undecodable names, interrupt, generated password
+      timing, case-insensitive collisions, the `MANIFEST.txt` collision, and
+      password encoding and storage. Size suffixes, manifest padding and the
+      `getpass` fallback are already in the spec.
 - [ ] Write `errors.py`. `UsageError` maps to exit 1, `InputError` to 2,
       `WriteError` and `VerifyError` to 3, and `KeyboardInterrupt` to 130.
 - [ ] Write `sizes.py` per `SPEC.md` §4. `KB`/`MB`/`GB`/`TB` and bare
@@ -208,12 +214,17 @@ dev-docs/investigations/2026-10-08-stream-zip-spike.md   the findings above, in 
 ### Phase 2: Collect
 
 - [ ] Define `FileEntry(root: int, relparts: tuple[str, ...], arcname: str,
-      size: int, mtime: datetime, mode: int, is_dir: bool, dev: int,
-      ino: int)` as a frozen dataclass. `root` indexes a directory descriptor
-      opened once per input with `O_DIRECTORY | O_NOFOLLOW` and held for the
-      run (`SPEC.md` §6.5). File inputs use their parent folder as the root.
-- [ ] Walk with `os.fwalk` from each root descriptor, so the walk never
-      follows a swapped-in symlink.
+      size: int, mtime: datetime, mode: int, is_dir: bool,
+      chain: tuple[tuple[int, int], ...])` as a frozen dataclass. `root`
+      indexes a directory descriptor opened once per input and held for the
+      run. `chain` holds `(st_dev, st_ino)` for every directory between the
+      root and the entry, and for the entry itself (`SPEC.md` §6.5). File
+      inputs use their parent folder as the root.
+- [ ] Open roots with `O_DIRECTORY`, adding `O_NOFOLLOW` unless
+      `--follow-symlinks` is set (the two traversal policies in `SPEC.md`
+      §6.5).
+- [ ] Walk with `os.fwalk` from each root descriptor. Pass
+      `follow_symlinks=True` only under `--follow-symlinks`.
 - [ ] Map archive paths per `SPEC.md` §6.1. A folder keeps its own name as
       the top level. A file goes to the root. Separators are always `/`.
       Reject `..`, absolute paths and empty components.
@@ -254,14 +265,18 @@ dev-docs/investigations/2026-10-08-stream-zip-spike.md   the findings above, in 
   - Files use `ZIP_32`, or `ZIP_64` under the rules in `SPEC.md` §6.2
     (size, offset, the 65,535th entry, central-directory size). Never
     `ZIP_AUTO` (finding 3).
-  - Directories use `NO_COMPRESSION_32(0, 0)` with a trailing `/` in the
-    name.
+  - Directories use `NO_COMPRESSION_32(0, 0)`, or `NO_COMPRESSION_64(0, 0)`
+    under the same rules, with a trailing `/` in the name. Budget their real
+    framing in `local_bound` and `central`.
   - Mode bits are `S_IFREG | (st_mode & 0o777)` for files and
     `S_IFDIR | 0o755` for folders.
-- [ ] Open each source per `SPEC.md` §6.5: walk `relparts` from the root
-      descriptor with `os.open(..., dir_fd=…, flags=O_NOFOLLOW)`, then
-      `fstat` and compare device, inode and regular-file type with the
-      record. A mismatch raises `WriteError` (exit 3) naming the file.
+- [ ] Open each source per `SPEC.md` §6.5. Walk `relparts` from the root
+      descriptor with `os.open(..., dir_fd=…)`, using `O_NOFOLLOW` under the
+      default policy. `fstat` each directory against `chain` before opening
+      the next component. Open the leaf with `O_NONBLOCK`, `fstat` it, and
+      check it is a regular file with the recorded identity before reading.
+      Then clear `O_NONBLOCK`. A mismatch raises `WriteError` (exit 3) naming
+      the file.
 - [ ] Hash each file with SHA-256 and count its bytes while it is read, by
       wrapping the chunk iterator. Keep the hashes in memory for `verify.py`.
 - [ ] If the byte count differs from `FileEntry.size`, raise `WriteError`
@@ -276,9 +291,11 @@ dev-docs/investigations/2026-10-08-stream-zip-spike.md   the findings above, in 
       entry so the HMAC is checked. Compare the SHA-256 of each entry with
       the recorded hash. Check that the set of archive paths equals the
       planned set.
-- [ ] Add the structural check from `SPEC.md` §6.6. Open the part with
-      `zipfile.ZipFile` and compare the entry count, names and
-      `header_offset` values with the offsets the writer recorded.
+- [ ] Write `zipcheck.py` per `SPEC.md` §6.6. The writer records name,
+      method, flags, both sizes, CRC field, AES extra, Zip64 extra and
+      local-header offset per entry. `zipcheck` parses the EOCD and any
+      Zip64 end record and locator, checks counts and directory bounds, then
+      compares every central entry field with the record.
 - [ ] Add the run-wide cleanup scope now, in `output.py`. It tracks every
       `.partial` this run creates and deletes them on any exception or
       Ctrl-C. Phase 4 extends it to many parts.
@@ -298,8 +315,18 @@ dev-docs/investigations/2026-10-08-stream-zip-spike.md   the findings above, in 
     swapped for another, between collect and write fails with exit 3.
   - A file created at the final name after the existing-output check is not
     overwritten, and the run fails with exit 3.
-  - Truncating the end record, or overwriting the central directory with
-    junk, fails verification.
+  - Mutation tests, each of which must fail verification: truncate the end
+    record; overwrite the central directory with junk; change one central
+    entry's compressed size, uncompressed size, CRC, method, flags, AES
+    extra, or local-header offset; make the EOCD entry count disagree with
+    the Zip64 record; point the central directory offset past the file.
+  - `zipfile` accepts every unmutated part, as an independent cross-check.
+  - A file replaced by a FIFO fails with exit 3 within a 5-second timeout.
+  - A parent folder swapped for one that holds a hard link to the original
+    file fails, because the folder's identity changed.
+  - Under `--follow-symlinks`, a symlinked input root and a symlinked
+    intermediate folder both archive correctly. Under the default policy,
+    both are skipped with a warning.
   - The deflate bound holds at every level 0–9, for incompressible and
     empty input, at sizes around 16 KiB and 64 KiB multiples, and with
     feed sizes from 1 byte to 1 MiB (a `hypothesis` test).
@@ -337,9 +364,11 @@ local parts already written (`written_local`). Two ways to get it:
       choose. Use Zip32 sizes for `ZIP_32` entries and Zip64 sizes for
       `ZIP_64` entries. Use `deflate_bound` from `SPEC.md` §6.2. Always
       reserve 98 bytes of end records.
-- [ ] Before writing anything, fail with exit 2 if any single entry's
-      `local_bound + central + end_records` exceeds `--max-size`. Name the
-      file, and suggest the 7-Zip spanned command from `SPEC.md` §2.
+- [ ] Before writing anything, fail with exit 2 if any single entry cannot
+      fit in an empty part, using the full admission total from `SPEC.md`
+      §6.4. That total includes the manifest under `--manifest`, and the
+      outer layer under `--hide-names` once Phase 6 adds it. Name the file,
+      and suggest the 7-Zip spanned command from `SPEC.md` §2.
 - [ ] Implement admission and part rollover for `--order path`. The member
       iterator decides, before yielding each entry, whether it fits. If it
       does not, the iterator ends the current `stream_zip` call and the
@@ -348,8 +377,9 @@ local parts already written (`written_local`). Two ways to get it:
       under its `.partial` name until all parts verify. Then rename them in
       order to `bundle-partNN-of-MM.zip`, or to the plain name if there is
       one part.
-- [ ] Add §6.8 "Part admission" to `SPEC.md`, recording design A or B and
-      the measured slack.
+- [ ] Record the chosen design (A or B) and the measured slack in
+      `dev-docs/investigations/`. Fold only real rule changes into `SPEC.md`
+      §6.2.
 - [ ] Verify that each part opens without the others, that its size on disk
       is at most `--max-size`, and that the union of paths across parts
       equals the planned set with no duplicates.
@@ -367,8 +397,9 @@ local parts already written (`written_local`). Two ways to get it:
     Multi-gigabyte cases stay in the slow suite.
   - Many small files (5,000 empty files with a 1 MB cap) never exceed the
     cap. This is the central-directory case.
-  - 65,535 and 65,536 empty files in one part both write, verify, and open
-    in `zipfile`. Mark this slow.
+  - 65,535 and 65,536 entries in one part all write, verify, and open in
+    `zipfile`, for files only, directories only, and a mix. Mark these
+    slow.
   - Highly compressible data fills parts well. A smoke test checks that a
     part is at least 50% full when more files remain.
   - Each part extracts alone.
@@ -381,7 +412,9 @@ local parts already written (`written_local`). Two ways to get it:
       `--force`, a failure part-way removes the final names this run
       published and the remaining `.partial` files. With `--force`, it also
       renames every backup back to its original name. Backups are deleted
-      only after every part is published.
+      only after every part is published. Publishing the last part is the
+      commit point. A failed backup deletion after that keeps the new
+      outputs and remaining backups, warns, and exits 0.
 - [ ] Before the first byte is written, check that the output directory
       exists and is writable. Report a full disk (`ENOSPC`) clearly as exit 3.
 - [ ] Implement `--force` with the backup flow in `SPEC.md` §6.5, and the
@@ -397,6 +430,8 @@ local parts already written (`written_local`). Two ways to get it:
   - `--force` overwrites only its own targets.
   - With `--force`, a failure on the second publication leaves the original
     outputs byte-identical and removes the backups and new files.
+  - With `--force`, a failure on the second backup deletion keeps every new
+    output, keeps the remaining backup, warns, and exits 0.
 
 ### Phase 6: Hide names
 
@@ -413,8 +448,9 @@ local parts already written (`written_local`). Two ways to get it:
       next entry's local bound, all reserved central entries, and its end
       records. Compute `outer_fixed` from the same structs as Phase 4.
 - [ ] Extend the structural check to the inner zip. Keep the inner stream's
-      last `sum(central) + 98` bytes in a buffer and parse its central
-      directory and end records.
+      last `sum(central) + 98` bytes in a buffer and run `zipcheck` over
+      them.
+- [ ] Include the outer layer in the Phase 4 empty-part pre-check.
 - [ ] Verify both layers. Decrypt the outer entry, stream it into
       `stream_unzip` without a password, and check the inner SHA-256 values.
 - [ ] Tests:
@@ -466,6 +502,13 @@ local parts already written (`written_local`). Two ways to get it:
   publication with `--force` backups, source identity checks, Zip64 entry
   count, structural verification, the 2038 timestamp limit, `getpass` echo
   fallback, and manifest sizing. Three were confirmed by test.
+- 2026-10-08, re-review of all fixes. GPT-6.1-Sol low found 1 high, 5
+  medium and 2 low issues. Muse Spark 1.3 (free, OpenCode) found 2 medium
+  and 3 low. All were applied: a commit point for `--force` backups, 64-bit
+  methods for directories, full central-entry comparison, two traversal
+  policies, `O_NONBLOCK` leaf opens, directory identity checks, the
+  empty-part pre-check including manifest and outer costs, and wording
+  fixes.
 - 2026-10-08, StepFun 3.7 Flash (free, via Kilo). The review did not run,
   because the free tier returned a balance error twice.
 

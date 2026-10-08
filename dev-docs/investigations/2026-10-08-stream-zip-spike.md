@@ -30,7 +30,7 @@ versions. Claims marked "source" come from that reading. Claims marked
 | 7 | `stream_zip` takes `password: str`. `stream_unzip` takes `password: bytes` and by default also accepts ZipCrypto and AE-1 through `allowed_encryption_mechanisms`. | Tested (signatures) |
 | 8 | `stream-zip` pulls the next member only after the current one is finished. Output is re-chunked to `chunk_size` (65,536 by default), with a flush after each local header. | Source |
 | 9 | Extra fields per entry: extended timestamp 9 bytes, AES 11 bytes, Zip64 local 20 bytes when `ZIP_64`. | Source |
-| 10 | Once there are more than 65,535 members, the end records are upgraded to Zip64 (98 bytes instead of 22). | Source |
+| 10 | With only `ZIP_32` or `NO_COMPRESSION_32` members, entry 65,536 raises `CentralDirectoryNumberOfEntriesOverflowError`. The end records are upgraded to Zip64 (98 bytes instead of 22) only if a 64-bit member is present. Switching members from index 65,534 onward to `ZIP_64` produced a valid 65,537-entry archive with Zip64 end records. | Tested (corrected 2026-10-08 after the Codex re-review) |
 
 Measured archive sizes, one entry each, password set:
 
@@ -53,7 +53,8 @@ deflate expansion term.
   (findings 1 and 7).
 - Use deflate level 0 for the `--hide-names` outer entry (finding 3).
 - Reserve central-directory entries for every admitted member and 98 bytes
-  of end records (findings 8 and 10).
+  of end records (finding 8). Switch to 64-bit methods, for files and
+  directories, from the 65,535th entry (finding 10).
 
 ## Not yet tested
 

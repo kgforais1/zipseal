@@ -29,3 +29,9 @@ edits and refactors. User-visible changes go in [`CHANGELOG.md`](CHANGELOG.md).
   segments, the freshness hook rejects malformed and future dates, the TODO
   hook checks only root `TODO.md`, a root `README.md`, and clearer
   `AGENTS.md` doc-update and test-password rules.
+- Applied the 2026-10-08 re-reviews: a `--force` commit point, 64-bit
+  methods for directories, full central-entry verification, two symlink
+  traversal policies, `O_NONBLOCK` leaf opens, directory identity checks,
+  and an empty-part pre-check. The TODO hook now checks `TODO.md` when run
+  without arguments, and the freshness hook rejects trailing junk after the
+  date.

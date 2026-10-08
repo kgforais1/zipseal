@@ -40,7 +40,9 @@ EXEMPT_DIRS = {".context", "node_modules", "vendor", "dist", "build"}
 EXEMPT_PREFIXES = ("dev-docs/plans/", "dev-docs/investigations/")
 EXEMPT_ROOT_FILES = {"CHANGELOG.md", "CHANGELOG.dev.md"}
 
-MARKER_RE = re.compile(r"Last reviewed:\s*(\d{4}-\d{2}-\d{2})", re.IGNORECASE)
+# Capture the whole value on the marker line, so "2026-10-08garbage" is rejected
+# rather than matched by its valid prefix.
+MARKER_RE = re.compile(r"Last reviewed:[ \t]*(\S*)[ \t]*$", re.IGNORECASE | re.MULTILINE)
 TODAY = date.today()
 
 
