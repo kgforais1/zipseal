@@ -4,10 +4,16 @@ updates:
     directory: "/"
     schedule:
       interval: "weekly"
+      day: "thursday"
+      time: "17:00"
+      timezone: "America/New_York"
     open-pull-requests-limit: 5
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
       interval: "weekly"
+      day: "thursday"
+      time: "17:00"
+      timezone: "America/New_York"
     commit-message:
       prefix: "ci"
