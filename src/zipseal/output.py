@@ -95,7 +95,7 @@ class Output:
     def final_names(self, count: int) -> list[Path]:
         if count == 1:
             return [self.output]
-        width = 2 if count <= 99 else 3
+        width = max(2, len(str(count)))  # same width for every part, so names sort
         return [
             self.dir / f"{self.stem}-part{i:0{width}d}-of-{count:0{width}d}{self.suffix}"
             for i in range(1, count + 1)

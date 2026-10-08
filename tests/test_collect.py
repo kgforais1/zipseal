@@ -225,3 +225,9 @@ def test_undecodable_names(tmp_path: Path) -> None:
     (d / os.fsdecode(b"bad\xff.txt")).write_text("x")
     with pytest.raises(InputError, match="not valid UTF-8"):
         run([d], tmp_path)
+
+
+def test_collision_file_and_folder_share_a_name(tmp_path: Path) -> None:
+    make(tmp_path, {"a/Docs": "a file", "b/docs/x.txt": "inside a folder"})
+    with pytest.raises(InputError, match="a file and a folder share a name"):
+        run([tmp_path / "a/Docs", tmp_path / "b/docs"], tmp_path)

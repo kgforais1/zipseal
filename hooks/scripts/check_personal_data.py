@@ -47,11 +47,12 @@ def scan(path: Path) -> list[str]:
 def main(argv: list[str]) -> int:
     findings = [f for name in argv for f in scan(Path(name))]
     for finding in findings:
-        print(f"[personal-data] {finding}")
+        print(f"[personal-data] {finding}", file=sys.stderr)
     if findings:
         print(
             "[personal-data] Remove it, use a placeholder such as /Users/you, or add "
-            f"'{OPT_OUT}: <reason>' on the line."
+            f"'{OPT_OUT}: <reason>' on the line.",
+            file=sys.stderr,
         )
     return 1 if findings else 0
 

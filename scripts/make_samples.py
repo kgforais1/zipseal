@@ -10,7 +10,7 @@ a single zip, split parts with a manifest, and --hide-names parts.
 
 import os
 import random
-import shutil
+import re
 import struct
 import subprocess
 import zlib
@@ -50,8 +50,6 @@ def png(path: Path, width: int, height: int, seed: int) -> None:
 def make_inputs() -> None:
     photos = INPUT / "photos"
     photos.mkdir(parents=True, exist_ok=True)
-    for old in photos.glob("img*.jpg"):  # earlier samples were random bytes, not images
-        old.unlink()
     for i in range(1, 6):
         png(photos / f"generated-{i}.png", 600, 500, seed=i)
     (INPUT / "empty-folder").mkdir(exist_ok=True)
@@ -63,9 +61,18 @@ def make_inputs() -> None:
 
 def run(out: str, *flags: str) -> None:
     folder = ROOT / out
-    shutil.rmtree(folder, ignore_errors=True)
-    folder.mkdir()
     name = out.split("-", 1)[1]
+    folder.mkdir(exist_ok=True)
+    # Only remove archives this script wrote; refuse if anything else is in the folder.
+    ours = re.compile(re.escape(name) + r"(-part\d+-of-\d+)?\.zip")
+    foreign = [
+        p.name for p in folder.iterdir() if not ours.fullmatch(p.name) and p.name != ".DS_Store"
+    ]
+    if foreign:
+        raise SystemExit(f"{folder} holds files this script did not write: {foreign}")
+    for old in folder.iterdir():
+        if ours.fullmatch(old.name):
+            old.unlink()
     env = {**os.environ, "ZS_SAMPLE_PW": PASSWORD}
     subprocess.run(
         ["zipseal", str(INPUT), "-o", str(folder / f"{name}.zip"),

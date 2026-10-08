@@ -232,20 +232,30 @@ class _Walker:
 
 
 def _check_collisions(entries: list[FileEntry]) -> None:
-    exact: dict[str, list[FileEntry]] = {}
+    """Fail on paths that would clash when extracted, including on case-insensitive disks:
+    the same path twice, paths differing only in case, and a file whose name is also a
+    folder on another entry's path."""
     folded: dict[str, list[FileEntry]] = {}
     for entry in entries:
-        exact.setdefault(entry.arcname, []).append(entry)
         folded.setdefault(entry.arcname.casefold(), []).append(entry)
-    clashes = [group for group in folded.values() if len(group) > 1]
-    if not clashes:
-        return
     lines = []
-    for group in clashes:
-        names = sorted({e.arcname for e in group})
-        kind = "same path" if len(names) == 1 else "differ only in case"
-        lines.append(f"  {', '.join(names)} ({kind}, {len(group)} sources)")
-    raise InputError("archive path collisions:\n" + "\n".join(lines))
+    for group in folded.values():
+        if len(group) > 1:
+            names = sorted({e.arcname for e in group})
+            kind = "same path" if len(names) == 1 else "differ only in case"
+            lines.append(f"  {', '.join(names)} ({kind}, {len(group)} sources)")
+    files = {e.arcname.casefold(): e.arcname for e in entries if not e.is_dir}
+    for entry in entries:
+        parts = entry.arcname.rstrip("/").split("/")
+        for depth in range(1, len(parts)):
+            ancestor = "/".join(parts[:depth]).casefold()
+            if ancestor in files:
+                lines.append(
+                    f"  {files[ancestor]}, {entry.arcname} (a file and a folder share a name)"
+                )
+                break
+    if lines:
+        raise InputError("archive path collisions:\n" + "\n".join(lines))
 
 
 def collect(

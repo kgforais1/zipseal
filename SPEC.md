@@ -346,7 +346,8 @@ breaks the result for the recipient unless they also run a restore step.
 
 - **Part names.** A run that produces one part writes exactly the `-o`
   name, even with `--max-size`. Two or more parts are named
-  `NAME-partNN-of-MM.zip`, with three digits when there are more than 99.
+  `NAME-partNN-of-MM.zip`. Part numbers have as many digits as the part count
+  needs, and at least two, so the names sort in order.
 - **Existing outputs.** Before writing, the run fails with exit 3 if the
   `-o` name exists, or any file named `NAME-part` + digits + `-of-` +
   digits + `.zip`. `--force` lifts this, and replaces only the names this run

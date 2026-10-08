@@ -7,7 +7,7 @@ them, but some built-in ones do not.
 
 | Platform | Works | Does not work |
 |---|---|---|
-| macOS 11 and later | Double-click in Finder (Archive Utility) prompts for the password. `tar -xf FILE.zip --passphrase PASSWORD`. Keka. 7-Zip (`brew install sevenzip`). | `/usr/bin/unzip` ("unsupported compression method 99"). `ditto -x -k`. |
+| macOS 11 and later | Double-click in Finder (Archive Utility) prompts for the password. `tar -xf FILE.zip` (it prompts for the password; avoid `--passphrase`, which puts it in shell history). Keka. 7-Zip (`brew install sevenzip`). | `/usr/bin/unzip` ("unsupported compression method 99"). `ditto -x -k`. |
 | Windows | 7-Zip. | File Explorer's built-in zip support is unreliable for AES. |
 | Linux | 7-Zip (`7zz`), `bsdtar` (libarchive). | Info-ZIP `unzip`. |
 

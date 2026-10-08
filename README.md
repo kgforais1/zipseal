@@ -62,7 +62,7 @@ Run `zipseal --help` for every option.
 ## Opening the archives
 
 Double-click in Finder on macOS 11 or later, or use 7-Zip, Keka or
-`tar -xf FILE.zip --passphrase PASSWORD`. macOS's `/usr/bin/unzip` cannot
+`tar -xf FILE.zip`, which prompts for the password. macOS's `/usr/bin/unzip` cannot
 open AES zips. With `--hide-names`, Finder unpacks the inner `payload.zip`
 for you, while Keka and 7-Zip extract it as a second zip to open. See
 [opening the archives](user-docs/opening-archives.md).

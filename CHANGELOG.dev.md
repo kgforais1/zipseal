@@ -68,3 +68,4 @@ edits and refactors. User-visible changes go in [`CHANGELOG.md`](CHANGELOG.md).
 - MIT license. GitHub Actions CI: pre-commit hooks, tests on Linux and macOS with Python 3.11 and 3.13 (including 7-Zip and bsdtar interop), and a pip-audit dependency audit. Dependabot for uv and Actions.
 - Applied the GLM 5.3 review of PR #1: see the plan's review log. 159 tests.
 - Applied the kg-pr-review (DeepSeek) review of PR #1: the data hooks now fail closed outside a git repository, and only `noreply@anthropic.com` is allowlisted, not the whole domain.
+- Applied the CodeRabbit review of PR #1: Actions pinned to commit SHAs (checkout v7.0.1, setup-uv v10.2.0), NUL-delimited `git ls-files` in the forbidden-paths hook, file-versus-folder collision detection, part numbers wide enough to sort past 999 parts, safer sample cleanup, and docs that no longer put the password on a `tar` command line.

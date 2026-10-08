@@ -33,7 +33,7 @@ output:
   --force. Every part is verified before it gets its final name.
 
 opening the archives:
-  Finder (macOS 11+), 7-Zip, Keka, or `tar -xf FILE --passphrase PW`.
+  Finder (macOS 11+), 7-Zip, Keka, or `tar -xf FILE` (prompts for the password).
   macOS /usr/bin/unzip cannot open AES zips. With --hide-names, open the part
   with the password, then open payload.zip inside it.
 

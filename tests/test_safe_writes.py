@@ -153,3 +153,15 @@ def test_disk_full_is_a_write_error(
         archive([src], tmp_path / "out/b.zip")
     monkeypatch.setattr("zipseal.write.os.write", real_write)
     assert os.listdir(tmp_path / "out") == []
+
+
+def test_part_names_sort_with_many_parts(tmp_path: Path) -> None:
+    out = output_mod.Output(tmp_path / "b.zip", force=False)
+    for count, first, last in [
+        (2, "b-part01-of-02.zip", "b-part02-of-02.zip"),
+        (100, "b-part001-of-100.zip", "b-part100-of-100.zip"),
+        (1000, "b-part0001-of-1000.zip", "b-part1000-of-1000.zip"),
+    ]:
+        names = [p.name for p in out.final_names(count)]
+        assert names[0] == first and names[-1] == last
+        assert names == sorted(names)

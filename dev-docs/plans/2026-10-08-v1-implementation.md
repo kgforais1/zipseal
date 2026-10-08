@@ -106,7 +106,7 @@ These fill gaps in `SPEC.md`. Phase 1 copies each one into the spec.
 
 | Topic | Decision |
 |---|---|
-| Single-part naming | If the run produces one part, it is named exactly `-o`, for example `bundle.zip`, even when `--max-size` is set. Two or more parts are named `bundle-partNN-of-MM.zip`. Use three-digit `NNN` when there are more than 99 parts. |
+| Single-part naming | If the run produces one part, it is named exactly `-o`, for example `bundle.zip`, even when `--max-size` is set. Two or more parts are named `bundle-partNN-of-MM.zip`. Part numbers use as many digits as the count needs, at least two. |
 | Output inside an input | If the output path is inside an input folder, the walker skips the output name, any existing part name for it (same pattern as the existing-output check), and `*.partial` files. |
 | `--force` scope | `--force` replaces only the exact file names this run produces, using the backup-and-restore flow in `SPEC.md` §6.5. Other files that look like old parts are listed as a warning, never deleted. |
 | Existing-output check | Before writing, the run fails with exit 3 if `bundle.zip` exists, or any file matching `bundle-part` + digits + `-of-` + digits + `.zip`, unless `--force` is set. Other names are never matched. |

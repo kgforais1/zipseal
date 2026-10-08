@@ -95,7 +95,7 @@ def read_patterns(path: Path) -> list[str]:
 def tracked_files(root: Path) -> list[str]:
     try:
         out = subprocess.run(
-            ["git", "-C", str(root), "ls-files"],
+            ["git", "-C", str(root), "ls-files", "-z"],
             capture_output=True,
             text=True,
             check=True,
@@ -104,7 +104,8 @@ def tracked_files(root: Path) -> list[str]:
         # Fail closed: an unreadable index must not look like "nothing is tracked".
         print(f"[forbidden-paths] ERROR cannot list tracked files: {exc}", file=sys.stderr)
         sys.exit(2)
-    return [line for line in out.stdout.splitlines() if line]
+    # -z gives raw paths; without it git quotes non-ASCII names and patterns miss them.
+    return [path for path in out.stdout.split("\0") if path]
 
 
 def main(argv: list[str] | None = None) -> int:
