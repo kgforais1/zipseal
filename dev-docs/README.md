@@ -95,6 +95,28 @@ honest:
   `TODO`/`FIXME` comments. Run `uvx vulture src` and `uvx deptry .` for dead
   code and unused dependencies.
 
+## Manual testing with sample archives
+
+The automated tests cover behavior. For checking archives by hand in Finder,
+Keka or 7-Zip, rebuild the local samples:
+
+```sh
+uv run python scripts/make_samples.py
+```
+
+It writes to `sample-data/`, which is gitignored:
+
+| Path | Holds |
+|---|---|
+| `input/` | Synthetic inputs (noise PNGs that open as images, text, a Unicode name, an empty folder). Files you add here yourself are kept. |
+| `1-single/` | One zip. |
+| `2-split/` | Parts under 5 MB, each with `MANIFEST.txt`. |
+| `3-hidden/` | Parts under 5 MB made with `--hide-names`. |
+
+The password for every sample is `zipseal-sample-123`. Never commit anything
+from `sample-data/`: the archives are build output, and inputs you add may be
+personal files.
+
 ## Hooks that enforce this
 
 | Hook | Script | Rule |

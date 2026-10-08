@@ -35,6 +35,7 @@ uv run zipseal --help          # run the CLI
 uv run pytest                  # fast tests
 uv run pytest -m slow          # Zip64 / 4 GiB tests
 pre-commit run --all-files     # lint, format, secret scan, file-size policy
+uv run python scripts/make_samples.py  # rebuild sample archives in sample-data/
 ```
 
 Run `pre-commit install` once per clone to enable the git hook.
