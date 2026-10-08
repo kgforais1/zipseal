@@ -23,6 +23,26 @@ repos:
         language: system
         files: '^TODO\.md$'
 
+      - id: check-forbidden-paths
+        name: "data: forbidden tracked paths"
+        entry: python3 hooks/scripts/check_forbidden_paths.py
+        language: system
+        pass_filenames: false
+        always_run: true
+
+      - id: check-gitignore-protected
+        name: "data: protected .gitignore rules"
+        entry: python3 hooks/scripts/check_gitignore_protected.py
+        language: system
+        pass_filenames: false
+        always_run: true
+
+      - id: check-personal-data
+        name: "data: home paths and email addresses"
+        entry: python3 hooks/scripts/check_personal_data.py
+        language: system
+        types: [text]
+
       - id: basedpyright
         name: "python: basedpyright"
         entry: uv run basedpyright

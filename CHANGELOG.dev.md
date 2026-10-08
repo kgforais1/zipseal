@@ -64,3 +64,4 @@ edits and refactors. User-visible changes go in [`CHANGELOG.md`](CHANGELOG.md).
   reference, opening archives, security), root README, and slow tests for a
   file over 4 GiB and 10,000 small files.
 - 7-Zip interop tests (`tests/test_sevenzip.py`), run against 7-Zip 26.04.
+- Data hooks for publishing safely: forbidden tracked paths, protected `.gitignore` rules, and a home-path and email scan.

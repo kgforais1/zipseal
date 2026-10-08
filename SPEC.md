@@ -51,8 +51,8 @@ stand alone. Email attachment limits and upload caps are the usual reasons.
 
 Other languages have equivalents if Python is a poor fit. Go has
 `github.com/yeka/zip`. Rust has the `zip` crate, which supports AES writes.
-Python is recommended here because the repo's other tools
-(`excel-pii-phi/tools/`) are Python and `uv` is installed.
+Python is recommended here because the author's related tools are Python
+and `uv` is installed.
 
 ## 4. CLI
 

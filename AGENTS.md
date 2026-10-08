@@ -77,6 +77,10 @@ These rules are the point of the tool. Treat a violation as a bug.
   flags a fixture anyway, add a `# gitleaks:allow` comment on that line, and
   say why in the commit message. Never allowlist a whole folder.
 - Error messages may name input files. They must never include file contents.
+- The repo is meant to be safe to publish. Pre-commit blocks archives,
+  images, documents, `sample-data/`, home-folder paths and real email
+  addresses (see the hooks table in `dev-docs/README.md`). Never weaken
+  `.forbidden-paths` or `.gitignore-protected` to get a commit through.
 
 ## Conventions
 
