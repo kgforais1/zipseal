@@ -1,6 +1,5 @@
 import io
 import os
-import shutil
 import stat
 import subprocess
 import sys
@@ -9,7 +8,7 @@ import zipfile
 from pathlib import Path
 
 import pytest
-from helpers import PASSWORD, archive, args_for, collect_for, extract, leftovers, make_tree
+from helpers import BSDTAR, PASSWORD, archive, args_for, collect_for, extract, leftovers, make_tree
 
 from zipseal.errors import VerifyError, WriteError
 from zipseal.passwords import Password
@@ -69,14 +68,14 @@ def test_zipfile_cross_check(tree: Path, tmp_path: Path) -> None:
     assert all(i.compress_type == 99 and i.flag_bits & 1 for i in infos)
 
 
-@pytest.mark.skipif(not shutil.which("tar"), reason="no tar")
+@pytest.mark.skipif(BSDTAR is None, reason="no libarchive tar (bsdtar)")
 def test_libarchive_extracts(tree: Path, tmp_path: Path) -> None:
     out = tmp_path / "out/bundle.zip"
     archive([tree], out)
     dest = tmp_path / "x"
     dest.mkdir()
     proc = subprocess.run(
-        ["tar", "-xf", str(out), "-C", str(dest), "--passphrase", PASSWORD],
+        [str(BSDTAR), "-xf", str(out), "-C", str(dest), "--passphrase", PASSWORD],
         capture_output=True,
     )
     if proc.returncode != 0 and b"passphrase" in proc.stderr:
@@ -254,7 +253,7 @@ def test_interrupt_cleans_partials(
     assert not out.exists()
 
 
-@pytest.mark.skipif(not shutil.which("tar"), reason="no tar")
+@pytest.mark.skipif(BSDTAR is None, reason="no libarchive tar (bsdtar)")
 @pytest.mark.parametrize("pw", ["pässwörd-ünïcode", "密码-password-日本語"])
 def test_non_ascii_password_interop(tree: Path, tmp_path: Path, pw: str) -> None:
     """libarchive derives the key from UTF-8 bytes, as 7-Zip does."""
@@ -263,7 +262,7 @@ def test_non_ascii_password_interop(tree: Path, tmp_path: Path, pw: str) -> None
     dest = tmp_path / "x"
     dest.mkdir()
     proc = subprocess.run(
-        ["tar", "-xf", str(out), "-C", str(dest), "--passphrase", pw], capture_output=True
+        [str(BSDTAR), "-xf", str(out), "-C", str(dest), "--passphrase", pw], capture_output=True
     )
     assert proc.returncode == 0, proc.stderr
     assert (dest / "src/a.txt").read_text() == "hello\n"

@@ -14,8 +14,6 @@ An item that needs more than a few lines of thought gets a plan in
 ## Next
 
 - Implement v1 per [`dev-docs/plans/2026-10-08-v1-implementation.md`](dev-docs/plans/2026-10-08-v1-implementation.md).
-- Add CI. Run pre-commit, pytest and a dependency audit on push and pull
-  request with GitHub Actions. Add Dependabot for `uv` and Actions.
 
 ## Later
 

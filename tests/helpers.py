@@ -1,5 +1,7 @@
 import io
 import os
+import shutil
+import sys
 from argparse import Namespace
 from pathlib import Path
 
@@ -12,6 +14,9 @@ from zipseal.pipeline import write_archive
 from zipseal.write import PartResult
 
 PASSWORD = "test-password-long"
+
+# libarchive's tar understands AES zips; GNU tar does not. macOS tar is libarchive.
+BSDTAR = shutil.which("bsdtar") or (shutil.which("tar") if sys.platform == "darwin" else None)
 
 
 def make_tree(root: Path, files: dict[str, bytes | str]) -> None:

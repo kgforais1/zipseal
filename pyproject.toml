@@ -6,6 +6,8 @@ authors = [
     { name = "kgrizz-git", email = "216068303+kgrizz-git@users.noreply.github.com" }
 ]
 requires-python = ">=3.11"
+license = "MIT"
+license-files = ["LICENSE"]
 dependencies = [
     "stream-zip>=0.0.84,<0.1",
     "stream-unzip>=0.0.101,<0.1",

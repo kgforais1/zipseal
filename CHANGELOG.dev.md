@@ -65,3 +65,4 @@ edits and refactors. User-visible changes go in [`CHANGELOG.md`](CHANGELOG.md).
   file over 4 GiB and 10,000 small files.
 - 7-Zip interop tests (`tests/test_sevenzip.py`), run against 7-Zip 26.04.
 - Data hooks for publishing safely: forbidden tracked paths, protected `.gitignore` rules, and a home-path and email scan.
+- MIT license. GitHub Actions CI: pre-commit hooks, tests on Linux and macOS with Python 3.11 and 3.13 (including 7-Zip and bsdtar interop), and a pip-audit dependency audit. Dependabot for uv and Actions.

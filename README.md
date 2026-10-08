@@ -15,3 +15,5 @@ zipseal reports/ -o bundle.zip --max-size 20MB --generate-password
   [CLI reference](user-docs/cli.md) and [security notes](user-docs/security.md).
 - Contributors and agents: start with [`AGENTS.md`](AGENTS.md). The design
   is in [`SPEC.md`](SPEC.md).
+
+Licensed under the [MIT License](LICENSE).
