@@ -484,14 +484,16 @@ local parts already written (`written_local`). Two ways to get it:
 - [x] Manifest tests: entry counts that cross a digit width (9→10, 99→100),
       Unicode names, a name that collides with `MANIFEST.txt` after
       casefolding, and a manifest too large to fit with any entry.
-- [ ] Print progress on stderr only when stderr is a TTY. Print one final
+- [x] Print progress on stderr only when stderr is a TTY. Print one final
       summary line listing the parts and their sizes.
-- [ ] Write `user-docs/`: quick start, CLI reference, opening archives on
+- [x] Write `user-docs/`: quick start, CLI reference, opening archives on
       each OS, and security notes from `SPEC.md` §7. Expand the root
       `README.md` with install and quick-start steps.
-- [ ] Run the slow tests: a file over 4 GiB (Zip64) and 10,000 small files.
+- [x] Run the slow tests: a file over 4 GiB (Zip64) and 10,000 small files.
+      All 9 slow tests passed on macOS on 2026-10-08.
 - [ ] Run the `7zz` interop tests (`brew install sevenzip`). `7zz t` must
-      accept every part.
+      accept every part. Blocked: `7zz` is not installed on the build
+      machine, and no `sevenzip`-marked tests exist yet.
 - [ ] Manual checks: split output opens in Keka and in Finder, and on
       Windows with 7-Zip if a machine is available. Record the results.
 - [ ] Set the version to `0.1.0`. Move the `CHANGELOG.md` entries to

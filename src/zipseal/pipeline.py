@@ -95,9 +95,9 @@ def write_archive(
     get_password: Callable[[Namespace], Password],
     err: TextIO | None = None,
 ) -> list[PartResult]:
-    err = err or sys.stderr
+    log: TextIO = err or sys.stderr
     entries = collection.entries
-    out = Output(args.output, force=args.force, warn=err)
+    out = Output(args.output, force=args.force, warn=log)
     out.preflight()
     manifest = _Manifest(entries) if args.manifest else None
     layout = make_layout(args, entries, manifest)
@@ -119,8 +119,12 @@ def write_archive(
     try:
         results: list[PartResult] = []
 
+        progress = log.isatty()
+
         def one_part(queue: deque[FileEntry]) -> None:
             path = out.new_partial(len(results) + 1)
+            if progress:
+                print(f"zipseal: writing part {len(results) + 1} ...", file=log, flush=True)
             budget = PartBudget(layout)
             results.append(
                 write_part(collection, queue, budget, password, args.level, path, extras)
@@ -138,6 +142,8 @@ def write_archive(
             while queue:
                 one_part(queue)
 
+        if progress and not args.no_verify:
+            print(f"zipseal: verifying {len(results)} part(s) ...", file=log, flush=True)
         for r in results:
             size = os.stat(r.path).st_size
             if args.max_size is not None and size > args.max_size:
@@ -147,7 +153,7 @@ def write_archive(
                 verify_part(r.path, password, r.records, inner=inner)
         finals = out.final_names(len(results))
         if password.generated:
-            print(f"zipseal: generated password: {password.value}", file=err)
+            print(f"zipseal: generated password: {password.value}", file=log)
         out.publish([r.path for r in results], finals)
         for r, final in zip(results, finals, strict=True):
             r.path = final

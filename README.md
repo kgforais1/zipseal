@@ -4,11 +4,14 @@ Last reviewed: 2026-10-08
 
 `zipseal` writes files and folders into AES-256 encrypted zips. It can split
 the output into parts that each stay under a size cap and each open on their
-own.
+own, which suits email and upload limits. It can also hide file names.
 
-Nothing is implemented yet. The design is in [`SPEC.md`](SPEC.md), and the
-build plan is in
-[`dev-docs/plans/2026-10-08-v1-implementation.md`](dev-docs/plans/2026-10-08-v1-implementation.md).
+```sh
+uv tool install .
+zipseal reports/ -o bundle.zip --max-size 20MB --generate-password
+```
 
-- Users: see [`user-docs/`](user-docs/).
-- Contributors and agents: start with [`AGENTS.md`](AGENTS.md).
+- Users: start with the [quick start](user-docs/quick-start.md), then the
+  [CLI reference](user-docs/cli.md) and [security notes](user-docs/security.md).
+- Contributors and agents: start with [`AGENTS.md`](AGENTS.md). The design
+  is in [`SPEC.md`](SPEC.md).

@@ -71,7 +71,7 @@ def build_parser() -> argparse.ArgumentParser:
         choices=range(10),
         default=6,
         metavar="0-9",
-        help="deflate level (default 6; 0 stores without compression)",
+        help="deflate level (default 6; 0 = no compression)",
     )
     parser.add_argument(
         "--exclude",

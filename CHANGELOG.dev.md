@@ -60,3 +60,6 @@ edits and refactors. User-visible changes go in [`CHANGELOG.md`](CHANGELOG.md).
   layers have exact runtime size accounting; verification decrypts the outer
   entry, streams the inner zip through `stream-unzip`, and parses its
   central directory from the retained tail. 147 tests.
+- Phase 7 (partial): progress lines on a TTY, user docs (quick start, CLI
+  reference, opening archives, security), root README, and slow tests for a
+  file over 4 GiB and 10,000 small files.

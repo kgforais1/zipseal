@@ -199,3 +199,33 @@ def test_entry_count_limit(tmp_path: Path, kind: str, count: int) -> None:
     [r] = archive([src], tmp_path / "out/b.zip")
     with zipfile.ZipFile(r.path) as zf:
         assert len(zf.infolist()) == count
+
+
+@pytest.mark.slow
+def test_file_over_4gib_uses_zip64(tmp_path: Path) -> None:
+    import zipfile
+
+    src = tmp_path / "src"
+    src.mkdir()
+    big = src / "big.bin"
+    with open(big, "wb") as fh:  # sparse: fast to create, compresses to almost nothing
+        fh.truncate(4 * 2**30 + 12345)
+    (src / "small.txt").write_text("small")
+    (tmp_path / "out").mkdir()
+    [r] = archive([src], tmp_path / "out/b.zip")
+    with zipfile.ZipFile(r.path) as zf:
+        sizes = {i.filename: i.file_size for i in zf.infolist()}
+    assert sizes["src/big.bin"] == 4 * 2**30 + 12345
+    assert sizes["src/small.txt"] == 5
+
+
+@pytest.mark.slow
+def test_ten_thousand_small_files(tmp_path: Path) -> None:
+    src = tmp_path / "src"
+    src.mkdir()
+    for i in range(10_000):
+        (src / f"f{i:05d}.txt").write_text(str(i))
+    (tmp_path / "out").mkdir()
+    results = archive([src], tmp_path / "out/b.zip", "--max-size", "500KB")
+    assert sum(len(r.records) for r in results) == 10_000
+    assert all(r.path.stat().st_size <= 500_000 for r in results)

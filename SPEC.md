@@ -1,6 +1,6 @@
 # zipseal — plan and design specification
 
-Status: draft, 2026-10-07. Nothing is implemented yet.
+Status: implemented on branch `feat/v1`, 2026-10-08. Drafted 2026-10-07.
 Last reviewed: 2026-10-08
 
 `zipseal` is a CLI that takes files and folders and writes them into one
@@ -85,6 +85,10 @@ Exit codes: `0` success, `1` usage error, `2` input error (missing path,
 oversized file), `3` write or verify failure.
 
 ## 5. Architecture
+
+The built modules add `sources.py` (safe source reads), `zipcheck.py`
+(structural verification), `output.py` (naming and publication),
+`pipeline.py` (orchestration) and `passwords.py`. The original sketch:
 
 ```
 cli.py        argument parsing, password acquisition, exit codes

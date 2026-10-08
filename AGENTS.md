@@ -11,9 +11,10 @@ cap. The design lives in [`SPEC.md`](SPEC.md).
 
 ## Status
 
-Nothing is implemented yet. Work follows
-[`dev-docs/plans/2026-10-08-v1-implementation.md`](dev-docs/plans/2026-10-08-v1-implementation.md),
-which expands `SPEC.md` §8.
+v1 is implemented on the `feat/v1` branch, following
+[`dev-docs/plans/2026-10-08-v1-implementation.md`](dev-docs/plans/2026-10-08-v1-implementation.md).
+The plan's unticked boxes list what remains: manual and 7-Zip interop
+checks, and the `0.1.0` release.
 
 ## Read this first
 
@@ -27,7 +28,7 @@ which expands `SPEC.md` §8.
 
 ## Commands
 
-The project uses `uv`. These commands work once step 1 of the plan adds `pyproject.toml`.
+The project uses `uv`.
 
 ```sh
 uv sync                        # install dependencies
@@ -46,7 +47,7 @@ SPEC.md               design; the source of truth for behavior
 TODO.md               future work only; never records finished work
 CHANGELOG.md          finished user-visible work
 CHANGELOG.dev.md      finished internal work (harness, hooks, CI, tests)
-src/zipseal/          cli, collect, plan, write, verify (see SPEC.md §5)
+src/zipseal/          cli, collect, plan, sources, write, verify, zipcheck, output, pipeline
 tests/                pytest; fixtures are generated in tmp_path
 user-docs/            docs for people who run zipseal or open its archives
 dev-docs/plans/       active plans; finished ones move to plans/archive/
