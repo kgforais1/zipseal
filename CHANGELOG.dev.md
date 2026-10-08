@@ -48,3 +48,10 @@ edits and refactors. User-visible changes go in [`CHANGELOG.md`](CHANGELOG.md).
   checks, `write.py`, `verify.py`, `zipcheck.py` structural verification,
   and `output.py` no-clobber publication with `--force` backups. Fixed
   non-ASCII passwords, which stream-zip encodes as Latin-1. 110 tests.
+- Phase 4 split: exact compressed-byte counting (design A, recorded in
+  `dev-docs/investigations/2026-10-08-part-admission.md`), the §6.2
+  admission rule, part rollover, `--order size` first-fit-decreasing, the
+  empty-part pre-check, and a runtime check that predicted part sizes equal
+  written sizes. `hypothesis` property test over random sizes and caps.
+- Phase 5 safe writes: failure, interrupt, disk-full, `--force` rollback and
+  commit-point tests. Source read errors now name the source file.

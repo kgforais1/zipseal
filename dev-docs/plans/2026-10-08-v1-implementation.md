@@ -362,40 +362,40 @@ local parts already written (`written_local`). Two ways to get it:
   works whatever the library's internals are, but wastes up to one
   `chunk_size` per part. Lower `chunk_size` to 16 KiB to limit the waste.
 
-- [ ] Implement design A. Add a test that fails if `stream-zip` stops calling
+- [x] Implement design A. Add a test that fails if `stream-zip` stops calling
       the wrapper's `compress` and `flush`, or if the computed local size of
       a member differs from the measured one. Fall back to design B if that
       test cannot be made to pass, and record why in
       `dev-docs/investigations/`.
-- [ ] Implement `local_bound(e)` and `central(e)` in `plan.py` from
+- [x] Implement `local_bound(e)` and `central(e)` in `plan.py` from
       `stream-zip`'s own header structs, for the method the writer will
       choose. Use Zip32 sizes for `ZIP_32` entries and Zip64 sizes for
       `ZIP_64` entries. Use `deflate_bound` from `SPEC.md` §6.2. Always
       reserve 98 bytes of end records.
-- [ ] Before writing anything, fail with exit 2 if any single entry cannot
+- [x] Before writing anything, fail with exit 2 if any single entry cannot
       fit in an empty part, using the full admission total from `SPEC.md`
       §6.4. That total includes the manifest under `--manifest`, and the
       outer layer under `--hide-names` once Phase 6 adds it. Name the file,
       and suggest the 7-Zip spanned command from `SPEC.md` §2.
-- [ ] Implement admission and part rollover for `--order path`. The member
+- [x] Implement admission and part rollover for `--order path`. The member
       iterator decides, before yielding each entry, whether it fits. If it
       does not, the iterator ends the current `stream_zip` call and the
       writer opens the next part.
-- [ ] Name parts `bundle-partNN.zip.partial` while writing. Keep every part
+- [x] Name parts `bundle-partNN.zip.partial` while writing. Keep every part
       under its `.partial` name until all parts verify. Then rename them in
       order to `bundle-partNN-of-MM.zip`, or to the plain name if there is
       one part.
-- [ ] Record the chosen design (A or B) and the measured slack in
+- [x] Record the chosen design (A or B) and the measured slack in
       `dev-docs/investigations/`. Fold only real rule changes into `SPEC.md`
       §6.2.
-- [ ] Verify that each part opens without the others, that its size on disk
+- [x] Verify that each part opens without the others, that its size on disk
       is at most `--max-size`, and that the union of paths across parts
       equals the planned set with no duplicates.
-- [ ] Implement `--order size` as first-fit-decreasing on
+- [x] Implement `--order size` as first-fit-decreasing on
       `local_bound + central`. Parts are assigned before writing and are
       never re-split (`SPEC.md` §6.3). They are still written one at a time.
-- [ ] Extend `--dry-run` to show the planned parts as "at most N parts".
-- [ ] Tests:
+- [x] Extend `--dry-run` to show the planned parts as "at most N parts".
+- [x] Tests:
   - Random incompressible data with caps of 1 MB, 5 MB and 25 MB never
     produces a part over the cap.
   - A `hypothesis` property test: for random file-size lists, random name
@@ -416,21 +416,21 @@ local parts already written (`written_local`). Two ways to get it:
 
 ### Phase 5: Safe writes and failure handling
 
-- [ ] Harden the cleanup scope from Phase 3 to cover publication. Without
+- [x] Harden the cleanup scope from Phase 3 to cover publication. Without
       `--force`, a failure part-way removes the final names this run
       published and the remaining `.partial` files. With `--force`, it also
       renames every backup back to its original name. Backups are deleted
       only after every part is published. Publishing the last part is the
       commit point. A failed backup deletion after that keeps the new
       outputs and remaining backups, warns, and exits 0.
-- [ ] Before the first byte is written, check that the output directory
+- [x] Before the first byte is written, check that the output directory
       exists and is writable. Report a full disk (`ENOSPC`) clearly as exit 3.
-- [ ] Implement `--force` with the backup flow in `SPEC.md` §6.5, and the
+- [x] Implement `--force` with the backup flow in `SPEC.md` §6.5, and the
       existing-output warning from the decisions table.
-- [ ] Implement `--no-verify`, which skips verification but still checks
+- [x] Implement `--no-verify`, which skips verification but still checks
       sizes against the cap. The generated password still prints, per the
       decisions table.
-- [ ] Tests:
+- [x] Tests:
   - A failure injected mid-part leaves no `.partial` files and no final
     files.
   - A failure injected in verification leaves no `.partial` files.

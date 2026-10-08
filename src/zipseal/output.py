@@ -110,7 +110,8 @@ class Output:
                     os.link(partial, final)
                 except FileExistsError:
                     raise WriteError(
-                        f"{final}: appeared while zipseal was running; not overwritten"
+                        f"{final}: appeared while zipseal was running; not overwritten, "
+                        "and no archive was written"
                     ) from None
                 published.append(final)
                 os.unlink(partial)

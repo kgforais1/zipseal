@@ -66,7 +66,10 @@ def read_chunks(
     total = 0
     try:
         while remaining > 0:
-            chunk = os.read(fd, min(CHUNK, remaining))
+            try:
+                chunk = os.read(fd, min(CHUNK, remaining))
+            except OSError as exc:
+                raise WriteError(f"{entry.arcname}: cannot read: {exc.strerror}") from None
             if not chunk:
                 break
             remaining -= len(chunk)

@@ -12,5 +12,7 @@ All notable user-facing changes are documented here. The format follows
   verifies it, and publishes it without overwriting existing files.
 - Password from a prompt, an environment variable, a file, or
   `--generate-password`.
+- `--max-size` splits output into parts that each open on their own and
+  never exceed the cap. `--order size` packs into fewer parts.
 - `--dry-run`, `--exclude`, `--follow-symlinks`, `--level`, `--force` and
   `--no-verify`.
