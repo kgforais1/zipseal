@@ -6,11 +6,11 @@ from collections.abc import Sequence
 from pathlib import Path
 from typing import NoReturn, TextIO
 
-from zipseal import __version__, passwords, plan
+from zipseal import __version__, passwords
 from zipseal.collect import Collection, collect
 from zipseal.errors import EXIT_INTERRUPT, EXIT_OK, UsageError, ZipsealError
 from zipseal.passwords import Password
-from zipseal.pipeline import check_fits, write_archive
+from zipseal.pipeline import estimate_parts, write_archive
 from zipseal.sizes import parse_size
 
 DEFAULT_EXCLUDES = (".DS_Store", "._*", "Thumbs.db")
@@ -132,22 +132,18 @@ def get_password(args: argparse.Namespace) -> Password:
     return password
 
 
-def print_dry_run(
-    collection: Collection, out: TextIO, max_size: int | None = None, order: str = "path"
-) -> None:
+def print_dry_run(collection: Collection, args: argparse.Namespace, out: TextIO) -> None:
     total = 0
     for entry in collection.entries:
         total += entry.size
         print(f"{entry.size:>14,}  {entry.arcname}", file=out)
     count = len(collection.entries)
     print(f"{count:,} entries, {total:,} bytes before compression", file=out)
-    if max_size is not None:
-        check_fits(collection.entries, max_size)
-        if order == "size":
-            parts = len(plan.first_fit_decreasing(collection.entries, max_size))
-        else:
-            parts = plan.bound_parts(collection.entries, max_size)
-        print(f"at most {parts} part{'s' if parts != 1 else ''} of {max_size:,} bytes", file=out)
+    if args.max_size is not None:
+        parts = estimate_parts(args, collection.entries)
+        print(
+            f"at most {parts} part{'s' if parts != 1 else ''} of {args.max_size:,} bytes", file=out
+        )
 
 
 def run(args: argparse.Namespace) -> int:
@@ -158,7 +154,7 @@ def run(args: argparse.Namespace) -> int:
         output=args.output,
     ) as collection:
         if args.dry_run:
-            print_dry_run(collection, sys.stdout, args.max_size, args.order)
+            print_dry_run(collection, args, sys.stdout)
             return EXIT_OK
         results = write_archive(args, collection, get_password)
         for r in results:

@@ -443,25 +443,25 @@ local parts already written (`written_local`). Two ways to get it:
 
 ### Phase 6: Hide names
 
-- [ ] Write each part as an inner `stream_zip` with no password and the
+- [x] Write each part as an inner `stream_zip` with no password and the
       chosen level. Feed its chunks as the content of one outer entry named
       `payload.zip`, with mtime 1980-01-01. Use method `ZIP_32`, or `ZIP_64`
       if the worst-case part could pass 4 GiB. Pass a level-0
       `get_compressobj` and the password on the outer call.
-- [ ] Disable extended timestamps on the outer call, so the outer entry
+- [x] Disable extended timestamps on the outer call, so the outer entry
       carries no real time.
-- [ ] Reserve the outer layer in admission (`SPEC.md` §6.7). Admit an
+- [x] Reserve the outer layer in admission (`SPEC.md` §6.7). Admit an
       entry only if `deflate_bound(inner_worst) + outer_fixed ≤ max_size`,
       where `inner_worst` is the inner zip's written local bytes plus the
       next entry's local bound, all reserved central entries, and its end
       records. Compute `outer_fixed` from the same structs as Phase 4.
-- [ ] Extend the structural check to the inner zip. Keep the inner stream's
+- [x] Extend the structural check to the inner zip. Keep the inner stream's
       last `sum(central) + 98` bytes in a buffer and run `zipcheck` over
       them.
-- [ ] Include the outer layer in the Phase 4 empty-part pre-check.
-- [ ] Verify both layers. Decrypt the outer entry, stream it into
+- [x] Include the outer layer in the Phase 4 empty-part pre-check.
+- [x] Verify both layers. Decrypt the outer entry, stream it into
       `stream_unzip` without a password, and check the inner SHA-256 values.
-- [ ] Tests:
+- [x] Tests:
   - Listing a part shows only `payload.zip`. Use `stream-unzip` for this,
     and also `7zz l` when it is installed.
   - The inner round trip extracts files identical to the inputs.
@@ -475,13 +475,13 @@ local parts already written (`written_local`). Two ways to get it:
 
 ### Phase 7: Polish and release
 
-- [ ] Implement `--manifest`. It adds `MANIFEST.txt` inside each part,
+- [x] Implement `--manifest`. It adds `MANIFEST.txt` inside each part,
       listing every archive path and its part number. With `--manifest`,
       parts are assigned from bounds before writing and never re-split
       (`SPEC.md` §6.3). Its size is fixed before packing by the zero-padding
       rule in the decisions table. Reserve its bound in each part's budget. With `--hide-names`, the manifest goes
       inside the inner zip, never the outer one.
-- [ ] Manifest tests: entry counts that cross a digit width (9→10, 99→100),
+- [x] Manifest tests: entry counts that cross a digit width (9→10, 99→100),
       Unicode names, a name that collides with `MANIFEST.txt` after
       casefolding, and a manifest too large to fit with any entry.
 - [ ] Print progress on stderr only when stderr is a TTY. Print one final

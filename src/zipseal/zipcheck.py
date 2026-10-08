@@ -234,3 +234,33 @@ def check_file(fd: int, expected: list[tuple[str, int]], label: str) -> None:
     found = [(c.name, c.uncompressed) for c in entries]
     if found != expected:
         raise VerifyError(f"{label}: central directory does not list the files that were written")
+
+
+def check_inner_tail(tail: bytes, length: int, records: list, label: str) -> None:
+    """Check an unencrypted inner zip (--hide-names) from its last bytes only.
+
+    The local entries were already checked by stream-unzip, CRCs included, as they
+    streamed. This checks the end records and central directory, that entries
+    start at 0 in strictly increasing order before the directory, and that names
+    and sizes match the writer's records.
+    """
+    start = length - len(tail)
+
+    def read_at(offset: int, size: int) -> bytes:
+        if offset < start:
+            raise VerifyError(f"{label}: central directory is larger than expected")
+        return tail[offset - start : offset - start + size]
+
+    entries, cd_offset = read_central(read_at, length, label)
+    previous = -1
+    for c in entries:
+        if c.flags & 0x01 or c.method == AES_METHOD:
+            raise VerifyError(f"{label}: {c.name}: inner entries must not be encrypted")
+        if c.offset <= previous or c.offset >= max(cd_offset, 1):
+            raise VerifyError(f"{label}: {c.name}: local header offset is out of order")
+        previous = c.offset
+    if entries and entries[0].offset != 0:
+        raise VerifyError(f"{label}: first entry does not start at offset 0")
+    found = [(c.name, c.uncompressed) for c in entries]
+    if found != [(r.arcname, r.size) for r in records]:
+        raise VerifyError(f"{label}: central directory does not list the files that were written")

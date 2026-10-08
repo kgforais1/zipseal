@@ -55,3 +55,8 @@ edits and refactors. User-visible changes go in [`CHANGELOG.md`](CHANGELOG.md).
   written sizes. `hypothesis` property test over random sizes and caps.
 - Phase 5 safe writes: failure, interrupt, disk-full, `--force` rollback and
   commit-point tests. Source read errors now name the source file.
+- Phase 6 and manifest: `plan.Layout` frames plain or nested parts; the
+  outer layer is reserved with zlib's bound over the whole inner zip; both
+  layers have exact runtime size accounting; verification decrypts the outer
+  entry, streams the inner zip through `stream-unzip`, and parses its
+  central directory from the retained tail. 147 tests.

@@ -14,5 +14,9 @@ All notable user-facing changes are documented here. The format follows
   `--generate-password`.
 - `--max-size` splits output into parts that each open on their own and
   never exceed the cap. `--order size` packs into fewer parts.
+- `--hide-names` nests each part's files in an inner zip inside one encrypted
+  `payload.zip`, so names, sizes and dates are hidden without the password.
+- `--manifest` adds `MANIFEST.txt` to every part, listing which part holds
+  each file.
 - `--dry-run`, `--exclude`, `--follow-symlinks`, `--level`, `--force` and
   `--no-verify`.
