@@ -53,6 +53,7 @@ dev-docs/plans/       active plans; finished ones move to plans/archive/
 dev-docs/investigations/  dated research and spike write-ups
 hooks/scripts/        repo policy checks run by pre-commit
 .context/             scratch and handoffs (gitignored)
+sample-data/          local inputs for manual runs (gitignored)
 ```
 
 ## Security rules
@@ -68,6 +69,10 @@ These rules are the point of the tool. Treat a violation as a bug.
   failure. Create outputs with mode `0600`.
 - Never commit real input data or generated archives. `.gitignore` blocks
   `*.zip`, `*.partial` and volume files. Tests build their inputs in `tmp_path`.
+  For manual runs, put inputs in `sample-data/` (gitignored).
+- Test passwords must be obviously fake, such as `test-password`. If gitleaks
+  flags a fixture anyway, add a `# gitleaks:allow` comment on that line, and
+  say why in the commit message. Never allowlist a whole folder.
 - Error messages may name input files. They must never include file contents.
 
 ## Conventions
@@ -84,8 +89,8 @@ These rules are the point of the tool. Treat a violation as a bug.
   when the task is verified, archive finished plans, delete finished items
   from `TODO.md`, and log the work in `CHANGELOG.md` (user-visible) or
   `CHANGELOG.dev.md` (internal).
-- Update `SPEC.md`, `AGENTS.md` and `user-docs/` in the same commit as the
-  behavior change they describe.
+- When behavior changes, update whichever of `SPEC.md`, `AGENTS.md` and
+  `user-docs/` describes it, in the same commit.
 - Use Conventional Commit prefixes (`feat:`, `fix:`, `docs:`, `chore:`, `test:`).
 
 ## Agent tooling policy

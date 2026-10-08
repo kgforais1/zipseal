@@ -9,8 +9,7 @@ the gardening pass in dev-docs/README.md covers those.
 Usage:
   python hooks/scripts/check_todo_limits.py [file ...]
 
-If no files are passed, scans the default backlog filenames at repo root and
-under plans/ (non-archive).
+If no files are passed, checks TODO.md at the repo root.
 
 Exit codes: 0 = pass (warnings OK), 1 = hard violation.
 
@@ -32,54 +31,24 @@ WARN_AS_ERROR = os.getenv("POLICY_WARN_AS_ERROR", "0") == "1"
 
 # Basenames treated as living backlog files when present in the commit set
 # or when scanning defaults.
-BACKLOG_BASENAMES = {
-    "to_do.md",
-    "todo.md",
-    "TODO.md",
-    "TO_DO.md",
-    "backlog.md",
-}
-
-IGNORE_FRAGMENTS = [
-    ".context/",
-    "dev-docs/plans/archive/",
-    "node_modules/",
-    ".git/",
-    "backups/",
-]
-
-
-def is_ignored(path: str) -> bool:
-    normalized = path.replace(os.sep, "/")
-    return any(frag in normalized for frag in IGNORE_FRAGMENTS)
+# TODO.md at the repo root is the only living backlog (see dev-docs/README.md).
+# The pre-commit `files:` filter matches the same single path.
+BACKLOG_PATH = "TODO.md"
 
 
 def is_backlog_path(path: Path) -> bool:
-    name = path.name
-    if name in BACKLOG_BASENAMES:
-        return True
-    # Allow to_do.md under plans/ but not archived plans content
-    if path.suffix.lower() == ".md" and name.lower() in {"to_do.md", "todo.md"}:
-        return True
-    return False
+    return path.as_posix() == BACKLOG_PATH
 
 
 def default_targets(repo_root: Path) -> list[Path]:
-    candidates = [
-        repo_root / "to_do.md",
-        repo_root / "TODO.md",
-        repo_root / "todo.md",
-        repo_root / "backlog.md",
-        repo_root / "plans" / "to_do.md",
-        repo_root / "plans" / "TODO.md",
-    ]
-    return [p for p in candidates if p.is_file()]
+    candidate = repo_root / BACKLOG_PATH
+    return [candidate] if candidate.is_file() else []
 
 
 def check(filepath: Path) -> tuple[list[str], list[str]]:
     errors: list[str] = []
     warnings: list[str] = []
-    if not filepath.exists() or is_ignored(str(filepath)):
+    if not filepath.exists():
         return errors, warnings
     if not is_backlog_path(filepath):
         return errors, warnings
@@ -96,12 +65,12 @@ def check(filepath: Path) -> tuple[list[str], list[str]]:
     if lines > HARD_LINE_CAP:
         errors.append(
             f"{rel}: {lines} lines > hard cap {HARD_LINE_CAP} for living TODO/backlog. "
-            "Prune done items, move large work into plans/, or split the backlog."
+            "Prune done items, or move large work into dev-docs/plans/."
         )
     elif lines > SOFT_LINE_CAP:
         warnings.append(
             f"{rel}: {lines} lines > soft cap {SOFT_LINE_CAP} "
-            f"(hard cap {HARD_LINE_CAP}). Prune or promote items to plans/."
+            f"(hard cap {HARD_LINE_CAP}). Prune or promote items to dev-docs/plans/."
         )
 
     return errors, warnings
@@ -112,7 +81,7 @@ def main() -> int:
     args = [Path(a) for a in sys.argv[1:]]
 
     if args:
-        files = [p for p in args if is_backlog_path(p) and not is_ignored(str(p))]
+        files = [p for p in args if is_backlog_path(p)]
         # If pre-commit passed only non-backlog files, nothing to do
         if not files and args:
             return 0

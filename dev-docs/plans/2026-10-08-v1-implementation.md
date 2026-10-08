@@ -59,6 +59,15 @@ corrected on 2026-10-08. Full evidence is in
 7. **`stream-zip` pulls the next member only after the current member is
    finished.** Output is re-chunked to `chunk_size` (65,536 by default), with
    a flush after each local header.
+8. **The original deflate bound was not a guaranteed bound.** `SPEC.md` §6.2
+   now uses zlib's own bound for raw deflate with `memLevel=8`. Level 0 does
+   not always fill 65,535-byte blocks, so the outer layer under
+   `--hide-names` uses the same bound.
+9. **Explicit `ZIP_32` fails at 65,536 entries, and extended timestamps fail
+   after January 2038.** Entries from the 65,535th onward use `ZIP_64`, and
+   extended timestamps are off.
+10. **`stream-unzip` ignores the central directory.** An archive with a
+    corrupt end record still decrypts. Verification adds a structural check.
 
 Measured archive sizes, one entry each, password set:
 
@@ -99,14 +108,15 @@ These fill gaps in `SPEC.md`. Phase 1 copies each one into the spec.
 |---|---|
 | Single-part naming | If the run produces one part, it is named exactly `-o`, for example `bundle.zip`, even when `--max-size` is set. Two or more parts are named `bundle-partNN-of-MM.zip`. Use three-digit `NNN` when there are more than 99 parts. |
 | Output inside an input | If the output path is inside an input folder, the walker skips the output name, any existing part name for it (same pattern as the existing-output check), and `*.partial` files. |
-| `--force` scope | `--force` overwrites only the exact file names this run produces. Other files that look like old parts are listed as a warning, never deleted. |
+| `--force` scope | `--force` replaces only the exact file names this run produces, using the backup-and-restore flow in `SPEC.md` §6.5. Other files that look like old parts are listed as a warning, never deleted. |
 | Existing-output check | Before writing, the run fails with exit 3 if `bundle.zip` exists, or any file matching `bundle-part` + digits + `-of-` + digits + `.zip`, unless `--force` is set. Other names are never matched. |
 | `--dry-run` part count | Planning uses worst-case bounds, so dry-run prints "at most N parts". |
-| Timestamps | mtimes before 1980-01-01 are clamped to that date, and mtimes after 2107-12-31 to that date. Each clamp prints one warning that names the file. |
+| Timestamps | Extended timestamps are off (`SPEC.md` §6.2). DOS timestamps in local time are clamped to 1980-01-01 00:00:00 through 2107-12-31 23:59:58. Each clamp prints one warning that names the file. |
 | Undecodable file names | Names that do not decode as UTF-8 stop the run with exit 2 and a list of the bad paths. |
 | Interrupt | Ctrl-C deletes this run's `.partial` files and exits with 130. |
-| Generated password timing | `--generate-password` prints the password once, to stderr, after every part has passed verification (or the size check under `--no-verify`) and immediately before the final renames. A failed run prints no password. |
+| Generated password timing | `--generate-password` prints the password once, to stderr, after every part has passed verification (or the size check under `--no-verify`) and immediately before publication. A run that fails earlier prints no password. If publication then fails and rolls back, the run says plainly that no archive was written. |
 | Case-insensitive collisions | Compare archive paths after NFC normalization and `str.casefold()`. |
+| Manifest size | Part numbers in the manifest are zero-padded to the digit count of the number of entries, so the manifest's exact size is known before packing and does not depend on assignments. If the manifest's bound plus any single entry exceeds the cap, the run fails with exit 2. |
 | `MANIFEST.txt` collision | If an input already maps to `MANIFEST.txt` at the archive root, `--manifest` fails with exit 2. |
 | Password encoding | Passwords are encoded as UTF-8. Generated passwords use only ASCII letters and digits. A non-ASCII password prints a warning that some tools may not open the archive. |
 | Password storage | The password is held as `str` in memory for the run. Python cannot reliably wipe memory. `SPEC.md` §7 records this as a known limit. |
@@ -170,7 +180,9 @@ dev-docs/investigations/2026-10-08-stream-zip-spike.md   the findings above, in 
 - [ ] Implement the password sources:
   - `--password-prompt`, the default, asks twice with `getpass` and requires
     a match. With no TTY on stdin it fails with exit 1 and suggests
-    `--password-env` or `--password-file`.
+    `--password-env` or `--password-file`. Turn `getpass.GetPassWarning`
+    into an error with a `warnings` filter, so a terminal that cannot hide
+    input stops the run (exit 1) before any input is read.
   - `--password-env VAR` fails if `VAR` is unset or empty.
   - `--password-file PATH` reads the first line and strips the trailing
     `\n` or `\r\n`. It warns when the mode allows group or other reads. It
@@ -185,6 +197,8 @@ dev-docs/investigations/2026-10-08-stream-zip-spike.md   the findings above, in 
   - Each password source, using `monkeypatch` for `getpass` and the
     environment.
   - Mismatched prompts.
+  - A `GetPassWarning` from `getpass` exits 1 without reading or printing
+    anything.
   - A password file that is readable by others.
   - A typed or supplied password never appears in stdout, stderr or
     exception text, on success or failure. Check this with `capsys`.
@@ -193,8 +207,13 @@ dev-docs/investigations/2026-10-08-stream-zip-spike.md   the findings above, in 
 
 ### Phase 2: Collect
 
-- [ ] Define `FileEntry(src: Path, arcname: str, size: int, mtime: datetime,
-      mode: int, is_dir: bool)` as a frozen dataclass.
+- [ ] Define `FileEntry(root: int, relparts: tuple[str, ...], arcname: str,
+      size: int, mtime: datetime, mode: int, is_dir: bool, dev: int,
+      ino: int)` as a frozen dataclass. `root` indexes a directory descriptor
+      opened once per input with `O_DIRECTORY | O_NOFOLLOW` and held for the
+      run (`SPEC.md` §6.5). File inputs use their parent folder as the root.
+- [ ] Walk with `os.fwalk` from each root descriptor, so the walk never
+      follows a swapped-in symlink.
 - [ ] Map archive paths per `SPEC.md` §6.1. A folder keeps its own name as
       the top level. A file goes to the root. Separators are always `/`.
       Reject `..`, absolute paths and empty components.
@@ -214,7 +233,8 @@ dev-docs/investigations/2026-10-08-stream-zip-spike.md   the findings above, in 
       caught.
 - [ ] Skip the output name, existing part names and `.partial` files when
       the output sits inside an input (see the decisions table).
-- [ ] Clamp timestamps per the decisions table.
+- [ ] Clamp timestamps per the decisions table. Test 2038-01-20 and
+      2107-12-31 explicitly.
 - [ ] Implement `--dry-run` listing of the collected entries. Part grouping
       is added in Phase 4.
 - [ ] Tests:
@@ -229,13 +249,19 @@ dev-docs/investigations/2026-10-08-stream-zip-spike.md   the findings above, in 
 ### Phase 3: Single archive
 
 - [ ] In `write.py`, stream the entries through `stream_zip` with the
-      password and `get_compressobj` set to `--level`:
-  - Files use `ZIP_32`, or `ZIP_64` when the entry's bound or the running
-    offset could pass `0xFFFFFFFF`. Never `ZIP_AUTO` (finding 3).
+      password, `extended_timestamps=False`, and `get_compressobj` returning
+      `zlib.compressobj(level, zlib.DEFLATED, -15, 8)`:
+  - Files use `ZIP_32`, or `ZIP_64` under the rules in `SPEC.md` §6.2
+    (size, offset, the 65,535th entry, central-directory size). Never
+    `ZIP_AUTO` (finding 3).
   - Directories use `NO_COMPRESSION_32(0, 0)` with a trailing `/` in the
     name.
   - Mode bits are `S_IFREG | (st_mode & 0o777)` for files and
     `S_IFDIR | 0o755` for folders.
+- [ ] Open each source per `SPEC.md` §6.5: walk `relparts` from the root
+      descriptor with `os.open(..., dir_fd=…, flags=O_NOFOLLOW)`, then
+      `fstat` and compare device, inode and regular-file type with the
+      record. A mismatch raises `WriteError` (exit 3) naming the file.
 - [ ] Hash each file with SHA-256 and count its bytes while it is read, by
       wrapping the chunk iterator. Keep the hashes in memory for `verify.py`.
 - [ ] If the byte count differs from `FileEntry.size`, raise `WriteError`
@@ -250,11 +276,15 @@ dev-docs/investigations/2026-10-08-stream-zip-spike.md   the findings above, in 
       entry so the HMAC is checked. Compare the SHA-256 of each entry with
       the recorded hash. Check that the set of archive paths equals the
       planned set.
+- [ ] Add the structural check from `SPEC.md` §6.6. Open the part with
+      `zipfile.ZipFile` and compare the entry count, names and
+      `header_offset` values with the offsets the writer recorded.
 - [ ] Add the run-wide cleanup scope now, in `output.py`. It tracks every
       `.partial` this run creates and deletes them on any exception or
       Ctrl-C. Phase 4 extends it to many parts.
-- [ ] Rename `.partial` to the final name only after verification passes.
-      Before `os.replace`, `lstat` the final name and refuse a symlink.
+- [ ] Publish the final name with the no-clobber flow in `SPEC.md` §6.5:
+      `os.link(partial, final)`, then remove the `.partial`. Check hard-link
+      support in the output folder before writing anything.
 - [ ] Tests:
   - A round trip extracts files identical to the inputs. Archive bytes are
     never compared across runs, because AES salts are random.
@@ -264,6 +294,15 @@ dev-docs/investigations/2026-10-08-stream-zip-spike.md   the findings above, in 
   - A file that grows between collect and write fails with exit 3 and leaves
     no `.partial`.
   - A symlink planted at the `.partial` path is not written through.
+  - A regular file replaced by a same-size symlink, or a parent folder
+    swapped for another, between collect and write fails with exit 3.
+  - A file created at the final name after the existing-output check is not
+    overwritten, and the run fails with exit 3.
+  - Truncating the end record, or overwriting the central directory with
+    junk, fails verification.
+  - The deflate bound holds at every level 0–9, for incompressible and
+    empty input, at sizes around 16 KiB and 64 KiB multiples, and with
+    feed sizes from 1 byte to 1 MiB (a `hypothesis` test).
   - A wrong password fails with exit 3.
   - A corrupted byte in the ciphertext fails verification.
   - The output mode is `0600`.
@@ -296,7 +335,8 @@ local parts already written (`written_local`). Two ways to get it:
 - [ ] Implement `local_bound(e)` and `central(e)` in `plan.py` from
       `stream-zip`'s own header structs, for the method the writer will
       choose. Use Zip32 sizes for `ZIP_32` entries and Zip64 sizes for
-      `ZIP_64` entries. Always reserve 98 bytes of end records.
+      `ZIP_64` entries. Use `deflate_bound` from `SPEC.md` §6.2. Always
+      reserve 98 bytes of end records.
 - [ ] Before writing anything, fail with exit 2 if any single entry's
       `local_bound + central + end_records` exceeds `--max-size`. Name the
       file, and suggest the 7-Zip spanned command from `SPEC.md` §2.
@@ -327,6 +367,8 @@ local parts already written (`written_local`). Two ways to get it:
     Multi-gigabyte cases stay in the slow suite.
   - Many small files (5,000 empty files with a 1 MB cap) never exceed the
     cap. This is the central-directory case.
+  - 65,535 and 65,536 empty files in one part both write, verify, and open
+    in `zipfile`. Mark this slow.
   - Highly compressible data fills parts well. A smoke test checks that a
     part is at least 50% full when more files remain.
   - Each part extracts alone.
@@ -335,13 +377,15 @@ local parts already written (`written_local`). Two ways to get it:
 
 ### Phase 5: Safe writes and failure handling
 
-- [ ] Harden the cleanup scope from Phase 3. Cover failures during renames:
-      if a rename fails part-way, delete the parts already renamed by this
-      run as well as the remaining `.partial` files.
+- [ ] Harden the cleanup scope from Phase 3 to cover publication. Without
+      `--force`, a failure part-way removes the final names this run
+      published and the remaining `.partial` files. With `--force`, it also
+      renames every backup back to its original name. Backups are deleted
+      only after every part is published.
 - [ ] Before the first byte is written, check that the output directory
       exists and is writable. Report a full disk (`ENOSPC`) clearly as exit 3.
-- [ ] Implement `--force` and the existing-output warning from the decisions
-      table.
+- [ ] Implement `--force` with the backup flow in `SPEC.md` §6.5, and the
+      existing-output warning from the decisions table.
 - [ ] Implement `--no-verify`, which skips verification but still checks
       sizes against the cap. The generated password still prints, per the
       decisions table.
@@ -351,6 +395,8 @@ local parts already written (`written_local`). Two ways to get it:
   - A failure injected in verification leaves no `.partial` files.
   - A simulated Ctrl-C exits with 130 and leaves no `.partial` files.
   - `--force` overwrites only its own targets.
+  - With `--force`, a failure on the second publication leaves the original
+    outputs byte-identical and removes the backups and new files.
 
 ### Phase 6: Hide names
 
@@ -361,10 +407,14 @@ local parts already written (`written_local`). Two ways to get it:
       `get_compressobj` and the password on the outer call.
 - [ ] Disable extended timestamps on the outer call, so the outer entry
       carries no real time.
-- [ ] Reserve the outer layer in admission (`SPEC.md` §6.7). That is the
-      outer local header, AES overhead, descriptor, central entry and end
-      records, plus 5 bytes per 65,535 bytes of the inner zip's worst-case
-      size. Compute it from the same structs as Phase 4, not a constant.
+- [ ] Reserve the outer layer in admission (`SPEC.md` §6.7). Admit an
+      entry only if `deflate_bound(inner_worst) + outer_fixed ≤ max_size`,
+      where `inner_worst` is the inner zip's written local bytes plus the
+      next entry's local bound, all reserved central entries, and its end
+      records. Compute `outer_fixed` from the same structs as Phase 4.
+- [ ] Extend the structural check to the inner zip. Keep the inner stream's
+      last `sum(central) + 98` bytes in a buffer and parse its central
+      directory and end records.
 - [ ] Verify both layers. Decrypt the outer entry, stream it into
       `stream_unzip` without a password, and check the inner SHA-256 values.
 - [ ] Tests:
@@ -372,7 +422,10 @@ local parts already written (`written_local`). Two ways to get it:
     and also `7zz l` when it is installed.
   - The inner round trip extracts files identical to the inputs.
   - A part filled with incompressible data close to the cap stays under the
-    cap after the outer layer is added.
+    cap after the outer layer is added, for caps exactly at and one byte
+    around the admission threshold.
+  - An empty inner zip (a run of empty folders only) writes and verifies.
+  - A corrupt inner central directory fails verification.
   - No part exceeds the cap.
   - No temp files appear in the output directory or `$TMPDIR` during the run.
 
@@ -381,14 +434,17 @@ local parts already written (`written_local`). Two ways to get it:
 - [ ] Implement `--manifest`. It adds `MANIFEST.txt` inside each part,
       listing every archive path and its part number. With `--manifest`,
       parts are assigned from bounds before writing and never re-split
-      (`SPEC.md` §6.3), so the full manifest is known up front. Reserve its
-      bound in each part's budget. With `--hide-names`, the manifest goes
+      (`SPEC.md` §6.3). Its size is fixed before packing by the zero-padding
+      rule in the decisions table. Reserve its bound in each part's budget. With `--hide-names`, the manifest goes
       inside the inner zip, never the outer one.
+- [ ] Manifest tests: entry counts that cross a digit width (9→10, 99→100),
+      Unicode names, a name that collides with `MANIFEST.txt` after
+      casefolding, and a manifest too large to fit with any entry.
 - [ ] Print progress on stderr only when stderr is a TTY. Print one final
       summary line listing the parts and their sizes.
 - [ ] Write `user-docs/`: quick start, CLI reference, opening archives on
-      each OS, and security notes from `SPEC.md` §7. Add a short root
-      `README.md` that links to them.
+      each OS, and security notes from `SPEC.md` §7. Expand the root
+      `README.md` with install and quick-start steps.
 - [ ] Run the slow tests: a file over 4 GiB (Zip64) and 10,000 small files.
 - [ ] Run the `7zz` interop tests (`brew install sevenzip`). `7zz t` must
       accept every part.
@@ -405,6 +461,11 @@ local parts already written (`written_local`). Two ways to get it:
   were the missing central-directory reservation in admission, `ZIP_AUTO`
   ignoring the compressor and not checking sizes, the outer-layer overhead
   under `--hide-names`, and renaming parts before all of them verified.
+- 2026-10-08, GPT-6.1-Sol low (Codex). Found 4 high and 5 medium issues,
+  all applied the same day: deflate bound, outer-layer bound, no-clobber
+  publication with `--force` backups, source identity checks, Zip64 entry
+  count, structural verification, the 2038 timestamp limit, `getpass` echo
+  fallback, and manifest sizing. Three were confirmed by test.
 - 2026-10-08, StepFun 3.7 Flash (free, via Kilo). The review did not run,
   because the free tier returned a balance error twice.
 
@@ -439,6 +500,7 @@ user decision before the phase listed.
 | Risk | Likelihood | Impact | Mitigation |
 |---|---|---|---|
 | Exact counting (design A) disagrees with real output | med | high | A test compares computed and measured local sizes. Design B is the fallback. The property test gates both. |
+| Hard links are unsupported on the output filesystem (some network or FAT volumes) | low | med | Check before writing and fail with a clear message. A later fallback could use `renameat2`/`renamex_np` no-replace flags. |
 | A `stream-zip` 0.0.x release changes internals that design A relies on | med | med | Pin `<0.1`, commit `uv.lock`, and keep a test that fails loudly if the compressobj contract changes. |
 | Finder or Archive Utility fails on Zip64 or split parts | low | med | Manual check in Phases 3 and 7. Document the fallback to Keka or `tar -xf`. |
 | The password leaks through a traceback | low | high | One top-level handler prints sanitized messages. Tests assert that the password never appears in output. |

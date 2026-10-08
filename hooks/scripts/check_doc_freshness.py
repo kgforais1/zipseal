@@ -34,24 +34,24 @@ ROOT_REQUIRED: set[str] = {"README.md", "AGENTS.md", "SPEC.md", "TODO.md"}
 REQUIRED_FILES: set[str] = {"dev-docs/README.md"}
 
 # ── Exempt path fragments ─────────────────────────────────────────────────────
-EXEMPT_FRAGMENTS = [
-    ".context/",
-    "dev-docs/plans/",
-    "dev-docs/investigations/",
-    "CHANGELOG",
-    "node_modules/",
-    "vendor/",
-    "dist/",
-    "build/",
-]
+# Exemptions match whole path segments or leading path prefixes, never substrings,
+# so "src/rebuild/x.md" or "user-docs/CHANGELOG-notes.md" are not exempt by accident.
+EXEMPT_DIRS = {".context", "node_modules", "vendor", "dist", "build"}
+EXEMPT_PREFIXES = ("dev-docs/plans/", "dev-docs/investigations/")
+EXEMPT_ROOT_FILES = {"CHANGELOG.md", "CHANGELOG.dev.md"}
 
 MARKER_RE = re.compile(r"Last reviewed:\s*(\d{4}-\d{2}-\d{2})", re.IGNORECASE)
 TODAY = date.today()
 
 
 def is_exempt(filepath: str) -> bool:
-    norm = filepath.replace(os.sep, "/")
-    return any(frag in norm for frag in EXEMPT_FRAGMENTS)
+    path = Path(filepath)
+    norm = path.as_posix()
+    if norm in EXEMPT_ROOT_FILES:
+        return True
+    if norm.startswith(EXEMPT_PREFIXES):
+        return True
+    return bool(EXEMPT_DIRS & set(path.parts[:-1]))
 
 
 def is_required(path: Path) -> bool:
@@ -79,29 +79,33 @@ def check(filepath: str) -> tuple[list[str], list[str]]:
         return errors, warnings
 
     try:
-        # Only scan first 2 KB — marker should be near the top
         with open(path, encoding="utf-8", errors="ignore") as fh:
-            head = fh.read(2048)
+            text = fh.read()
     except OSError:
         return errors, warnings
 
-    match = MARKER_RE.search(head)
+    match = MARKER_RE.search(text)
 
     if not match:
         if is_required(path):
             errors.append(
                 f"{filepath}: missing 'Last reviewed: YYYY-MM-DD' marker. "
-                "Required in AGENTS.md, SPEC.md, TODO.md, user-docs/ and dev-docs/README.md."
+                "Required in README.md, AGENTS.md, SPEC.md, TODO.md, user-docs/ "
+                "and dev-docs/README.md."
             )
         return errors, warnings
 
     try:
         reviewed = date.fromisoformat(match.group(1))
     except ValueError:
-        warnings.append(f"{filepath}: unparseable date '{match.group(1)}' in Last reviewed marker.")
+        errors.append(f"{filepath}: unparseable date '{match.group(1)}' in Last reviewed marker.")
         return errors, warnings
 
     age = (TODAY - reviewed).days
+
+    if age < 0:
+        errors.append(f"{filepath}: Last reviewed {reviewed} is in the future.")
+        return errors, warnings
 
     if age > HARD_DAYS:
         errors.append(

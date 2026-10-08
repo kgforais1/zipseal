@@ -64,7 +64,7 @@ zipseal [OPTIONS] PATH [PATH ...] -o OUTPUT
 |---|---|---|
 | `-o, --output PATH` | required | Output name, such as `bundle.zip`. Parts become `bundle-part01-of-03.zip`. |
 | `--max-size SIZE` | none (one zip) | Cap per part. Accepts raw bytes, decimal suffixes `KB`/`MB`/`GB`/`TB` (and bare `K`/`M`/`G`/`T`), or binary suffixes `KiB`/`MiB`/`GiB`/`TiB`. Suffixes are case-insensitive. Anything else is a usage error. |
-| `--password-prompt` | default | Prompt twice with `getpass` and require a match. |
+| `--password-prompt` | default | Prompt twice with `getpass` and require a match. If `getpass` cannot turn off echo, it would fall back to visible input. That warning (`GetPassWarning`) is treated as an error, and the run stops before reading anything. |
 | `--password-env VAR` | — | Read the password from an environment variable. |
 | `--password-file PATH` | — | Read the first line of a file. Warn if the file is group- or world-readable. |
 | `--generate-password` | off | Make a random password with `secrets` (default 24 characters) and print it once to stderr. |
@@ -73,7 +73,7 @@ zipseal [OPTIONS] PATH [PATH ...] -o OUTPUT
 | `--follow-symlinks` | off | By default, symlinks are skipped with a warning. |
 | `--order {path,size}` | `path` | `path` keeps related files together. `size` packs largest-first for fewer parts. |
 | `--hide-names` | off | Nest each part's real zip inside an encrypted outer zip, so names are unreadable without the password (see §6.7). |
-| `--manifest` | off | Add `MANIFEST.txt` inside each part. It lists every file and which part holds it. |
+| `--manifest` | off | Add `MANIFEST.txt` inside each part. It lists every file and which part holds it. Part numbers are zero-padded to the width of the largest possible part count (the number of entries), so the manifest's size is known before packing and is the same in every part. |
 | `--no-verify` | verify on | Skip the post-write decrypt check. |
 | `--force` | off | Overwrite existing output files. |
 | `--dry-run` | off | Print the planned parts and their contents. Write nothing. |
@@ -116,21 +116,42 @@ The compressed size of a file is not known until it has been compressed. The
 tool therefore uses a worst-case bound when it decides where a file goes, and
 it counts the real bytes once the file is written.
 
-Each entry is written with an explicit method. It uses `ZIP_32` unless the
-entry's bound or the part's running offset could pass `0xFFFFFFFF`, in which
-case it uses `ZIP_64`. `ZIP_AUTO` is not used, because it ignores the
-caller's compressor and does not check the size it is given.
+Each entry is written with an explicit method. It uses `ZIP_32` unless one
+of these holds, in which case it uses `ZIP_64`:
+
+- the entry's bound, or the part's running offset plus that bound, could
+  pass `0xFFFFFFFF`;
+- the entry is the part's 65,535th entry or later. With explicit `ZIP_32`,
+  `stream-zip` fails at 65,536 entries. Switching later entries to `ZIP_64`
+  makes it write Zip64 end records instead (tested 2026-10-08);
+- the reserved central directory could pass `0xFFFFFFFF` bytes.
+
+`ZIP_AUTO` is not used, because it ignores the caller's compressor and does
+not check the size it is given.
+
+The compressor is fixed: raw deflate (`wbits=-15`), `memLevel=8`, at the
+chosen level. For that configuration zlib guarantees this bound on the
+compressed size of `n` input bytes, at every level including 0:
+
+```
+deflate_bound(n) = n + (n >> 12) + (n >> 14) + (n >> 25) + 7
+```
+
+Extended timestamps are disabled (`extended_timestamps=False`). `stream-zip`
+packs them as signed 32-bit seconds, which fails after January 2038. Entries
+carry DOS timestamps only, which cover 1980 to 2107 in local time at 2-second
+resolution.
 
 Each entry has two parts to its cost. The local part is written as the entry
 streams. The central part is written only when the part closes:
 
 ```
-local_bound(e) = local_header(e)         # 30 + len(name) + UT extra (9) + AES extra (11)
+local_bound(e) = local_header(e)         # 30 + len(name) + AES extra (11)
                                          #   + Zip64 extra (20) if ZIP_64
                + aes_overhead            # 16 salt + 2 verifier + 10 MAC
-               + deflate_worst(e.size)   # size + 5 bytes per 16 KiB block + 64
+               + deflate_bound(e.size)
                + data_descriptor(e)      # 16, or 24 if ZIP_64
-central(e)     = 46 + len(name) + extra fields   # UT, AES, and Zip64 if needed
+central(e)     = 46 + len(name) + extra fields   # AES, and Zip64 if needed
 end_records    = 98                      # Zip64 end record + locator + EOCD
 ```
 
@@ -188,10 +209,24 @@ delegates that file to `7zz -v`.
 - On any failure, all `.partial` files from the run are deleted.
 - `.partial` files are opened with `O_CREAT | O_EXCL | O_NOFOLLOW`, so a
   planted file or symlink is never written through.
-- A file whose size changes between collection and reading stops the run.
-  The writer counts the bytes it reads and compares them with the collected
-  size.
-- Existing output files are never overwritten without `--force`.
+- A source that changes between collection and reading stops the run.
+  Collection records each file's device, inode, type and size. Reading opens
+  the file relative to a directory descriptor held since collection, one
+  path component at a time with `O_NOFOLLOW`, then checks `fstat` against the
+  record. The writer also counts the bytes it reads. A swapped file, a file
+  replaced by a symlink, a swapped parent folder, or a size change all fail.
+  With `--follow-symlinks`, components may be symlinks, but the identity
+  check still applies.
+- Final names are published without clobbering. Each `.partial` is
+  hard-linked to its final name with `os.link`, which fails if the name
+  exists, and then the `.partial` is removed. A file that appears at a final
+  name during the run is therefore never overwritten. If the filesystem does
+  not support hard links, the run fails with exit 3 before writing.
+- With `--force`, each existing final name is first renamed to a private
+  backup name in the same folder. Then the new part is published. If any
+  step fails, the run removes what it published and restores every backup,
+  so the previous outputs survive. Backups are deleted only after every part
+  is published.
 - Output files are created with mode `0600`.
 
 ### 6.6 Verification
@@ -204,6 +239,16 @@ SHA-256 of each decrypted entry with a SHA-256 taken while the source was
 read. It confirms the
 set of archive paths across all parts equals the planned set. It also checks
 that each part's size on disk is at most `--max-size`.
+
+`stream-unzip` reads only the local entries. It stops at the first
+central-directory signature and ignores everything after it, so an archive
+with a corrupt central directory or end record would still pass. Verification
+therefore also checks the structure itself. It opens each part with the
+standard library's `zipfile`, which parses the end records and central
+directory, and checks that the entry count, names and local-header offsets
+match what the writer recorded. Under `--hide-names` the inner zip is checked
+the same way: verification keeps the inner stream's trailing bytes, which
+hold its central directory and end records, and parses them.
 
 ### 6.7 Hiding file names (`--hide-names`)
 
@@ -235,10 +280,13 @@ bundle-part01-of-03.zip          outer: AES-256, deflate level 0
   temporary unencrypted file is written.
 - **Splitting still works.** Each part gets its own inner zip that holds only
   that part's files. Every part still opens on its own. The size rule in
-  §6.2 must reserve the outer layer. That is the outer local header, central
-  entry, AES fields and end records, about 300 bytes. It also includes level-0
-  block overhead of 5 bytes per 65,535 bytes of inner zip. A 25 MB part needs
-  about 2 KB of outer overhead, not a fixed 200 bytes.
+  §6.2 must reserve the outer layer. The inner zip's worst-case size is its
+  local bounds plus its central entries plus its end records. The outer entry
+  then costs `deflate_bound(inner)` plus the outer local header, AES
+  overhead, data descriptor, central entry and end records. Level 0 does not
+  always fill 65,535-byte blocks, so a fixed per-block figure is not safe.
+  1,000,000 bytes fed in 64 KiB chunks produced 115 bytes of expansion, not
+  80.
 - **Verification checks both layers.** It decrypts the outer zip, opens the
   inner zip from the stream, and checks every inner SHA-256. Inner entries
   are not encrypted, so their CRCs are checked too.

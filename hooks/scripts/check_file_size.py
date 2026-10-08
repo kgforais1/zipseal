@@ -65,25 +65,25 @@ DOC_EXTS = {".md", ".rst", ".txt"}
 OVERRIDE_RE = re.compile(r"policy:file-size\s+allow=(\d+)", re.IGNORECASE)
 
 # ── Ignored path fragments ────────────────────────────────────────────────────
-IGNORE_FRAGMENTS = [
-    "notes_and_ideas/",
-    ".context/",
-    "node_modules/",
-    "__pycache__/",
-    ".git/",
-    "migrations/",
-    "vendor/",
-    "dist/",
-    "build/",
-    ".venv/",
-    "venv/",
-    ".tox/",
-    ".eggs/",
-]
+# Matched against whole directory segments, never substrings, so "src/rebuild/x.py"
+# is still checked.
+IGNORE_DIRS = {
+    ".context",
+    "node_modules",
+    "__pycache__",
+    ".git",
+    "vendor",
+    "dist",
+    "build",
+    ".venv",
+    "venv",
+    ".tox",
+    ".eggs",
+}
 
 
 def is_ignored(path: str) -> bool:
-    return any(frag in path.replace(os.sep, "/") for frag in IGNORE_FRAGMENTS)
+    return bool(IGNORE_DIRS & set(Path(path).parts[:-1]))
 
 
 def read_override(path: Path) -> int | None:

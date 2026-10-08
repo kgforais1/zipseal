@@ -59,7 +59,8 @@ Linked: <TODO item, issue or PR>
 
 ### Completion steps
 
-Do all of these in the commit that finishes the plan:
+Do steps 1–4 and 6 in the commit that finishes the plan. Step 5 is local
+cleanup, because `.context/` is never committed:
 
 1. Set `Status:` to `complete` or `abandoned`.
 2. Move the file to `plans/archive/` with `git mv`. Never delete a plan.
@@ -78,10 +79,12 @@ Stale docs mislead agents more than missing docs do. These rules keep docs
 honest:
 
 - Durable docs carry `Last reviewed: YYYY-MM-DD` near the top. That covers
-  `AGENTS.md`, `SPEC.md`, `TODO.md`, the two `README.md` files in `user-docs/`
-  and `dev-docs/`, and every page in `user-docs/`. The pre-commit hook
-  `check-doc-freshness` blocks a missing marker. It warns after 180 days and
-  blocks after 365.
+  the root `README.md`, `AGENTS.md`, `SPEC.md` and `TODO.md`,
+  `dev-docs/README.md`, and every page in `user-docs/`. This list matches the
+  hook's `ROOT_REQUIRED`, `REQUIRED_FILES` and `REQUIRED_DIRS` sets. Change
+  both together. The pre-commit hook `check-doc-freshness` blocks a missing,
+  malformed or future-dated marker. It warns after 180 days and blocks after
+  365.
 - Bump the date only after re-reading the doc against the current code. The
   date asserts that someone checked.
 - Plans and investigations are dated by their file name and are exempt.
