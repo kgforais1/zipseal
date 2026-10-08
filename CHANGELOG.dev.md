@@ -38,3 +38,8 @@ edits and refactors. User-visible changes go in [`CHANGELOG.md`](CHANGELOG.md).
 - Phase 1 scaffold: `pyproject.toml` (uv, `src/` layout, `zipseal` console
   script), `errors.py`, `sizes.py`, `passwords.py`, the full argparse CLI,
   pytest markers, and a `basedpyright` pre-commit hook. 48 tests.
+- Phase 2 collect: `collect.py` walks inputs through held directory
+  descriptors with `os.fwalk`, records the identity chain of every entry,
+  applies excludes, symlink policies, special-file skips, empty folders,
+  NFC names, casefold collisions, timestamp clamping and output-in-input
+  skipping. `--dry-run` lists entries. 66 tests.

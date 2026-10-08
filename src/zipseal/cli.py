@@ -4,9 +4,10 @@ import argparse
 import sys
 from collections.abc import Sequence
 from pathlib import Path
-from typing import NoReturn
+from typing import NoReturn, TextIO
 
 from zipseal import __version__, passwords
+from zipseal.collect import Collection, collect
 from zipseal.errors import EXIT_INTERRUPT, EXIT_OK, UsageError, ZipsealError
 from zipseal.passwords import Password
 from zipseal.sizes import parse_size
@@ -130,10 +131,27 @@ def get_password(args: argparse.Namespace) -> Password:
     return password
 
 
+def print_dry_run(collection: Collection, out: TextIO) -> None:
+    total = 0
+    for entry in collection.entries:
+        total += entry.size
+        print(f"{entry.size:>14,}  {entry.arcname}", file=out)
+    count = len(collection.entries)
+    print(f"{count:,} entries, {total:,} bytes before compression", file=out)
+
+
 def run(args: argparse.Namespace) -> int:
-    if not args.dry_run:
+    with collect(
+        args.paths,
+        excludes=args.excludes,
+        follow_symlinks=args.follow_symlinks,
+        output=args.output,
+    ) as collection:
+        if args.dry_run:
+            print_dry_run(collection, sys.stdout)
+            return EXIT_OK
         get_password(args)
-    raise UsageError("writing archives is not implemented yet")
+        raise UsageError("writing archives is not implemented yet")
 
 
 def main(argv: Sequence[str] | None = None) -> int:

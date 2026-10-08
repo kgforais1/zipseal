@@ -214,42 +214,42 @@ dev-docs/investigations/2026-10-08-stream-zip-spike.md   the findings above, in 
 
 ### Phase 2: Collect
 
-- [ ] Define `FileEntry(root: int, relparts: tuple[str, ...], arcname: str,
+- [x] Define `FileEntry(root: int, relparts: tuple[str, ...], arcname: str,
       size: int, mtime: datetime, mode: int, is_dir: bool,
       chain: tuple[tuple[int, int], ...])` as a frozen dataclass. `root`
       indexes a directory descriptor opened once per input and held for the
       run. `chain` holds `(st_dev, st_ino)` for every directory between the
       root and the entry, and for the entry itself (`SPEC.md` §6.5). File
       inputs use their parent folder as the root.
-- [ ] Open roots with `O_DIRECTORY`, adding `O_NOFOLLOW` unless
+- [x] Open roots with `O_DIRECTORY`, adding `O_NOFOLLOW` unless
       `--follow-symlinks` is set (the two traversal policies in `SPEC.md`
       §6.5).
-- [ ] Walk with `os.fwalk` from each root descriptor. Pass
+- [x] Walk with `os.fwalk` from each root descriptor. Pass
       `follow_symlinks=True` only under `--follow-symlinks`.
-- [ ] Map archive paths per `SPEC.md` §6.1. A folder keeps its own name as
+- [x] Map archive paths per `SPEC.md` §6.1. A folder keeps its own name as
       the top level. A file goes to the root. Separators are always `/`.
       Reject `..`, absolute paths and empty components.
-- [ ] Apply excludes:
+- [x] Apply excludes:
   - Defaults are `.DS_Store`, `._*` and `Thumbs.db`.
   - `--exclude` is repeatable. A pattern matches the base name, or the full
     archive path if it contains `/`.
   - `--no-default-excludes` turns off the defaults.
-- [ ] Skip symlinks with one warning each, unless `--follow-symlinks` is set.
+- [x] Skip symlinks with one warning each, unless `--follow-symlinks` is set.
       When following, detect directory cycles by `(st_dev, st_ino)` and fail
       with exit 2.
-- [ ] Skip sockets, FIFOs and device files with a warning.
-- [ ] Store empty folders as directory entries.
-- [ ] Detect collisions and fail with exit 2, listing every colliding
+- [x] Skip sockets, FIFOs and device files with a warning.
+- [x] Store empty folders as directory entries.
+- [x] Detect collisions and fail with exit 2, listing every colliding
       archive path and its sources. Also compare the NFC, `casefold()` form,
       so an archive that would collide when extracted on macOS or Windows is
       caught.
-- [ ] Skip the output name, existing part names and `.partial` files when
+- [x] Skip the output name, existing part names and `.partial` files when
       the output sits inside an input (see the decisions table).
-- [ ] Clamp timestamps per the decisions table. Test 2038-01-20 and
+- [x] Clamp timestamps per the decisions table. Test 2038-01-20 and
       2107-12-31 explicitly.
-- [ ] Implement `--dry-run` listing of the collected entries. Part grouping
+- [x] Implement `--dry-run` listing of the collected entries. Part grouping
       is added in Phase 4.
-- [ ] Tests:
+- [x] Tests:
   - Nested trees and mixed file and folder inputs.
   - Excludes and their defaults.
   - Symlink skip and follow, plus a symlink cycle.
