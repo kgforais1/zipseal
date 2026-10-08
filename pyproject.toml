@@ -27,6 +27,7 @@ build-backend = "uv_build"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+pythonpath = ["tests"]
 addopts = "-m 'not slow'"
 markers = [
     "slow: long-running tests (Zip64, huge entry counts). Run with -m slow.",

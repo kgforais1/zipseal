@@ -260,7 +260,7 @@ dev-docs/investigations/2026-10-08-stream-zip-spike.md   the findings above, in 
 
 ### Phase 3: Single archive
 
-- [ ] In `write.py`, stream the entries through `stream_zip` with the
+- [x] In `write.py`, stream the entries through `stream_zip` with the
       password, `extended_timestamps=False`, and `get_compressobj` returning
       `zlib.compressobj(level, zlib.DEFLATED, -15, 8)`:
   - Files use `ZIP_32`, or `ZIP_64` under the rules in `SPEC.md` §6.2
@@ -271,39 +271,43 @@ dev-docs/investigations/2026-10-08-stream-zip-spike.md   the findings above, in 
     framing in `local_bound` and `central`.
   - Mode bits are `S_IFREG | (st_mode & 0o777)` for files and
     `S_IFDIR | 0o755` for folders.
-- [ ] Open each source per `SPEC.md` §6.5. Walk `relparts` from the root
+- [x] Open each source per `SPEC.md` §6.5. Walk `relparts` from the root
       descriptor with `os.open(..., dir_fd=…)`, using `O_NOFOLLOW` under the
       default policy. `fstat` each directory against `chain` before opening
       the next component. Open the leaf with `O_NONBLOCK`, `fstat` it, and
       check it is a regular file with the recorded identity before reading.
       Then clear `O_NONBLOCK`. A mismatch raises `WriteError` (exit 3) naming
       the file.
-- [ ] Hash each file with SHA-256 and count its bytes while it is read, by
+- [x] Hash each file with SHA-256 and count its bytes while it is read, by
       wrapping the chunk iterator. Keep the hashes in memory for `verify.py`.
-- [ ] If the byte count differs from `FileEntry.size`, raise `WriteError`
+- [x] If the byte count differs from `FileEntry.size`, raise `WriteError`
       (exit 3) with a message that names the file. Read at most `size + 1`
       bytes so a growing file cannot run on.
-- [ ] Open output with
+- [x] Open output with
       `os.open(path, O_WRONLY | O_CREAT | O_EXCL | O_NOFOLLOW, 0o600)` under
       the `.partial` name. Call `fsync` before closing.
-- [ ] In `verify.py`, stream the part through `stream_unzip` with the
+- [x] In `verify.py`, stream the part through `stream_unzip` with the
       password as UTF-8 bytes and
       `allowed_encryption_mechanisms` limited to AE-2 AES-256. Drain every
       entry so the HMAC is checked. Compare the SHA-256 of each entry with
       the recorded hash. Check that the set of archive paths equals the
       planned set.
-- [ ] Write `zipcheck.py` per `SPEC.md` §6.6. The writer records name,
+- [x] Write `zipcheck.py` per `SPEC.md` §6.6. Built as a self-consistency
+      check (central entries against the local headers and descriptors on
+      disk) plus the writer's names and sizes, which catches the same
+      mutations without re-deriving every field. `SPEC.md` §6.6 was updated
+      to match. The writer records name,
       method, flags, both sizes, CRC field, AES extra, Zip64 extra and
       local-header offset per entry. `zipcheck` parses the EOCD and any
       Zip64 end record and locator, checks counts and directory bounds, then
       compares every central entry field with the record.
-- [ ] Add the run-wide cleanup scope now, in `output.py`. It tracks every
+- [x] Add the run-wide cleanup scope now, in `output.py`. It tracks every
       `.partial` this run creates and deletes them on any exception or
       Ctrl-C. Phase 4 extends it to many parts.
-- [ ] Publish the final name with the no-clobber flow in `SPEC.md` §6.5:
+- [x] Publish the final name with the no-clobber flow in `SPEC.md` §6.5:
       `os.link(partial, final)`, then remove the `.partial`. Check hard-link
       support in the output folder before writing anything.
-- [ ] Tests:
+- [x] Tests:
   - A round trip extracts files identical to the inputs. Archive bytes are
     never compared across runs, because AES salts are random.
   - A non-ASCII password round-trips through `stream-zip` and
@@ -337,6 +341,9 @@ dev-docs/investigations/2026-10-08-stream-zip-spike.md   the findings above, in 
   - An existing output without `--force` fails with exit 3.
 - [ ] Manual check: the archive opens in Keka and in Finder (Archive Utility)
       on macOS 26. Record the result in the Phase 3 commit message.
+      Blocked: needs a person at the GUI. `tar -xf --passphrase`
+      (libarchive) extraction is automated in `test_single_archive.py`,
+      including non-ASCII passwords.
 
 ### Phase 4: Split
 

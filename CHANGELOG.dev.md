@@ -43,3 +43,8 @@ edits and refactors. User-visible changes go in [`CHANGELOG.md`](CHANGELOG.md).
   applies excludes, symlink policies, special-file skips, empty folders,
   NFC names, casefold collisions, timestamp clamping and output-in-input
   skipping. `--dry-run` lists entries. 66 tests.
+- Phase 3 single archive: `plan.py` bounds (framing measured against
+  stream-zip in tests), `sources.py` descriptor-based reads with identity
+  checks, `write.py`, `verify.py`, `zipcheck.py` structural verification,
+  and `output.py` no-clobber publication with `--force` backups. Fixed
+  non-ASCII passwords, which stream-zip encodes as Latin-1. 110 tests.

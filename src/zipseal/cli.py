@@ -10,6 +10,7 @@ from zipseal import __version__, passwords
 from zipseal.collect import Collection, collect
 from zipseal.errors import EXIT_INTERRUPT, EXIT_OK, UsageError, ZipsealError
 from zipseal.passwords import Password
+from zipseal.pipeline import write_archive
 from zipseal.sizes import parse_size
 
 DEFAULT_EXCLUDES = (".DS_Store", "._*", "Thumbs.db")
@@ -150,8 +151,10 @@ def run(args: argparse.Namespace) -> int:
         if args.dry_run:
             print_dry_run(collection, sys.stdout)
             return EXIT_OK
-        get_password(args)
-        raise UsageError("writing archives is not implemented yet")
+        results = write_archive(args, collection, get_password)
+        for r in results:
+            print(f"zipseal: wrote {r.path} ({r.size:,} bytes)", file=sys.stderr)
+        return EXIT_OK
 
 
 def main(argv: Sequence[str] | None = None) -> int:

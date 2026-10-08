@@ -260,14 +260,18 @@ that each part's size on disk is at most `--max-size`.
 central-directory signature and ignores everything after it, so an archive
 with a corrupt central directory or end record would still pass. Verification
 therefore also checks the structure itself, with its own small parser in
-`zipcheck.py`. The writer records, for every entry, its name, method,
-general-purpose flags, compressed and uncompressed sizes, CRC field, AES
-extra field, Zip64 extra field and local-header offset. The parser reads the
-end of central directory record, and the Zip64 end record and locator when
-present. It checks that their entry counts agree, and that the central
-directory's offset and size lie inside the file and end exactly where the
-end records begin. It then parses every central entry and compares every
-recorded field. Any difference fails verification.
+`zipcheck.py`. The parser reads the end of central directory record, and the
+Zip64 end record and locator when present. It checks that their entry counts
+agree, and that the central directory ends exactly where the end records
+begin. It then parses every central entry and checks it against the file
+itself. The local header at the recorded offset must have the same name,
+flags, method and AES field. The data descriptor after the data must have
+the same CRC and sizes. Entries must be contiguous, from offset 0 to the
+start of the central directory. Every entry must be AE-2 AES-256 with a zero
+CRC. Finally, the list of names and uncompressed sizes must equal what the
+writer recorded. Any difference fails verification. Checking the central
+directory against the bytes on disk catches the same corruption as
+predicting every field, without duplicating stream-zip's layout logic.
 
 The standard library's `zipfile` is not enough on its own. It accepts a
 central entry whose sizes or CRC were changed. Tests still use it as an
@@ -358,7 +362,10 @@ breaks the result for the recipient unless they also run a restore step.
   `--no-verify`) and just before publication. A run that fails earlier
   prints no password. If publication then fails and rolls back, the run
   says that no archive was written.
-- **Password handling.** Passwords are encoded as UTF-8. Generated passwords
+- **Password handling.** Passwords are encoded as UTF-8, as 7-Zip and
+  libarchive expect. `stream-zip` hands a `str` password to pycryptodome,
+  which encodes it as Latin-1, so zipseal passes the UTF-8 bytes decoded as
+  Latin-1. Without that, non-ASCII passwords would not open elsewhere. Generated passwords
   use only ASCII letters and digits. A non-ASCII password, or one shorter
   than 12 characters, prints a warning. An empty password is an error.
 

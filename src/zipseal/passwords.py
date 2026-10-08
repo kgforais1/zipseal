@@ -37,6 +37,15 @@ class Password:
     def encode(self) -> bytes:
         return self.value.encode("utf-8")
 
+    def for_stream_zip(self) -> str:
+        """The password as stream-zip needs it, so the key is derived from UTF-8 bytes.
+
+        stream-zip passes a str to pycryptodome, which encodes it as Latin-1. Decoding
+        the UTF-8 bytes as Latin-1 makes that round trip produce the UTF-8 bytes, which
+        is what 7-Zip and libarchive use.
+        """
+        return self.encode().decode("latin-1")
+
 
 def generate() -> Password:
     value = "".join(secrets.choice(GENERATED_ALPHABET) for _ in range(GENERATED_LENGTH))

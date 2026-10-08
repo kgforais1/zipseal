@@ -123,10 +123,39 @@ def test_cli_never_prints_supplied_password(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
     monkeypatch.setenv("ZS_PW", SECRET)
-    code = cli.main([str(tmp_path), "-o", str(tmp_path / "out.zip"), "--password-env", "ZS_PW"])
+    (tmp_path / "in").mkdir()
+    (tmp_path / "in/a.txt").write_text("x")
+    code = cli.main(
+        [str(tmp_path / "in"), "-o", str(tmp_path / "out.zip"), "--password-env", "ZS_PW"]
+    )
     out, err = capsys.readouterr()
-    assert code != 0  # writing is not implemented yet; this path must still be clean
+    assert code == 0
     assert SECRET not in out and SECRET not in err
+
+
+def test_cli_generated_password_printed_once(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    (tmp_path / "in").mkdir()
+    (tmp_path / "in/a.txt").write_text("x")
+    code = cli.main([str(tmp_path / "in"), "-o", str(tmp_path / "out.zip"), "--generate-password"])
+    out, err = capsys.readouterr()
+    assert code == 0
+    lines = [ln for ln in err.splitlines() if "generated password" in ln]
+    assert len(lines) == 1
+    assert lines[0].split(": ")[-1] not in out
+
+
+def test_cli_generated_password_not_printed_on_failure(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    (tmp_path / "in").mkdir()
+    (tmp_path / "in/a.txt").write_text("x")
+    (tmp_path / "out.zip").write_text("exists")
+    code = cli.main([str(tmp_path / "in"), "-o", str(tmp_path / "out.zip"), "--generate-password"])
+    _, err = capsys.readouterr()
+    assert code == 3
+    assert "generated password" not in err
 
 
 def test_cli_failure_never_prints_password(
