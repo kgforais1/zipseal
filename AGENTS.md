@@ -1,23 +1,28 @@
 # AGENTS.md
 
+Last reviewed: 2026-10-08
+
 Single source of truth for AI coding agents in this repository. `CLAUDE.md` is a
 thin pointer back here.
 
 `zipseal` is a Python CLI that writes files and folders into AES-256 encrypted
 zips. It can split output into self-contained parts that each stay under a size
-cap. The design and the implementation plan both live in [`SPEC.md`](SPEC.md).
+cap. The design lives in [`SPEC.md`](SPEC.md).
 
 ## Status
 
-Nothing is implemented yet. Work follows the steps in `SPEC.md` §8, in order.
-Resolve or record the open questions in §9 before the step they affect.
+Nothing is implemented yet. Work follows
+[`dev-docs/plans/2026-10-08-v1-implementation.md`](dev-docs/plans/2026-10-08-v1-implementation.md),
+which expands `SPEC.md` §8.
 
 ## Read this first
 
 | If you are… | Read |
 |---|---|
-| Implementing a feature | `SPEC.md` §4–§6 for behavior, §8 for order and tests |
+| Implementing a feature | `SPEC.md` §4–§6 for behavior, then the active plan for order and tests |
 | Touching passwords, encryption, or file writes | `SPEC.md` §6.5–§6.7 and §7, then the security rules below |
+| Starting or finishing a plan, or logging done work | [`dev-docs/README.md`](dev-docs/README.md) |
+| Picking the next task | [`TODO.md`](TODO.md) and the active plan in `dev-docs/plans/` |
 | Resuming someone else's work | `.context/handoff.md`, if present |
 
 ## Commands
@@ -37,11 +42,17 @@ Run `pre-commit install` once per clone to enable the git hook.
 ## Layout
 
 ```
-SPEC.md               design and implementation plan
+SPEC.md               design; the source of truth for behavior
+TODO.md               future work only; never records finished work
+CHANGELOG.md          finished user-visible work
+CHANGELOG.dev.md      finished internal work (harness, hooks, CI, tests)
 src/zipseal/          cli, collect, plan, write, verify (see SPEC.md §5)
 tests/                pytest; fixtures are generated in tmp_path
+user-docs/            docs for people who run zipseal or open its archives
+dev-docs/plans/       active plans; finished ones move to plans/archive/
+dev-docs/investigations/  dated research and spike write-ups
 hooks/scripts/        repo policy checks run by pre-commit
-.context/             scratch plans and handoffs (gitignored)
+.context/             scratch and handoffs (gitignored)
 ```
 
 ## Security rules
@@ -64,11 +75,17 @@ These rules are the point of the tool. Treat a violation as a bug.
 - Python 3.11+, `ruff` for lint and format (config in `ruff.toml`).
 - Keep source files under 600 lines. `hooks/scripts/check_file_size.py` warns at
   600 and blocks at 1000.
-- Every behavior in `SPEC.md` §8's test list gets a pytest test. Mark slow
+- Every behavior in the plan's test list gets a pytest test. Mark slow
   tests with `@pytest.mark.slow`. Skip `7zz` tests when the binary is missing.
 - If code and `SPEC.md` disagree, fix one of them in the same change. Do not
   leave the spec stale.
-- Record user-facing changes in `CHANGELOG.md` under `[Unreleased]`.
+- Follow the plan lifecycle and doc gardening rules in
+  [`dev-docs/README.md`](dev-docs/README.md). In short: tick a plan box only
+  when the task is verified, archive finished plans, delete finished items
+  from `TODO.md`, and log the work in `CHANGELOG.md` (user-visible) or
+  `CHANGELOG.dev.md` (internal).
+- Update `SPEC.md`, `AGENTS.md` and `user-docs/` in the same commit as the
+  behavior change they describe.
 - Use Conventional Commit prefixes (`feat:`, `fix:`, `docs:`, `chore:`, `test:`).
 
 ## Agent tooling policy

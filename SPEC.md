@@ -1,6 +1,7 @@
 # zipseal — plan and design specification
 
 Status: draft, 2026-10-07. Nothing is implemented yet.
+Last reviewed: 2026-10-08
 
 `zipseal` is a CLI that takes files and folders and writes them into one
 password-protected zip, or into several zips that each stay under a size cap.
@@ -231,6 +232,10 @@ breaks the result for the recipient unless they also run a restore step.
   with AES-256.
 
 ## 8. Implementation plan
+
+The detailed, tracked version of this plan is
+[`dev-docs/plans/2026-10-08-v1-implementation.md`](dev-docs/plans/2026-10-08-v1-implementation.md).
+This section is the summary.
 
 1. **Scaffold.** Add `pyproject.toml` with `stream-zip`, `stream-unzip` and
    `pytest`. Add the `cli.py` skeleton, password acquisition and size parsing.

@@ -11,6 +11,18 @@ repos:
         language: system
         types: [file]
 
+      - id: check-doc-freshness
+        name: "policy: doc freshness"
+        entry: python3 hooks/scripts/check_doc_freshness.py
+        language: system
+        types: [markdown]
+
+      - id: check-todo-limits
+        name: "policy: TODO size"
+        entry: python3 hooks/scripts/check_todo_limits.py
+        language: system
+        files: '^TODO\.md$'
+
   - repo: https://github.com/gitleaks/gitleaks
     rev: v8.30.0
     hooks:
