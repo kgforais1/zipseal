@@ -80,7 +80,7 @@ def main() -> None:
     run("1-single")
     run("2-split", "--max-size", MAX_SIZE, "--manifest")
     run("3-hidden", "--max-size", MAX_SIZE, "--hide-names")
-    print(f"Samples are in {ROOT}. Password: {PASSWORD}")
+    print(f"Samples are in {ROOT}. The password is in dev-docs/README.md.")
 
 
 if __name__ == "__main__":
