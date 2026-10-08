@@ -3,8 +3,8 @@
 check_todo_limits.py — pre-commit hook for living TODO / to_do backlog size.
 
 Enforces soft/hard line caps on repo backlog files (see
-policies/plans-and-todos.md). Does not scan inline TODO comments in source;
-use prompts/todo-plan-audit.md for those.
+dev-docs/README.md). Does not scan inline TODO comments in source;
+the gardening pass in dev-docs/README.md covers those.
 
 Usage:
   python hooks/scripts/check_todo_limits.py [file ...]

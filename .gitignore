@@ -10,9 +10,11 @@
 # Never commit archives, partial writes, or real input data. Tests generate
 # their fixtures in pytest's tmp_path.
 *.zip
+*.ZIP
 *.7z
+*.7z.[0-9][0-9][0-9]
+*.zip.[0-9][0-9][0-9]
 *.z[0-9][0-9]
-*.[0-9][0-9][0-9]
 *.partial
 sample-data/
 scratch/

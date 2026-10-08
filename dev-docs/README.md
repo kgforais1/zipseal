@@ -69,7 +69,8 @@ Do all of these in the commit that finishes the plan:
 6. Update `SPEC.md` if the built behavior differs from it.
 
 Keep each plan under about 600 lines. Split a larger effort into phased plans
-that link to each other.
+that link to each other. The file-size hook only warns at 1,000 lines for
+docs, so this limit is a convention, not a gate.
 
 ## Doc gardening
 

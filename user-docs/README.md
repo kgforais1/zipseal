@@ -5,7 +5,7 @@ Last reviewed: 2026-10-08
 This folder holds documentation for people who run `zipseal` or receive its
 archives. Nothing is here yet, because nothing is implemented.
 
-Planned pages, written during step 6 of the v1 plan:
+Planned pages, written in Phase 7 of the v1 plan:
 
 - Install and quick start.
 - CLI reference, generated from or checked against `zipseal --help`.

@@ -63,7 +63,7 @@ zipseal [OPTIONS] PATH [PATH ...] -o OUTPUT
 | Option | Default | Meaning |
 |---|---|---|
 | `-o, --output PATH` | required | Output name, such as `bundle.zip`. Parts become `bundle-part01-of-03.zip`. |
-| `--max-size SIZE` | none (one zip) | Cap per part. Accepts `25MB`, `10MiB`, `2G`, or raw bytes. |
+| `--max-size SIZE` | none (one zip) | Cap per part. Accepts raw bytes, decimal suffixes `KB`/`MB`/`GB`/`TB` (and bare `K`/`M`/`G`/`T`), or binary suffixes `KiB`/`MiB`/`GiB`/`TiB`. Suffixes are case-insensitive. Anything else is a usage error. |
 | `--password-prompt` | default | Prompt twice with `getpass` and require a match. |
 | `--password-env VAR` | — | Read the password from an environment variable. |
 | `--password-file PATH` | — | Read the first line of a file. Warn if the file is group- or world-readable. |
@@ -116,22 +116,41 @@ The compressed size of a file is not known until it has been compressed. The
 tool therefore uses a worst-case bound when it decides where a file goes, and
 it counts the real bytes once the file is written.
 
-For each entry, the bound is:
+Each entry is written with an explicit method. It uses `ZIP_32` unless the
+entry's bound or the part's running offset could pass `0xFFFFFFFF`, in which
+case it uses `ZIP_64`. `ZIP_AUTO` is not used, because it ignores the
+caller's compressor and does not check the size it is given.
+
+Each entry has two parts to its cost. The local part is written as the entry
+streams. The central part is written only when the part closes:
 
 ```
-bound(e) = deflate_worst(e.size)   # size + 5 bytes per 16 KiB block + 64
-         + local_header(e)         # 30 + len(name) + Zip64/AES extra fields
-         + aes_overhead            # 16 salt + 2 verifier + 10 MAC
-         + data_descriptor         # 24 with Zip64
-         + central_entry(e)        # 46 + len(name) + extra fields
+local_bound(e) = local_header(e)         # 30 + len(name) + UT extra (9) + AES extra (11)
+                                         #   + Zip64 extra (20) if ZIP_64
+               + aes_overhead            # 16 salt + 2 verifier + 10 MAC
+               + deflate_worst(e.size)   # size + 5 bytes per 16 KiB block + 64
+               + data_descriptor(e)      # 16, or 24 if ZIP_64
+central(e)     = 46 + len(name) + extra fields   # UT, AES, and Zip64 if needed
+end_records    = 98                      # Zip64 end record + locator + EOCD
 ```
 
 The writer admits the next entry into the current part only if
-`bytes_written_so_far + bound(next) + end_of_central_dir ≤ max_size`.
-Otherwise it closes the part and starts a new one.
+
+```
+written_local + local_bound(next)
+  + sum(central(e) for every admitted entry, plus next)
+  + end_records  ≤  max_size
+```
+
+`written_local` is the exact byte count of the local parts already written.
+The central entries of every admitted entry are reserved, because none of
+them has been written yet. The end records are always reserved at their
+Zip64 size, which wastes at most 76 bytes but covers parts with more than
+65,535 entries. If the entry does not fit, the writer closes the part and
+starts a new one.
 
 This guarantees no part ever exceeds the cap. The only slack is the gap
-between the last file's bound and its real size. Already-compressed inputs
+between each file's bound and its real size. Already-compressed inputs
 (JPEG, MP4, other zips) have almost no gap. Text can leave a part partly
 unfilled. That is acceptable for v1. A later `--tight` mode could compress
 each file to a temporary file first and use its exact size.
@@ -148,6 +167,12 @@ first-fit-decreasing and usually produces fewer parts, but it scatters
 related files. Both orders are deterministic, so the same input gives the
 same split.
 
+`--order path` assigns parts while streaming, using real compressed sizes.
+`--order size` and `--manifest` instead assign every entry to a part from
+bounds alone, before anything is written, and never re-split. First-fit
+needs to see all parts at once, and a manifest must list every part before
+part 1 is written. Packing is looser in those modes.
+
 ### 6.4 Files larger than the cap
 
 In v1, any single file whose bound exceeds `--max-size` stops the run before
@@ -157,15 +182,26 @@ delegates that file to `7zz -v`.
 
 ### 6.5 Safe writes
 
-- Each part is written as `NAME.partial` and renamed only after it verifies.
+- Each part is written under a `.partial` name. No part is renamed until
+  every part has been written and verified. Then all parts are renamed, in
+  order. A failure therefore never leaves a final-named part behind.
 - On any failure, all `.partial` files from the run are deleted.
+- `.partial` files are opened with `O_CREAT | O_EXCL | O_NOFOLLOW`, so a
+  planted file or symlink is never written through.
+- A file whose size changes between collection and reading stops the run.
+  The writer counts the bytes it reads and compares them with the collected
+  size.
 - Existing output files are never overwritten without `--force`.
 - Output files are created with mode `0600`.
 
 ### 6.6 Verification
 
 After all parts are written, `verify.py` reopens each one with the password.
-It decrypts every entry, checks the CRC and the AES MAC, and confirms the
+It allows only AE-2 AES-256 entries, so a ZipCrypto or AE-1 entry fails.
+AE-2 stores a CRC of zero, so integrity comes from the AES HMAC, which
+`stream-unzip` checks as it decrypts. Verification also compares the
+SHA-256 of each decrypted entry with a SHA-256 taken while the source was
+read. It confirms the
 set of archive paths across all parts equals the planned set. It also checks
 that each part's size on disk is at most `--max-size`.
 
@@ -176,7 +212,7 @@ plaintext headers. Anyone can list them without the password. `--hide-names`
 fixes this by nesting:
 
 ```
-bundle-part01-of-03.zip          outer: AES-256, stored (no compression)
+bundle-part01-of-03.zip          outer: AES-256, deflate level 0
 └── payload.zip                  one entry with a fixed, generic name
     ├── reports/q3.xlsx          inner: deflate, no encryption
     └── reports/notes.txt
@@ -185,8 +221,12 @@ bundle-part01-of-03.zip          outer: AES-256, stored (no compression)
 - **The inner zip is not encrypted.** The outer AES layer already protects
   it. A second password, or the same password twice, adds no real security.
   It would only make the recipient type a password twice.
-- **The outer zip stores without compression.** The inner zip is already
-  compressed, so compressing again wastes time.
+- **The outer zip uses deflate level 0.** The inner zip is already
+  compressed, so compressing again wastes time. A truly stored entry is not
+  possible, because `stream-zip` needs a stored entry's size and CRC before
+  it starts, and the inner zip is still being generated. Level 0 emits
+  stored deflate blocks instead and needs neither value. The outer entry
+  uses `ZIP_32`, or `ZIP_64` if the worst-case part could pass 4 GiB.
 - **The outer entry hides its metadata.** Its name is always `payload.zip`.
   Its timestamp is fixed at 1980-01-01, so it does not reveal when the files
   were made.
@@ -195,10 +235,13 @@ bundle-part01-of-03.zip          outer: AES-256, stored (no compression)
   temporary unencrypted file is written.
 - **Splitting still works.** Each part gets its own inner zip that holds only
   that part's files. Every part still opens on its own. The size rule in
-  §6.2 adds a fixed outer overhead (one local header, one central entry, AES
-  fields and end record), about 200 bytes per part.
+  §6.2 must reserve the outer layer. That is the outer local header, central
+  entry, AES fields and end records, about 300 bytes. It also includes level-0
+  block overhead of 5 bytes per 65,535 bytes of inner zip. A 25 MB part needs
+  about 2 KB of outer overhead, not a fixed 200 bytes.
 - **Verification checks both layers.** It decrypts the outer zip, opens the
-  inner zip from the stream, and checks every inner CRC.
+  inner zip from the stream, and checks every inner SHA-256. Inner entries
+  are not encrypted, so their CRCs are checked too.
 
 An outside observer still sees each part's total size, the part count, and
 the file's own timestamp on disk. Nothing else leaks.
@@ -226,8 +269,14 @@ breaks the result for the recipient unless they also run a restore step.
   AES zips.
 - Windows Explorer support for AES zips is unreliable, so recommend 7-Zip on
   Windows.
-- Strength depends on the password. Recommend `--generate-password`, and
-  send the password through a different channel than the zip.
+- Strength depends on the password. AE-2 derives keys with
+  PBKDF2-HMAC-SHA1 at only 1,000 iterations, so a weak password falls quickly
+  to offline guessing. Recommend `--generate-password`, and send the password
+  through a different channel than the zip.
+- `--password-env` keeps the value off the command line. Other processes of
+  the same user can still read a process's environment, so prefer the prompt
+  or a `0600` password file on shared machines.
+- Python cannot reliably wipe a password from memory. It lives for the run.
 - All parts share one password. That is a convenience trade-off and is fine
   with AES-256.
 
@@ -251,7 +300,9 @@ This section is the summary.
 
 Tests (pytest, using generated temporary files):
 
-- A round trip of mixed files and nested folders gives byte-identical output.
+- A round trip of mixed files and nested folders extracts files identical to
+  the inputs. The archives themselves differ on every run, because AES salts
+  are random.
 - Random incompressible data at caps of 1 MB, 5 MB and 25 MB never produces a
   part over the cap.
 - Every part opens on its own, without the other parts.
@@ -261,7 +312,7 @@ Tests (pytest, using generated temporary files):
 - Unicode file names, empty files, empty folders and a file over 4 GiB
   (Zip64) all work. Mark the 4 GiB test slow.
 - With `--hide-names`, `7zz l` on a part lists only `payload.zip`. The inner
-  round trip is also byte-identical, and no part exceeds the cap.
+  round trip also extracts identical files, and no part exceeds the cap.
 - `7zz t -p…` accepts every part. Skip this test if `7zz` is not installed.
 
 ## 9. Open questions

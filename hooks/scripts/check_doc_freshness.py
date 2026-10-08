@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-check_doc_freshness.py — pre-commit hook enforcing policies/doc-freshness.md.
+check_doc_freshness.py — pre-commit hook enforcing the doc gardening rules in dev-docs/README.md.
 
 Checks that markdown docs in policy-required paths carry a valid
 "Last reviewed: YYYY-MM-DD" marker that is not past the staleness window.
@@ -91,7 +91,7 @@ def check(filepath: str) -> tuple[list[str], list[str]]:
         if is_required(path):
             errors.append(
                 f"{filepath}: missing 'Last reviewed: YYYY-MM-DD' marker. "
-                "Required in policies/, templates/, inventory/, and root agent docs."
+                "Required in AGENTS.md, SPEC.md, TODO.md, user-docs/ and dev-docs/README.md."
             )
         return errors, warnings
 

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-check_file_size.py — pre-commit hook enforcing policies/file-size-and-counts.md.
+check_file_size.py — pre-commit hook enforcing the file-size rule in AGENTS.md.
 
 Usage (pre-commit wires this automatically):
   python hooks/scripts/check_file_size.py [file ...]
