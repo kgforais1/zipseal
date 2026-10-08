@@ -46,7 +46,9 @@ def repo_root(explicit: str | None) -> Path:
         )
         return Path(out.stdout.strip()).resolve()
     except (subprocess.CalledProcessError, FileNotFoundError):
-        return Path.cwd().resolve()
+        # Fail closed: outside a git work tree this gate cannot vouch for anything.
+        print("[gate] ERROR not inside a git repository (or git is missing)", file=sys.stderr)
+        sys.exit(2)
 
 
 def glob_to_regex(pattern: str) -> re.Pattern[str]:
@@ -98,8 +100,10 @@ def tracked_files(root: Path) -> list[str]:
             text=True,
             check=True,
         )
-    except (subprocess.CalledProcessError, FileNotFoundError):
-        return []
+    except (subprocess.CalledProcessError, FileNotFoundError) as exc:
+        # Fail closed: an unreadable index must not look like "nothing is tracked".
+        print(f"[forbidden-paths] ERROR cannot list tracked files: {exc}", file=sys.stderr)
+        sys.exit(2)
     return [line for line in out.stdout.splitlines() if line]
 
 

@@ -44,7 +44,9 @@ def repo_root(explicit: str | None) -> Path:
         )
         return Path(out.stdout.strip()).resolve()
     except (subprocess.CalledProcessError, FileNotFoundError):
-        return Path.cwd().resolve()
+        # Fail closed: outside a git work tree this gate cannot vouch for anything.
+        print("[gate] ERROR not inside a git repository (or git is missing)", file=sys.stderr)
+        sys.exit(2)
 
 
 def read_patterns(path: Path) -> list[str]:

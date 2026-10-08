@@ -4,7 +4,8 @@
 Usage (pre-commit passes staged files):
   python3 hooks/scripts/check_personal_data.py FILE...
 
-Allowed: GitHub noreply addresses, example.com/example.org addresses, and the
+Allowed: GitHub noreply addresses, example.com/example.org addresses,
+noreply@anthropic.com (used in Co-Authored-By trailers), and the
 placeholder home paths /Users/you and /home/you. A line can opt out with the
 comment `personal-data:allow` plus a reason. Exit 1 on any finding.
 """
@@ -17,7 +18,9 @@ from pathlib import Path
 
 HOME_PATH = re.compile(r"(?:/Users/|/home/|[A-Za-z]:\\\\?Users\\\\?)(?!you\b)([A-Za-z0-9._-]+)")
 EMAIL = re.compile(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}")
-ALLOWED_EMAIL = re.compile(r"(@users\.noreply\.github\.com|@example\.(com|org)|@anthropic\.com)$")
+ALLOWED_EMAIL = re.compile(
+    r"(@users\.noreply\.github\.com|@example\.(com|org)|^noreply@anthropic\.com)$"
+)
 OPT_OUT = "personal-data:allow"
 SKIP = {"uv.lock"}
 

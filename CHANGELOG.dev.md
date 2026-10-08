@@ -67,3 +67,4 @@ edits and refactors. User-visible changes go in [`CHANGELOG.md`](CHANGELOG.md).
 - Data hooks for publishing safely: forbidden tracked paths, protected `.gitignore` rules, and a home-path and email scan.
 - MIT license. GitHub Actions CI: pre-commit hooks, tests on Linux and macOS with Python 3.11 and 3.13 (including 7-Zip and bsdtar interop), and a pip-audit dependency audit. Dependabot for uv and Actions.
 - Applied the GLM 5.3 review of PR #1: see the plan's review log. 159 tests.
+- Applied the kg-pr-review (DeepSeek) review of PR #1: the data hooks now fail closed outside a git repository, and only `noreply@anthropic.com` is allowlisted, not the whole domain.
