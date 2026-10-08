@@ -15,6 +15,33 @@ from zipseal.sizes import parse_size
 
 DEFAULT_EXCLUDES = (".DS_Store", "._*", "Thumbs.db")
 
+EPILOG = """\
+examples:
+  zipseal reports/ notes.txt -o bundle.zip --generate-password
+  zipseal reports/ -o bundle.zip --max-size 20MB          # parts for email
+  zipseal reports/ -o bundle.zip --max-size 20MB --hide-names
+  zipseal reports/ -o bundle.zip --max-size 20MB --dry-run
+
+passwords:
+  There is no option that takes the password itself, because it would end up
+  in shell history and the process list. Without a password option, zipseal
+  prompts twice. Send the password through a different channel than the zip.
+
+output:
+  One part keeps the -o name. Several are named NAME-partNN-of-MM.zip, and
+  each one opens on its own. Existing files are never overwritten without
+  --force. Every part is verified before it gets its final name.
+
+opening the archives:
+  Finder (macOS 11+), 7-Zip, Keka, or `tar -xf FILE --passphrase PW`.
+  macOS /usr/bin/unzip cannot open AES zips. With --hide-names, open the part
+  with the password, then open payload.zip inside it.
+
+exit codes:
+  0 success, 1 usage error, 2 input error (missing path, name collision,
+  file too large for --max-size), 3 write or verify failure, 130 interrupted.
+"""
+
 
 class _Parser(argparse.ArgumentParser):
     """Report usage errors with exit 1 (SPEC.md §4), not argparse's default 2."""
@@ -37,6 +64,8 @@ def build_parser() -> argparse.ArgumentParser:
             "Write files and folders into AES-256 encrypted zips, optionally split "
             "into self-contained parts that each stay under a size cap."
         ),
+        epilog=EPILOG,
+        formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     parser.add_argument("paths", metavar="PATH", nargs="+", type=Path, help="files or folders")
     parser.add_argument(
@@ -46,7 +75,7 @@ def build_parser() -> argparse.ArgumentParser:
         "--max-size",
         type=_size,
         metavar="SIZE",
-        help="cap per part, such as 25MB, 10MiB, 2G or plain bytes",
+        help="cap per part: plain bytes, KB/MB/GB/TB (powers of 10) or KiB/MiB/GiB/TiB",
     )
 
     pw = parser.add_mutually_exclusive_group()
@@ -78,7 +107,7 @@ def build_parser() -> argparse.ArgumentParser:
         action="append",
         default=[],
         metavar="GLOB",
-        help="skip matching files; repeatable",
+        help="skip names matching GLOB (or archive paths, if GLOB has a /); repeatable",
     )
     parser.add_argument(
         "--no-default-excludes",
@@ -97,15 +126,21 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--hide-names",
         action="store_true",
-        help="nest each part inside an encrypted outer zip so names are hidden",
+        help="hide file names, sizes and dates: each part holds one encrypted payload.zip",
     )
     parser.add_argument(
         "--manifest", action="store_true", help="add MANIFEST.txt listing every part's files"
     )
     parser.add_argument(
-        "--no-verify", action="store_true", help="skip the decrypt check after writing"
+        "--no-verify",
+        action="store_true",
+        help="skip decrypting each part after writing (the size cap is still checked)",
     )
-    parser.add_argument("--force", action="store_true", help="replace existing output files")
+    parser.add_argument(
+        "--force",
+        action="store_true",
+        help="replace existing outputs; they are restored if the run fails",
+    )
     parser.add_argument(
         "--dry-run", action="store_true", help="show the planned parts and write nothing"
     )
