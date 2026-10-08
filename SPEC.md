@@ -77,7 +77,6 @@ zipseal [OPTIONS] PATH [PATH ...] -o OUTPUT
 | `--no-verify` | verify on | Skip the post-write decrypt check. |
 | `--force` | off | Overwrite existing output files. |
 | `--dry-run` | off | Print the planned parts and their contents. Write nothing. |
-| `--legacy-zipcrypto` | off | Use ZipCrypto for old unzip tools. Prints a loud warning. Needs `pyzipper`. Probably defer past v1. |
 
 There is deliberately no `--password VALUE` flag. A value on the command line
 lands in shell history and is visible to other users through `ps`.
@@ -332,6 +331,37 @@ burden on Mac recipients. It remains a reasonable later `--format 7z` backend. N
 keeps the tool pure Python. Renaming files to random IDs was rejected. It
 breaks the result for the recipient unless they also run a restore step.
 
+### 6.8 Other behavior
+
+- **Part names.** A run that produces one part writes exactly the `-o`
+  name, even with `--max-size`. Two or more parts are named
+  `NAME-partNN-of-MM.zip`, with three digits when there are more than 99.
+- **Existing outputs.** Before writing, the run fails with exit 3 if the
+  `-o` name exists, or any file named `NAME-part` + digits + `-of-` +
+  digits + `.zip`. `--force` lifts this, and replaces only the names this run
+  produces (§6.5). Other old parts are listed in a warning, never deleted.
+- **Output inside an input.** The walker skips the output name, any
+  existing part name for it, and `.partial` files.
+- **Dry run.** `--dry-run` needs no password. It plans from worst-case
+  bounds, so it reports "at most N parts".
+- **Timestamps.** DOS timestamps in local time are clamped to 1980-01-01
+  00:00:00 through 2107-12-31 23:59:58, with one warning per clamped file.
+- **File names.** Names that do not decode as UTF-8 stop the run with exit 2.
+  Archive paths are normalized to NFC. Two paths that are equal after
+  `str.casefold()` are a collision, because they would clash when extracted
+  on macOS or Windows.
+- **Manifest collision.** If an input already maps to `MANIFEST.txt` at the
+  archive root, `--manifest` fails with exit 2.
+- **Interrupt.** Ctrl-C removes this run's `.partial` files and exits 130.
+- **Generated password.** `--generate-password` prints the password once,
+  to stderr, after every part has verified (or passed the size check under
+  `--no-verify`) and just before publication. A run that fails earlier
+  prints no password. If publication then fails and rolls back, the run
+  says that no archive was written.
+- **Password handling.** Passwords are encoded as UTF-8. Generated passwords
+  use only ASCII letters and digits. A non-ASCII password, or one shorter
+  than 12 characters, prints a warning. An empty password is an error.
+
 ## 7. Security notes for the README
 
 - AES-256 (WinZip AE-2) protects file contents. It does **not** hide file
@@ -393,12 +423,14 @@ Tests (pytest, using generated temporary files):
 
 ## 9. Open questions
 
-- Should a single file over the cap be split with 7-Zip in v1, or stay an
-  error?
-- Is `--legacy-zipcrypto` needed for any real recipient?
-- Should the manifest live inside each part (private) or beside the parts
-  (readable without the password, but it leaks names)? The draft puts it
-  inside.
+These were decided on 2026-10-08 by adopting the plan's recommendations.
+Reopen one if a real recipient needs something else.
+
+- A single file over the cap stays an error in v1, with a 7-Zip hint (§6.4).
+- There is no `--legacy-zipcrypto` in v1. ZipCrypto is broken, and no
+  recipient has needed it yet.
+- The manifest lives only inside the parts. A manifest beside the parts
+  would leak the names that `--hide-names` hides.
 
 ## 10. References
 

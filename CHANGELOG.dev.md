@@ -35,3 +35,6 @@ edits and refactors. User-visible changes go in [`CHANGELOG.md`](CHANGELOG.md).
   and an empty-part pre-check. The TODO hook now checks `TODO.md` when run
   without arguments, and the freshness hook rejects trailing junk after the
   date.
+- Phase 1 scaffold: `pyproject.toml` (uv, `src/` layout, `zipseal` console
+  script), `errors.py`, `sizes.py`, `passwords.py`, the full argparse CLI,
+  pytest markers, and a `basedpyright` pre-commit hook. 48 tests.

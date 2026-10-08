@@ -1,0 +1,39 @@
+[project]
+name = "zipseal"
+version = "0.0.0"
+description = "Write files and folders into AES-256 zips, optionally split into self-contained parts under a size cap."
+authors = [
+    { name = "kgrizz-git", email = "216068303+kgrizz-git@users.noreply.github.com" }
+]
+requires-python = ">=3.11"
+dependencies = [
+    "stream-zip>=0.0.84,<0.1",
+    "stream-unzip>=0.0.101,<0.1",
+]
+
+[project.scripts]
+zipseal = "zipseal.cli:main"
+
+[dependency-groups]
+dev = [
+    "pytest>=8",
+    "hypothesis>=6",
+    "basedpyright>=1.20",
+]
+
+[build-system]
+requires = ["uv_build>=0.12.10,<0.13.0"]
+build-backend = "uv_build"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-m 'not slow'"
+markers = [
+    "slow: long-running tests (Zip64, huge entry counts). Run with -m slow.",
+    "sevenzip: needs the 7zz binary; skipped when it is missing.",
+]
+
+[tool.basedpyright]
+typeCheckingMode = "standard"
+include = ["src", "tests"]
+pythonVersion = "3.11"

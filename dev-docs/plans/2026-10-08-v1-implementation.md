@@ -1,7 +1,7 @@
 # Plan: zipseal v1 implementation
 
 Date: 2026-10-08
-Status: draft
+Status: in-progress
 Linked: `TODO.md` → "Implement v1"; design in [`SPEC.md`](../../SPEC.md)
 
 ## Goal
@@ -131,7 +131,8 @@ uv.lock                 committed lockfile
 .python-version         3.12 for development; requires-python >=3.11
 src/zipseal/__init__.py version string
 src/zipseal/__main__.py python -m zipseal
-src/zipseal/cli.py      argparse, password sources, exit codes, error printing
+src/zipseal/cli.py      argparse, exit codes, error printing
+src/zipseal/passwords.py password sources; Password hides its value from repr()
 src/zipseal/sizes.py    parse "25MB" / "10MiB" / "2G" / raw bytes
 src/zipseal/collect.py  FileEntry, walk, excludes, symlinks, collisions
 src/zipseal/plan.py     bound(), part assignment for path and size order
@@ -157,33 +158,33 @@ dev-docs/investigations/2026-10-08-stream-zip-spike.md   the findings above, in 
 
 ### Phase 1: Scaffold
 
-- [ ] Run `uv init --package --lib`, then trim it to the layout above. Add a
+- [x] Run `uv init --package --lib`, then trim it to the layout above. Add a
       `zipseal = "zipseal.cli:main"` console script.
-- [ ] Add runtime deps `stream-zip` and `stream-unzip`. Add dev deps `pytest`,
+- [x] Add runtime deps `stream-zip` and `stream-unzip`. Add dev deps `pytest`,
       `hypothesis` and `basedpyright`.
-- [ ] Configure pytest with a `slow` marker that is skipped unless `-m slow`
+- [x] Configure pytest with a `slow` marker that is skipped unless `-m slow`
       is passed, and a `sevenzip` marker that skips when `7zz` is missing.
-- [ ] Add `basedpyright` to `.pre-commit-config.yaml` as a local hook running
+- [x] Add `basedpyright` to `.pre-commit-config.yaml` as a local hook running
       `uv run basedpyright` with `pass_filenames: false` and
       `files: ^(src|tests)/`, so it always checks the whole package.
-- [ ] Copy the decisions-table rows that are not yet in `SPEC.md` into the
+- [x] Copy the decisions-table rows that are not yet in `SPEC.md` into the
       relevant sections: single-part naming, output inside an input,
       `--force` scope, the existing-output check, `--dry-run` part count,
       timestamp clamping, undecodable names, interrupt, generated password
       timing, case-insensitive collisions, the `MANIFEST.txt` collision, and
       password encoding and storage. Size suffixes, manifest padding and the
       `getpass` fallback are already in the spec.
-- [ ] Write `errors.py`. `UsageError` maps to exit 1, `InputError` to 2,
+- [x] Write `errors.py`. `UsageError` maps to exit 1, `InputError` to 2,
       `WriteError` and `VerifyError` to 3, and `KeyboardInterrupt` to 130.
-- [ ] Write `sizes.py` per `SPEC.md` §4. `KB`/`MB`/`GB`/`TB` and bare
+- [x] Write `sizes.py` per `SPEC.md` §4. `KB`/`MB`/`GB`/`TB` and bare
       `K`/`M`/`G`/`T` are powers of 10. `KiB`/`MiB`/`GiB`/`TiB` are powers of
       2. Suffixes are case-insensitive. Bare numbers are bytes. Reject
       unknown suffixes, trailing junk, zero, negatives and fractions of a
       byte.
-- [ ] Write the argparse skeleton in `cli.py` with every `SPEC.md` §4 option
+- [x] Write the argparse skeleton in `cli.py` with every `SPEC.md` §4 option
       except `--legacy-zipcrypto`. The password options form a mutually
       exclusive group.
-- [ ] Implement the password sources:
+- [x] Implement the password sources:
   - `--password-prompt`, the default, asks twice with `getpass` and requires
     a match. With no TTY on stdin it fails with exit 1 and suggests
     `--password-env` or `--password-file`. Turn `getpass.GetPassWarning`
@@ -196,9 +197,9 @@ dev-docs/investigations/2026-10-08-stream-zip-spike.md   the findings above, in 
   - `--generate-password` produces 24 characters from `secrets.choice` over
     ASCII letters and digits. It prints at the moment given in the decisions
     table.
-- [ ] Reject an empty password. Warn when a typed password is shorter than
+- [x] Reject an empty password. Warn when a typed password is shorter than
       12 characters.
-- [ ] Tests:
+- [x] Tests:
   - Size parsing, valid and invalid.
   - Each password source, using `monkeypatch` for `getpass` and the
     environment.
@@ -526,17 +527,12 @@ The plan is complete when all of these hold:
 
 ## Open questions
 
-These come from `SPEC.md` §9, with a recommendation for each. They need a
-user decision before the phase listed.
+All three were decided on 2026-10-08 by adopting the recommendations. They
+are recorded in `SPEC.md` §9.
 
-- [ ] Should a file over the cap be split with 7-Zip in v1? The
-      recommendation is no. Keep it an error with a 7-Zip hint, as §6.4
-      says. Needed before Phase 4.
-- [ ] Is `--legacy-zipcrypto` needed? The recommendation is no. Drop it from
-      the v1 help text. Needed before Phase 1.
-- [ ] Should the manifest live inside or beside the parts? The
-      recommendation is inside only. A manifest beside the parts leaks the
-      names that `--hide-names` exists to hide. Needed before Phase 7.
+- [x] A file over the cap stays an error with a 7-Zip hint.
+- [x] No `--legacy-zipcrypto` in v1.
+- [x] The manifest lives inside the parts only.
 
 ## Risks
 
