@@ -339,11 +339,9 @@ dev-docs/investigations/2026-10-08-stream-zip-spike.md   the findings above, in 
   - A corrupted byte in the ciphertext fails verification.
   - The output mode is `0600`.
   - An existing output without `--force` fails with exit 3.
-- [ ] Manual check: the archive opens in Keka and in Finder (Archive Utility)
-      on macOS 26. Record the result in the Phase 3 commit message.
-      Blocked: needs a person at the GUI. `tar -xf --passphrase`
-      (libarchive) extraction is automated in `test_single_archive.py`,
-      including non-ASCII passwords.
+- [x] Manual check: the archive opens in Keka and in Finder (Archive Utility)
+      on macOS 26. Done 2026-10-08 by the user on single, split and
+      `--hide-names` samples. Both extracted correctly.
 
 ### Phase 4: Split
 
@@ -496,8 +494,8 @@ local parts already written (`written_local`). Two ways to get it:
       passed (single archive, non-ASCII password, wrong password, every split
       part alone, `--hide-names` listing and nested extraction, and 65,536
       entries in the slow suite).
-- [ ] Manual checks: split output opens in Keka and in Finder, and on
-      Windows with 7-Zip if a machine is available. Record the results.
+- [x] Manual checks: split output opens in Keka and in Finder. Done
+      2026-10-08 by the user. Windows was not tested.
 - [ ] Set the version to `0.1.0`. Move the `CHANGELOG.md` entries to
       `[0.1.0]` and tag `v0.1.0`.
 - [ ] Run the completion steps in `dev-docs/README.md`.

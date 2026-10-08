@@ -19,6 +19,14 @@ Each part holds one file, `payload.zip`. Open the part with the password,
 then open `payload.zip`, which needs no password. Any zip tool can open
 `payload.zip`, including Finder and `unzip`.
 
+Tools differ in what you see:
+
+- **Finder** (Archive Utility) expands `payload.zip` automatically, so you
+  get the files directly. On the very first open it may briefly show an
+  error and then extract correctly.
+- **Keka** and **7-Zip** extract `payload.zip` and stop. Open it as a
+  second step.
+
 ## Non-ASCII passwords
 
 zipseal derives keys from the UTF-8 bytes of the password, as 7-Zip and
