@@ -13,8 +13,8 @@ cap. The design lives in [`SPEC.md`](SPEC.md).
 
 v1 is implemented on the `feat/v1` branch, following
 [`dev-docs/plans/2026-10-08-v1-implementation.md`](dev-docs/plans/2026-10-08-v1-implementation.md).
-The plan's unticked boxes list what remains: manual and 7-Zip interop
-checks, and the `0.1.0` release.
+The plan's unticked boxes list what remains: the manual Finder and Keka
+check, and the `0.1.0` release.
 
 ## Read this first
 

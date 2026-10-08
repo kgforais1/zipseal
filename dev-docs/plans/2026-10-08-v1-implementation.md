@@ -491,9 +491,11 @@ local parts already written (`written_local`). Two ways to get it:
       `README.md` with install and quick-start steps.
 - [x] Run the slow tests: a file over 4 GiB (Zip64) and 10,000 small files.
       All 9 slow tests passed on macOS on 2026-10-08.
-- [ ] Run the `7zz` interop tests (`brew install sevenzip`). `7zz t` must
-      accept every part. Blocked: `7zz` is not installed on the build
-      machine, and no `sevenzip`-marked tests exist yet.
+- [x] Run the `7zz` interop tests (`brew install sevenzip`). `7zz t` must
+      accept every part. 7-Zip 26.04 on 2026-10-08: `tests/test_sevenzip.py`
+      passed (single archive, non-ASCII password, wrong password, every split
+      part alone, `--hide-names` listing and nested extraction, and 65,536
+      entries in the slow suite).
 - [ ] Manual checks: split output opens in Keka and in Finder, and on
       Windows with 7-Zip if a machine is available. Record the results.
 - [ ] Set the version to `0.1.0`. Move the `CHANGELOG.md` entries to

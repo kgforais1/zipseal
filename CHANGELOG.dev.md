@@ -63,3 +63,4 @@ edits and refactors. User-visible changes go in [`CHANGELOG.md`](CHANGELOG.md).
 - Phase 7 (partial): progress lines on a TTY, user docs (quick start, CLI
   reference, opening archives, security), root README, and slow tests for a
   file over 4 GiB and 10,000 small files.
+- 7-Zip interop tests (`tests/test_sevenzip.py`), run against 7-Zip 26.04.
