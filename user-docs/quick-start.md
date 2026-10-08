@@ -7,13 +7,11 @@ Last reviewed: 2026-10-08
 zipseal needs Python 3.11 or later and [`uv`](https://docs.astral.sh/uv/).
 
 ```sh
-git clone https://github.com/kgrizz-git/zipseal.git
-cd zipseal
-uv tool install .
+uv tool install git+https://github.com/kgforais1/zipseal.git
 ```
 
-This puts `zipseal` on your `PATH`. To run it without installing, use
-`uv run zipseal …` inside the repository.
+This puts `zipseal` on your `PATH`. From a clone, `uv tool install .` does
+the same, and `uv run zipseal …` runs it without installing.
 
 ## Make one encrypted zip
 
