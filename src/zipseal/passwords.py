@@ -87,8 +87,8 @@ def from_file(path: Path, warn: TextIO | None = None) -> Password:
     """Read the first line, without its line ending. Warn if others can read the file."""
     warn = warn or sys.stderr
     try:
-        mode = path.stat().st_mode
         with path.open(encoding="utf-8", newline="") as fh:
+            mode = os.fstat(fh.fileno()).st_mode  # the file actually read, not a re-lookup
             line = fh.readline()
     except (OSError, UnicodeDecodeError) as exc:
         reason = exc.strerror if isinstance(exc, OSError) else "not valid UTF-8"
