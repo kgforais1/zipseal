@@ -1,6 +1,6 @@
 [project]
 name = "zipseal"
-version = "0.0.0"
+version = "0.1.0"
 description = "Write files and folders into AES-256 zips, optionally split into self-contained parts under a size cap."
 authors = [
     { name = "kgrizz-git", email = "216068303+kgrizz-git@users.noreply.github.com" }

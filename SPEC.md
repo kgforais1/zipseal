@@ -1,6 +1,6 @@
 # zipseal — plan and design specification
 
-Status: implemented on branch `feat/v1`, 2026-10-08. Drafted 2026-10-07.
+Status: implemented and released as v0.1.0, 2026-10-08. Drafted 2026-10-07.
 Last reviewed: 2026-10-08
 
 `zipseal` is a CLI that takes files and folders and writes them into one
@@ -404,7 +404,7 @@ breaks the result for the recipient unless they also run a restore step.
 ## 8. Implementation plan
 
 The detailed, tracked version of this plan is
-[`dev-docs/plans/2026-10-08-v1-implementation.md`](dev-docs/plans/2026-10-08-v1-implementation.md).
+[`dev-docs/plans/archive/2026-10-08-v1-implementation.md`](dev-docs/plans/archive/2026-10-08-v1-implementation.md).
 This section is the summary.
 
 1. **Scaffold.** Add `pyproject.toml` with `stream-zip`, `stream-unzip` and

@@ -1,7 +1,7 @@
 # Investigation: part admission design
 
 Date: 2026-10-08
-Feeds: [`../plans/2026-10-08-v1-implementation.md`](../plans/2026-10-08-v1-implementation.md) Phase 4, `SPEC.md` §6.2
+Feeds: [`../plans/archive/2026-10-08-v1-implementation.md`](../plans/archive/2026-10-08-v1-implementation.md) Phase 4, `SPEC.md` §6.2
 
 ## Decision
 

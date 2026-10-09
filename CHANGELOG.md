@@ -6,6 +6,8 @@ All notable user-facing changes are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.1.0] - 2026-10-08
+
 ### Added
 
 - `zipseal PATH... -o OUT.zip` writes one AES-256 (WinZip AE-2) zip,

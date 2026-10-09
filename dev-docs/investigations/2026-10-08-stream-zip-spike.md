@@ -2,7 +2,7 @@
 
 Date: 2026-10-08
 Versions: `stream-zip` 0.0.84, `stream-unzip` 0.0.101, Python 3.12 via `uvx`
-Feeds: [`../plans/2026-10-08-v1-implementation.md`](../plans/2026-10-08-v1-implementation.md), `SPEC.md` §6.2, §6.6, §6.7
+Feeds: [`../plans/archive/2026-10-08-v1-implementation.md`](../plans/archive/2026-10-08-v1-implementation.md), `SPEC.md` §6.2, §6.6, §6.7
 
 ## Question
 

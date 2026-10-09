@@ -1,8 +1,8 @@
 # Plan: zipseal v1 implementation
 
 Date: 2026-10-08
-Status: in-progress
-Linked: `TODO.md` → "Implement v1"; design in [`SPEC.md`](../../SPEC.md)
+Status: complete
+Linked: `TODO.md` → "Implement v1"; design in [`SPEC.md`](../../../SPEC.md)
 
 ## Goal
 
@@ -24,7 +24,7 @@ someone can install with `uv tool install`.
 A spike on 2026-10-08 against `stream-zip` 0.0.84 and `stream-unzip` 0.0.101,
 and a Grok 4.7 review the same day, found the problems below. `SPEC.md` was
 corrected on 2026-10-08. Full evidence is in
-[`../investigations/2026-10-08-stream-zip-spike.md`](../investigations/2026-10-08-stream-zip-spike.md).
+[`../investigations/2026-10-08-stream-zip-spike.md`](../../investigations/2026-10-08-stream-zip-spike.md).
 
 1. **AE-2 entries carry no CRC.** `stream-zip` writes AES entries with vendor
    version 2 (AE-2), strength 3 (AES-256), method 99, and a CRC field of 0.
@@ -496,9 +496,9 @@ local parts already written (`written_local`). Two ways to get it:
       entries in the slow suite).
 - [x] Manual checks: split output opens in Keka and in Finder. Done
       2026-10-08 by the user. Windows was not tested.
-- [ ] Set the version to `0.1.0`. Move the `CHANGELOG.md` entries to
+- [x] Set the version to `0.1.0`. Move the `CHANGELOG.md` entries to
       `[0.1.0]` and tag `v0.1.0`.
-- [ ] Run the completion steps in `dev-docs/README.md`.
+- [x] Run the completion steps in `dev-docs/README.md`.
 
 ## Review log
 
@@ -534,13 +534,13 @@ local parts already written (`written_local`). Two ways to get it:
 
 The plan is complete when all of these hold:
 
-- [ ] `uv run pytest` passes, and `uv run pytest -m slow` passes once on macOS.
-- [ ] `pre-commit run --all-files` passes, including `basedpyright`.
-- [ ] Every test listed in `SPEC.md` §8 has a matching test, or a recorded
+- [x] `uv run pytest` passes, and `uv run pytest -m slow` passes once on macOS.
+- [x] `pre-commit run --all-files` passes, including `basedpyright`.
+- [x] Every test listed in `SPEC.md` §8 has a matching test, or a recorded
       reason why it changed.
-- [ ] `uv tool install .` puts a working `zipseal` on the PATH.
-- [ ] The manual Keka, Finder and 7-Zip checks are recorded.
-- [ ] `SPEC.md` matches the built behavior.
+- [x] `uv tool install .` puts a working `zipseal` on the PATH.
+- [x] The manual Keka, Finder and 7-Zip checks are recorded.
+- [x] `SPEC.md` matches the built behavior.
 
 ## Open questions
 
@@ -565,4 +565,4 @@ are recorded in `SPEC.md` §9.
 
 ## Completion steps
 
-Follow the lifecycle in [`dev-docs/README.md`](../README.md#completion-steps).
+Follow the lifecycle in [`dev-docs/README.md`](../../README.md#completion-steps).

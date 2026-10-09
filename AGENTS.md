@@ -11,9 +11,9 @@ cap. The design lives in [`SPEC.md`](SPEC.md).
 
 ## Status
 
-v1 is implemented on the `feat/v1` branch, following
-[`dev-docs/plans/2026-10-08-v1-implementation.md`](dev-docs/plans/2026-10-08-v1-implementation.md).
-What remains is the `0.1.0` release and the merge to `main`.
+v0.1.0 is released. The v1 plan is complete and archived in
+[`dev-docs/plans/archive/`](dev-docs/plans/archive/). Future work is in
+[`TODO.md`](TODO.md).
 
 ## Read this first
 
