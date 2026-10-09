@@ -26,6 +26,7 @@ Protect `.forbidden-paths` with CODEOWNERS. See policies/sensitive-data-scan-gat
 from __future__ import annotations
 
 import argparse
+import os
 import re
 import subprocess
 import sys
@@ -97,7 +98,6 @@ def tracked_files(root: Path) -> list[str]:
         out = subprocess.run(
             ["git", "-C", str(root), "ls-files", "-z"],
             capture_output=True,
-            text=True,
             check=True,
         )
     except (subprocess.CalledProcessError, FileNotFoundError) as exc:
@@ -105,7 +105,8 @@ def tracked_files(root: Path) -> list[str]:
         print(f"[forbidden-paths] ERROR cannot list tracked files: {exc}", file=sys.stderr)
         sys.exit(2)
     # -z gives raw paths; without it git quotes non-ASCII names and patterns miss them.
-    return [path for path in out.stdout.split("\0") if path]
+    # Decode like the filesystem does, so a non-UTF-8 name is checked, not a crash.
+    return [os.fsdecode(raw) for raw in out.stdout.split(b"\0") if raw]
 
 
 def main(argv: list[str] | None = None) -> int:

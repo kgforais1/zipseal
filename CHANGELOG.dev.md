@@ -69,3 +69,4 @@ edits and refactors. User-visible changes go in [`CHANGELOG.md`](CHANGELOG.md).
 - Applied the GLM 5.3 review of PR #1: see the plan's review log. 159 tests.
 - Applied the kg-pr-review (DeepSeek) review of PR #1: the data hooks now fail closed outside a git repository, and only `noreply@anthropic.com` is allowlisted, not the whole domain.
 - Applied the CodeRabbit review of PR #1: Actions pinned to commit SHAs (checkout v7.0.1, setup-uv v10.2.0), NUL-delimited `git ls-files` in the forbidden-paths hook, file-versus-folder collision detection, part numbers wide enough to sort past 999 parts, safer sample cleanup, and docs that no longer put the password on a `tar` command line.
+- Applied the second CodeRabbit review: `persist-credentials: false` on every checkout, and the forbidden-paths hook decodes `git ls-files -z` output like the filesystem, so non-UTF-8 names are checked instead of crashing it.
