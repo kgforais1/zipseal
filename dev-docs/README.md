@@ -95,6 +95,28 @@ honest:
   `TODO`/`FIXME` comments. Run `uvx vulture src` and `uvx deptry .` for dead
   code and unused dependencies.
 
+## Manual testing with sample archives
+
+The automated tests cover behavior. For checking archives by hand in Finder,
+Keka or 7-Zip, rebuild the local samples:
+
+```sh
+uv run python scripts/make_samples.py
+```
+
+It writes to `sample-data/`, which is gitignored:
+
+| Path | Holds |
+|---|---|
+| `input/` | Synthetic inputs (noise PNGs that open as images, text, a Unicode name, an empty folder). Files you add here yourself are kept. |
+| `1-single/` | One zip. |
+| `2-split/` | Parts under 5 MB, each with `MANIFEST.txt`. |
+| `3-hidden/` | Parts under 5 MB made with `--hide-names`. |
+
+The password for every sample is `zipseal-sample-123`. Never commit anything
+from `sample-data/`: the archives are build output, and inputs you add may be
+personal files.
+
 ## Hooks that enforce this
 
 | Hook | Script | Rule |
@@ -102,3 +124,7 @@ honest:
 | `check-doc-freshness` | `hooks/scripts/check_doc_freshness.py` | `Last reviewed` marker present and recent |
 | `check-todo-limits` | `hooks/scripts/check_todo_limits.py` | `TODO.md` warns at 150 lines, blocks at 300 |
 | `check-file-size` | `hooks/scripts/check_file_size.py` | Source warns at 600 lines, blocks at 1000 |
+| `check-forbidden-paths` | `hooks/scripts/check_forbidden_paths.py` | No tracked file may match `.forbidden-paths` (archives, images, documents, `sample-data/`, secrets), even if force-added |
+| `check-gitignore-protected` | `hooks/scripts/check_gitignore_protected.py` | Every rule in `.gitignore-protected` must stay in `.gitignore` |
+| `check-personal-data` | `hooks/scripts/check_personal_data.py` | No home-folder paths or real email addresses in text files. Opt a line out with `personal-data:allow: <reason>` |
+| `gitleaks` | upstream hook | No secrets |

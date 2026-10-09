@@ -1,0 +1,14 @@
+# Each line must stay verbatim in .gitignore (hooks/scripts/check_gitignore_protected.py).
+.context/
+sample-data/
+*.zip
+*.ZIP
+*.7z
+*.partial
+.env
+.envrc
+*.pass
+*.password
+password*.txt
+*.pem
+*.key

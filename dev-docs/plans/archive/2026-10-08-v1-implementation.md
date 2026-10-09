@@ -1,8 +1,8 @@
 # Plan: zipseal v1 implementation
 
 Date: 2026-10-08
-Status: draft
-Linked: `TODO.md` → "Implement v1"; design in [`SPEC.md`](../../SPEC.md)
+Status: complete
+Linked: `TODO.md` → "Implement v1"; design in [`SPEC.md`](../../../SPEC.md)
 
 ## Goal
 
@@ -24,7 +24,7 @@ someone can install with `uv tool install`.
 A spike on 2026-10-08 against `stream-zip` 0.0.84 and `stream-unzip` 0.0.101,
 and a Grok 4.7 review the same day, found the problems below. `SPEC.md` was
 corrected on 2026-10-08. Full evidence is in
-[`../investigations/2026-10-08-stream-zip-spike.md`](../investigations/2026-10-08-stream-zip-spike.md).
+[`../investigations/2026-10-08-stream-zip-spike.md`](../../investigations/2026-10-08-stream-zip-spike.md).
 
 1. **AE-2 entries carry no CRC.** `stream-zip` writes AES entries with vendor
    version 2 (AE-2), strength 3 (AES-256), method 99, and a CRC field of 0.
@@ -106,7 +106,7 @@ These fill gaps in `SPEC.md`. Phase 1 copies each one into the spec.
 
 | Topic | Decision |
 |---|---|
-| Single-part naming | If the run produces one part, it is named exactly `-o`, for example `bundle.zip`, even when `--max-size` is set. Two or more parts are named `bundle-partNN-of-MM.zip`. Use three-digit `NNN` when there are more than 99 parts. |
+| Single-part naming | If the run produces one part, it is named exactly `-o`, for example `bundle.zip`, even when `--max-size` is set. Two or more parts are named `bundle-partNN-of-MM.zip`. Part numbers use as many digits as the count needs, at least two. |
 | Output inside an input | If the output path is inside an input folder, the walker skips the output name, any existing part name for it (same pattern as the existing-output check), and `*.partial` files. |
 | `--force` scope | `--force` replaces only the exact file names this run produces, using the backup-and-restore flow in `SPEC.md` §6.5. Other files that look like old parts are listed as a warning, never deleted. |
 | Existing-output check | Before writing, the run fails with exit 3 if `bundle.zip` exists, or any file matching `bundle-part` + digits + `-of-` + digits + `.zip`, unless `--force` is set. Other names are never matched. |
@@ -131,7 +131,8 @@ uv.lock                 committed lockfile
 .python-version         3.12 for development; requires-python >=3.11
 src/zipseal/__init__.py version string
 src/zipseal/__main__.py python -m zipseal
-src/zipseal/cli.py      argparse, password sources, exit codes, error printing
+src/zipseal/cli.py      argparse, exit codes, error printing
+src/zipseal/passwords.py password sources; Password hides its value from repr()
 src/zipseal/sizes.py    parse "25MB" / "10MiB" / "2G" / raw bytes
 src/zipseal/collect.py  FileEntry, walk, excludes, symlinks, collisions
 src/zipseal/plan.py     bound(), part assignment for path and size order
@@ -157,33 +158,33 @@ dev-docs/investigations/2026-10-08-stream-zip-spike.md   the findings above, in 
 
 ### Phase 1: Scaffold
 
-- [ ] Run `uv init --package --lib`, then trim it to the layout above. Add a
+- [x] Run `uv init --package --lib`, then trim it to the layout above. Add a
       `zipseal = "zipseal.cli:main"` console script.
-- [ ] Add runtime deps `stream-zip` and `stream-unzip`. Add dev deps `pytest`,
+- [x] Add runtime deps `stream-zip` and `stream-unzip`. Add dev deps `pytest`,
       `hypothesis` and `basedpyright`.
-- [ ] Configure pytest with a `slow` marker that is skipped unless `-m slow`
+- [x] Configure pytest with a `slow` marker that is skipped unless `-m slow`
       is passed, and a `sevenzip` marker that skips when `7zz` is missing.
-- [ ] Add `basedpyright` to `.pre-commit-config.yaml` as a local hook running
+- [x] Add `basedpyright` to `.pre-commit-config.yaml` as a local hook running
       `uv run basedpyright` with `pass_filenames: false` and
       `files: ^(src|tests)/`, so it always checks the whole package.
-- [ ] Copy the decisions-table rows that are not yet in `SPEC.md` into the
+- [x] Copy the decisions-table rows that are not yet in `SPEC.md` into the
       relevant sections: single-part naming, output inside an input,
       `--force` scope, the existing-output check, `--dry-run` part count,
       timestamp clamping, undecodable names, interrupt, generated password
       timing, case-insensitive collisions, the `MANIFEST.txt` collision, and
       password encoding and storage. Size suffixes, manifest padding and the
       `getpass` fallback are already in the spec.
-- [ ] Write `errors.py`. `UsageError` maps to exit 1, `InputError` to 2,
+- [x] Write `errors.py`. `UsageError` maps to exit 1, `InputError` to 2,
       `WriteError` and `VerifyError` to 3, and `KeyboardInterrupt` to 130.
-- [ ] Write `sizes.py` per `SPEC.md` §4. `KB`/`MB`/`GB`/`TB` and bare
+- [x] Write `sizes.py` per `SPEC.md` §4. `KB`/`MB`/`GB`/`TB` and bare
       `K`/`M`/`G`/`T` are powers of 10. `KiB`/`MiB`/`GiB`/`TiB` are powers of
       2. Suffixes are case-insensitive. Bare numbers are bytes. Reject
       unknown suffixes, trailing junk, zero, negatives and fractions of a
       byte.
-- [ ] Write the argparse skeleton in `cli.py` with every `SPEC.md` §4 option
+- [x] Write the argparse skeleton in `cli.py` with every `SPEC.md` §4 option
       except `--legacy-zipcrypto`. The password options form a mutually
       exclusive group.
-- [ ] Implement the password sources:
+- [x] Implement the password sources:
   - `--password-prompt`, the default, asks twice with `getpass` and requires
     a match. With no TTY on stdin it fails with exit 1 and suggests
     `--password-env` or `--password-file`. Turn `getpass.GetPassWarning`
@@ -196,9 +197,9 @@ dev-docs/investigations/2026-10-08-stream-zip-spike.md   the findings above, in 
   - `--generate-password` produces 24 characters from `secrets.choice` over
     ASCII letters and digits. It prints at the moment given in the decisions
     table.
-- [ ] Reject an empty password. Warn when a typed password is shorter than
+- [x] Reject an empty password. Warn when a typed password is shorter than
       12 characters.
-- [ ] Tests:
+- [x] Tests:
   - Size parsing, valid and invalid.
   - Each password source, using `monkeypatch` for `getpass` and the
     environment.
@@ -213,42 +214,42 @@ dev-docs/investigations/2026-10-08-stream-zip-spike.md   the findings above, in 
 
 ### Phase 2: Collect
 
-- [ ] Define `FileEntry(root: int, relparts: tuple[str, ...], arcname: str,
+- [x] Define `FileEntry(root: int, relparts: tuple[str, ...], arcname: str,
       size: int, mtime: datetime, mode: int, is_dir: bool,
       chain: tuple[tuple[int, int], ...])` as a frozen dataclass. `root`
       indexes a directory descriptor opened once per input and held for the
       run. `chain` holds `(st_dev, st_ino)` for every directory between the
       root and the entry, and for the entry itself (`SPEC.md` §6.5). File
       inputs use their parent folder as the root.
-- [ ] Open roots with `O_DIRECTORY`, adding `O_NOFOLLOW` unless
+- [x] Open roots with `O_DIRECTORY`, adding `O_NOFOLLOW` unless
       `--follow-symlinks` is set (the two traversal policies in `SPEC.md`
       §6.5).
-- [ ] Walk with `os.fwalk` from each root descriptor. Pass
+- [x] Walk with `os.fwalk` from each root descriptor. Pass
       `follow_symlinks=True` only under `--follow-symlinks`.
-- [ ] Map archive paths per `SPEC.md` §6.1. A folder keeps its own name as
+- [x] Map archive paths per `SPEC.md` §6.1. A folder keeps its own name as
       the top level. A file goes to the root. Separators are always `/`.
       Reject `..`, absolute paths and empty components.
-- [ ] Apply excludes:
+- [x] Apply excludes:
   - Defaults are `.DS_Store`, `._*` and `Thumbs.db`.
   - `--exclude` is repeatable. A pattern matches the base name, or the full
     archive path if it contains `/`.
   - `--no-default-excludes` turns off the defaults.
-- [ ] Skip symlinks with one warning each, unless `--follow-symlinks` is set.
+- [x] Skip symlinks with one warning each, unless `--follow-symlinks` is set.
       When following, detect directory cycles by `(st_dev, st_ino)` and fail
       with exit 2.
-- [ ] Skip sockets, FIFOs and device files with a warning.
-- [ ] Store empty folders as directory entries.
-- [ ] Detect collisions and fail with exit 2, listing every colliding
+- [x] Skip sockets, FIFOs and device files with a warning.
+- [x] Store empty folders as directory entries.
+- [x] Detect collisions and fail with exit 2, listing every colliding
       archive path and its sources. Also compare the NFC, `casefold()` form,
       so an archive that would collide when extracted on macOS or Windows is
       caught.
-- [ ] Skip the output name, existing part names and `.partial` files when
+- [x] Skip the output name, existing part names and `.partial` files when
       the output sits inside an input (see the decisions table).
-- [ ] Clamp timestamps per the decisions table. Test 2038-01-20 and
+- [x] Clamp timestamps per the decisions table. Test 2038-01-20 and
       2107-12-31 explicitly.
-- [ ] Implement `--dry-run` listing of the collected entries. Part grouping
+- [x] Implement `--dry-run` listing of the collected entries. Part grouping
       is added in Phase 4.
-- [ ] Tests:
+- [x] Tests:
   - Nested trees and mixed file and folder inputs.
   - Excludes and their defaults.
   - Symlink skip and follow, plus a symlink cycle.
@@ -259,7 +260,7 @@ dev-docs/investigations/2026-10-08-stream-zip-spike.md   the findings above, in 
 
 ### Phase 3: Single archive
 
-- [ ] In `write.py`, stream the entries through `stream_zip` with the
+- [x] In `write.py`, stream the entries through `stream_zip` with the
       password, `extended_timestamps=False`, and `get_compressobj` returning
       `zlib.compressobj(level, zlib.DEFLATED, -15, 8)`:
   - Files use `ZIP_32`, or `ZIP_64` under the rules in `SPEC.md` §6.2
@@ -270,39 +271,43 @@ dev-docs/investigations/2026-10-08-stream-zip-spike.md   the findings above, in 
     framing in `local_bound` and `central`.
   - Mode bits are `S_IFREG | (st_mode & 0o777)` for files and
     `S_IFDIR | 0o755` for folders.
-- [ ] Open each source per `SPEC.md` §6.5. Walk `relparts` from the root
+- [x] Open each source per `SPEC.md` §6.5. Walk `relparts` from the root
       descriptor with `os.open(..., dir_fd=…)`, using `O_NOFOLLOW` under the
       default policy. `fstat` each directory against `chain` before opening
       the next component. Open the leaf with `O_NONBLOCK`, `fstat` it, and
       check it is a regular file with the recorded identity before reading.
       Then clear `O_NONBLOCK`. A mismatch raises `WriteError` (exit 3) naming
       the file.
-- [ ] Hash each file with SHA-256 and count its bytes while it is read, by
+- [x] Hash each file with SHA-256 and count its bytes while it is read, by
       wrapping the chunk iterator. Keep the hashes in memory for `verify.py`.
-- [ ] If the byte count differs from `FileEntry.size`, raise `WriteError`
+- [x] If the byte count differs from `FileEntry.size`, raise `WriteError`
       (exit 3) with a message that names the file. Read at most `size + 1`
       bytes so a growing file cannot run on.
-- [ ] Open output with
+- [x] Open output with
       `os.open(path, O_WRONLY | O_CREAT | O_EXCL | O_NOFOLLOW, 0o600)` under
       the `.partial` name. Call `fsync` before closing.
-- [ ] In `verify.py`, stream the part through `stream_unzip` with the
+- [x] In `verify.py`, stream the part through `stream_unzip` with the
       password as UTF-8 bytes and
       `allowed_encryption_mechanisms` limited to AE-2 AES-256. Drain every
       entry so the HMAC is checked. Compare the SHA-256 of each entry with
       the recorded hash. Check that the set of archive paths equals the
       planned set.
-- [ ] Write `zipcheck.py` per `SPEC.md` §6.6. The writer records name,
+- [x] Write `zipcheck.py` per `SPEC.md` §6.6. Built as a self-consistency
+      check (central entries against the local headers and descriptors on
+      disk) plus the writer's names and sizes, which catches the same
+      mutations without re-deriving every field. `SPEC.md` §6.6 was updated
+      to match. The writer records name,
       method, flags, both sizes, CRC field, AES extra, Zip64 extra and
       local-header offset per entry. `zipcheck` parses the EOCD and any
       Zip64 end record and locator, checks counts and directory bounds, then
       compares every central entry field with the record.
-- [ ] Add the run-wide cleanup scope now, in `output.py`. It tracks every
+- [x] Add the run-wide cleanup scope now, in `output.py`. It tracks every
       `.partial` this run creates and deletes them on any exception or
       Ctrl-C. Phase 4 extends it to many parts.
-- [ ] Publish the final name with the no-clobber flow in `SPEC.md` §6.5:
+- [x] Publish the final name with the no-clobber flow in `SPEC.md` §6.5:
       `os.link(partial, final)`, then remove the `.partial`. Check hard-link
       support in the output folder before writing anything.
-- [ ] Tests:
+- [x] Tests:
   - A round trip extracts files identical to the inputs. Archive bytes are
     never compared across runs, because AES salts are random.
   - A non-ASCII password round-trips through `stream-zip` and
@@ -334,8 +339,9 @@ dev-docs/investigations/2026-10-08-stream-zip-spike.md   the findings above, in 
   - A corrupted byte in the ciphertext fails verification.
   - The output mode is `0600`.
   - An existing output without `--force` fails with exit 3.
-- [ ] Manual check: the archive opens in Keka and in Finder (Archive Utility)
-      on macOS 26. Record the result in the Phase 3 commit message.
+- [x] Manual check: the archive opens in Keka and in Finder (Archive Utility)
+      on macOS 26. Done 2026-10-08 by the user on single, split and
+      `--hide-names` samples. Both extracted correctly.
 
 ### Phase 4: Split
 
@@ -354,40 +360,40 @@ local parts already written (`written_local`). Two ways to get it:
   works whatever the library's internals are, but wastes up to one
   `chunk_size` per part. Lower `chunk_size` to 16 KiB to limit the waste.
 
-- [ ] Implement design A. Add a test that fails if `stream-zip` stops calling
+- [x] Implement design A. Add a test that fails if `stream-zip` stops calling
       the wrapper's `compress` and `flush`, or if the computed local size of
       a member differs from the measured one. Fall back to design B if that
       test cannot be made to pass, and record why in
       `dev-docs/investigations/`.
-- [ ] Implement `local_bound(e)` and `central(e)` in `plan.py` from
+- [x] Implement `local_bound(e)` and `central(e)` in `plan.py` from
       `stream-zip`'s own header structs, for the method the writer will
       choose. Use Zip32 sizes for `ZIP_32` entries and Zip64 sizes for
       `ZIP_64` entries. Use `deflate_bound` from `SPEC.md` §6.2. Always
       reserve 98 bytes of end records.
-- [ ] Before writing anything, fail with exit 2 if any single entry cannot
+- [x] Before writing anything, fail with exit 2 if any single entry cannot
       fit in an empty part, using the full admission total from `SPEC.md`
       §6.4. That total includes the manifest under `--manifest`, and the
       outer layer under `--hide-names` once Phase 6 adds it. Name the file,
       and suggest the 7-Zip spanned command from `SPEC.md` §2.
-- [ ] Implement admission and part rollover for `--order path`. The member
+- [x] Implement admission and part rollover for `--order path`. The member
       iterator decides, before yielding each entry, whether it fits. If it
       does not, the iterator ends the current `stream_zip` call and the
       writer opens the next part.
-- [ ] Name parts `bundle-partNN.zip.partial` while writing. Keep every part
+- [x] Name parts `bundle-partNN.zip.partial` while writing. Keep every part
       under its `.partial` name until all parts verify. Then rename them in
       order to `bundle-partNN-of-MM.zip`, or to the plain name if there is
       one part.
-- [ ] Record the chosen design (A or B) and the measured slack in
+- [x] Record the chosen design (A or B) and the measured slack in
       `dev-docs/investigations/`. Fold only real rule changes into `SPEC.md`
       §6.2.
-- [ ] Verify that each part opens without the others, that its size on disk
+- [x] Verify that each part opens without the others, that its size on disk
       is at most `--max-size`, and that the union of paths across parts
       equals the planned set with no duplicates.
-- [ ] Implement `--order size` as first-fit-decreasing on
+- [x] Implement `--order size` as first-fit-decreasing on
       `local_bound + central`. Parts are assigned before writing and are
       never re-split (`SPEC.md` §6.3). They are still written one at a time.
-- [ ] Extend `--dry-run` to show the planned parts as "at most N parts".
-- [ ] Tests:
+- [x] Extend `--dry-run` to show the planned parts as "at most N parts".
+- [x] Tests:
   - Random incompressible data with caps of 1 MB, 5 MB and 25 MB never
     produces a part over the cap.
   - A `hypothesis` property test: for random file-size lists, random name
@@ -408,21 +414,21 @@ local parts already written (`written_local`). Two ways to get it:
 
 ### Phase 5: Safe writes and failure handling
 
-- [ ] Harden the cleanup scope from Phase 3 to cover publication. Without
+- [x] Harden the cleanup scope from Phase 3 to cover publication. Without
       `--force`, a failure part-way removes the final names this run
       published and the remaining `.partial` files. With `--force`, it also
       renames every backup back to its original name. Backups are deleted
       only after every part is published. Publishing the last part is the
       commit point. A failed backup deletion after that keeps the new
       outputs and remaining backups, warns, and exits 0.
-- [ ] Before the first byte is written, check that the output directory
+- [x] Before the first byte is written, check that the output directory
       exists and is writable. Report a full disk (`ENOSPC`) clearly as exit 3.
-- [ ] Implement `--force` with the backup flow in `SPEC.md` §6.5, and the
+- [x] Implement `--force` with the backup flow in `SPEC.md` §6.5, and the
       existing-output warning from the decisions table.
-- [ ] Implement `--no-verify`, which skips verification but still checks
+- [x] Implement `--no-verify`, which skips verification but still checks
       sizes against the cap. The generated password still prints, per the
       decisions table.
-- [ ] Tests:
+- [x] Tests:
   - A failure injected mid-part leaves no `.partial` files and no final
     files.
   - A failure injected in verification leaves no `.partial` files.
@@ -435,25 +441,25 @@ local parts already written (`written_local`). Two ways to get it:
 
 ### Phase 6: Hide names
 
-- [ ] Write each part as an inner `stream_zip` with no password and the
+- [x] Write each part as an inner `stream_zip` with no password and the
       chosen level. Feed its chunks as the content of one outer entry named
       `payload.zip`, with mtime 1980-01-01. Use method `ZIP_32`, or `ZIP_64`
       if the worst-case part could pass 4 GiB. Pass a level-0
       `get_compressobj` and the password on the outer call.
-- [ ] Disable extended timestamps on the outer call, so the outer entry
+- [x] Disable extended timestamps on the outer call, so the outer entry
       carries no real time.
-- [ ] Reserve the outer layer in admission (`SPEC.md` §6.7). Admit an
+- [x] Reserve the outer layer in admission (`SPEC.md` §6.7). Admit an
       entry only if `deflate_bound(inner_worst) + outer_fixed ≤ max_size`,
       where `inner_worst` is the inner zip's written local bytes plus the
       next entry's local bound, all reserved central entries, and its end
       records. Compute `outer_fixed` from the same structs as Phase 4.
-- [ ] Extend the structural check to the inner zip. Keep the inner stream's
+- [x] Extend the structural check to the inner zip. Keep the inner stream's
       last `sum(central) + 98` bytes in a buffer and run `zipcheck` over
       them.
-- [ ] Include the outer layer in the Phase 4 empty-part pre-check.
-- [ ] Verify both layers. Decrypt the outer entry, stream it into
+- [x] Include the outer layer in the Phase 4 empty-part pre-check.
+- [x] Verify both layers. Decrypt the outer entry, stream it into
       `stream_unzip` without a password, and check the inner SHA-256 values.
-- [ ] Tests:
+- [x] Tests:
   - Listing a part shows only `payload.zip`. Use `stream-unzip` for this,
     and also `7zz l` when it is installed.
   - The inner round trip extracts files identical to the inputs.
@@ -467,28 +473,32 @@ local parts already written (`written_local`). Two ways to get it:
 
 ### Phase 7: Polish and release
 
-- [ ] Implement `--manifest`. It adds `MANIFEST.txt` inside each part,
+- [x] Implement `--manifest`. It adds `MANIFEST.txt` inside each part,
       listing every archive path and its part number. With `--manifest`,
       parts are assigned from bounds before writing and never re-split
       (`SPEC.md` §6.3). Its size is fixed before packing by the zero-padding
       rule in the decisions table. Reserve its bound in each part's budget. With `--hide-names`, the manifest goes
       inside the inner zip, never the outer one.
-- [ ] Manifest tests: entry counts that cross a digit width (9→10, 99→100),
+- [x] Manifest tests: entry counts that cross a digit width (9→10, 99→100),
       Unicode names, a name that collides with `MANIFEST.txt` after
       casefolding, and a manifest too large to fit with any entry.
-- [ ] Print progress on stderr only when stderr is a TTY. Print one final
+- [x] Print progress on stderr only when stderr is a TTY. Print one final
       summary line listing the parts and their sizes.
-- [ ] Write `user-docs/`: quick start, CLI reference, opening archives on
+- [x] Write `user-docs/`: quick start, CLI reference, opening archives on
       each OS, and security notes from `SPEC.md` §7. Expand the root
       `README.md` with install and quick-start steps.
-- [ ] Run the slow tests: a file over 4 GiB (Zip64) and 10,000 small files.
-- [ ] Run the `7zz` interop tests (`brew install sevenzip`). `7zz t` must
-      accept every part.
-- [ ] Manual checks: split output opens in Keka and in Finder, and on
-      Windows with 7-Zip if a machine is available. Record the results.
-- [ ] Set the version to `0.1.0`. Move the `CHANGELOG.md` entries to
+- [x] Run the slow tests: a file over 4 GiB (Zip64) and 10,000 small files.
+      All 9 slow tests passed on macOS on 2026-10-08.
+- [x] Run the `7zz` interop tests (`brew install sevenzip`). `7zz t` must
+      accept every part. 7-Zip 26.04 on 2026-10-08: `tests/test_sevenzip.py`
+      passed (single archive, non-ASCII password, wrong password, every split
+      part alone, `--hide-names` listing and nested extraction, and 65,536
+      entries in the slow suite).
+- [x] Manual checks: split output opens in Keka and in Finder. Done
+      2026-10-08 by the user. Windows was not tested.
+- [x] Set the version to `0.1.0`. Move the `CHANGELOG.md` entries to
       `[0.1.0]` and tag `v0.1.0`.
-- [ ] Run the completion steps in `dev-docs/README.md`.
+- [x] Run the completion steps in `dev-docs/README.md`.
 
 ## Review log
 
@@ -509,6 +519,14 @@ local parts already written (`written_local`). Two ways to get it:
   policies, `O_NONBLOCK` leaf opens, directory identity checks, the
   empty-part pre-check including manifest and outer costs, and wording
   fixes.
+- 2026-10-08, implementation reviews of `feat/v1`. Glyph Cluster (Kilo)
+  found one real low issue (password-file permissions read from a second
+  lookup), fixed. NVIDIA GLM 5.3 (OpenCode) found 2 medium and 6 low, all
+  fixed: the root-folder symlink policy now matches `SPEC.md` §6.5; a real
+  ZipCrypto archive test; the Zip64 locator probe gated on Zip64 use (a
+  crafted file name could fail verification); leftover `.partial` files
+  caught in preflight; one summary line; rollback reports parts it could not
+  remove; raw-byte name comparison; and exit 2 when nothing is archived.
 - 2026-10-08, StepFun 3.7 Flash (free, via Kilo). The review did not run,
   because the free tier returned a balance error twice.
 
@@ -516,27 +534,22 @@ local parts already written (`written_local`). Two ways to get it:
 
 The plan is complete when all of these hold:
 
-- [ ] `uv run pytest` passes, and `uv run pytest -m slow` passes once on macOS.
-- [ ] `pre-commit run --all-files` passes, including `basedpyright`.
-- [ ] Every test listed in `SPEC.md` §8 has a matching test, or a recorded
+- [x] `uv run pytest` passes, and `uv run pytest -m slow` passes once on macOS.
+- [x] `pre-commit run --all-files` passes, including `basedpyright`.
+- [x] Every test listed in `SPEC.md` §8 has a matching test, or a recorded
       reason why it changed.
-- [ ] `uv tool install .` puts a working `zipseal` on the PATH.
-- [ ] The manual Keka, Finder and 7-Zip checks are recorded.
-- [ ] `SPEC.md` matches the built behavior.
+- [x] `uv tool install .` puts a working `zipseal` on the PATH.
+- [x] The manual Keka, Finder and 7-Zip checks are recorded.
+- [x] `SPEC.md` matches the built behavior.
 
 ## Open questions
 
-These come from `SPEC.md` §9, with a recommendation for each. They need a
-user decision before the phase listed.
+All three were decided on 2026-10-08 by adopting the recommendations. They
+are recorded in `SPEC.md` §9.
 
-- [ ] Should a file over the cap be split with 7-Zip in v1? The
-      recommendation is no. Keep it an error with a 7-Zip hint, as §6.4
-      says. Needed before Phase 4.
-- [ ] Is `--legacy-zipcrypto` needed? The recommendation is no. Drop it from
-      the v1 help text. Needed before Phase 1.
-- [ ] Should the manifest live inside or beside the parts? The
-      recommendation is inside only. A manifest beside the parts leaks the
-      names that `--hide-names` exists to hide. Needed before Phase 7.
+- [x] A file over the cap stays an error with a 7-Zip hint.
+- [x] No `--legacy-zipcrypto` in v1.
+- [x] The manifest lives inside the parts only.
 
 ## Risks
 
@@ -552,4 +565,4 @@ user decision before the phase listed.
 
 ## Completion steps
 
-Follow the lifecycle in [`dev-docs/README.md`](../README.md#completion-steps).
+Follow the lifecycle in [`dev-docs/README.md`](../../README.md#completion-steps).

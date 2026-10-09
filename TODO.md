@@ -13,11 +13,8 @@ An item that needs more than a few lines of thought gets a plan in
 
 ## Next
 
-- Implement v1 per [`dev-docs/plans/2026-10-08-v1-implementation.md`](dev-docs/plans/2026-10-08-v1-implementation.md).
-- Add CI. Run pre-commit, pytest and a dependency audit on push and pull
-  request with GitHub Actions. Add Dependabot for `uv` and Actions.
+- Nothing scheduled. Pick from Later.
 
 ## Later
 
-- Resolve the open questions in `SPEC.md` §9.
 - Consider `--format 7z`, `--oversize=volumes` and `--tight` (`SPEC.md` §6.2, §6.4, §6.7).

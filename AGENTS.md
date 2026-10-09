@@ -11,9 +11,9 @@ cap. The design lives in [`SPEC.md`](SPEC.md).
 
 ## Status
 
-Nothing is implemented yet. Work follows
-[`dev-docs/plans/2026-10-08-v1-implementation.md`](dev-docs/plans/2026-10-08-v1-implementation.md),
-which expands `SPEC.md` §8.
+v0.1.0 is released. The v1 plan is complete and archived in
+[`dev-docs/plans/archive/`](dev-docs/plans/archive/). Future work is in
+[`TODO.md`](TODO.md).
 
 ## Read this first
 
@@ -27,7 +27,7 @@ which expands `SPEC.md` §8.
 
 ## Commands
 
-The project uses `uv`. These commands work once step 1 of the plan adds `pyproject.toml`.
+The project uses `uv`.
 
 ```sh
 uv sync                        # install dependencies
@@ -35,6 +35,7 @@ uv run zipseal --help          # run the CLI
 uv run pytest                  # fast tests
 uv run pytest -m slow          # Zip64 / 4 GiB tests
 pre-commit run --all-files     # lint, format, secret scan, file-size policy
+uv run python scripts/make_samples.py  # rebuild sample archives in sample-data/
 ```
 
 Run `pre-commit install` once per clone to enable the git hook.
@@ -46,14 +47,15 @@ SPEC.md               design; the source of truth for behavior
 TODO.md               future work only; never records finished work
 CHANGELOG.md          finished user-visible work
 CHANGELOG.dev.md      finished internal work (harness, hooks, CI, tests)
-src/zipseal/          cli, collect, plan, write, verify (see SPEC.md §5)
+src/zipseal/          cli, collect, plan, sources, write, verify, zipcheck, output, pipeline
 tests/                pytest; fixtures are generated in tmp_path
 user-docs/            docs for people who run zipseal or open its archives
 dev-docs/plans/       active plans; finished ones move to plans/archive/
 dev-docs/investigations/  dated research and spike write-ups
 hooks/scripts/        repo policy checks run by pre-commit
 .context/             scratch and handoffs (gitignored)
-sample-data/          local inputs for manual runs (gitignored)
+sample-data/          local inputs and sample archives (gitignored)
+scripts/make_samples.py  rebuilds sample-data/ with synthetic inputs
 ```
 
 ## Security rules
@@ -69,11 +71,16 @@ These rules are the point of the tool. Treat a violation as a bug.
   failure. Create outputs with mode `0600`.
 - Never commit real input data or generated archives. `.gitignore` blocks
   `*.zip`, `*.partial` and volume files. Tests build their inputs in `tmp_path`.
-  For manual runs, put inputs in `sample-data/` (gitignored).
+  For manual runs, use `uv run python scripts/make_samples.py`, which builds
+  synthetic inputs and sample archives in `sample-data/` (gitignored).
 - Test passwords must be obviously fake, such as `test-password`. If gitleaks
   flags a fixture anyway, add a `# gitleaks:allow` comment on that line, and
   say why in the commit message. Never allowlist a whole folder.
 - Error messages may name input files. They must never include file contents.
+- The repo is meant to be safe to publish. Pre-commit blocks archives,
+  images, documents, `sample-data/`, home-folder paths and real email
+  addresses (see the hooks table in `dev-docs/README.md`). Never weaken
+  `.forbidden-paths` or `.gitignore-protected` to get a commit through.
 
 ## Conventions
 

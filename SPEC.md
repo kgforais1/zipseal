@@ -1,6 +1,6 @@
 # zipseal — plan and design specification
 
-Status: draft, 2026-10-07. Nothing is implemented yet.
+Status: implemented and released as v0.1.0, 2026-10-08. Drafted 2026-10-07.
 Last reviewed: 2026-10-08
 
 `zipseal` is a CLI that takes files and folders and writes them into one
@@ -51,8 +51,8 @@ stand alone. Email attachment limits and upload caps are the usual reasons.
 
 Other languages have equivalents if Python is a poor fit. Go has
 `github.com/yeka/zip`. Rust has the `zip` crate, which supports AES writes.
-Python is recommended here because the repo's other tools
-(`excel-pii-phi/tools/`) are Python and `uv` is installed.
+Python is recommended here because the author's related tools are Python
+and `uv` is installed.
 
 ## 4. CLI
 
@@ -77,7 +77,6 @@ zipseal [OPTIONS] PATH [PATH ...] -o OUTPUT
 | `--no-verify` | verify on | Skip the post-write decrypt check. |
 | `--force` | off | Overwrite existing output files. |
 | `--dry-run` | off | Print the planned parts and their contents. Write nothing. |
-| `--legacy-zipcrypto` | off | Use ZipCrypto for old unzip tools. Prints a loud warning. Needs `pyzipper`. Probably defer past v1. |
 
 There is deliberately no `--password VALUE` flag. A value on the command line
 lands in shell history and is visible to other users through `ps`.
@@ -86,6 +85,10 @@ Exit codes: `0` success, `1` usage error, `2` input error (missing path,
 oversized file), `3` write or verify failure.
 
 ## 5. Architecture
+
+The built modules add `sources.py` (safe source reads), `zipcheck.py`
+(structural verification), `output.py` (naming and publication),
+`pipeline.py` (orchestration) and `passwords.py`. The original sketch:
 
 ```
 cli.py        argument parsing, password acquisition, exit codes
@@ -227,8 +230,11 @@ delegates that file to `7zz -v`.
   is rejected by type instead of blocking the open. The writer also counts
   the bytes it reads. A swapped file or folder, a file replaced by a symlink
   or FIFO, or a size change all fail.
-- Traversal has two policies. By default every component, including the
-  input root, is opened with `O_NOFOLLOW`. With `--follow-symlinks`,
+- Traversal has two policies. The folder that holds each input is opened
+  by its path as given, so symlinks above the input (such as macOS's `/tmp`)
+  resolve normally. From the input itself downwards, by default, every
+  component is opened with `O_NOFOLLOW`, and an input that is itself a
+  symlink is skipped with a warning. With `--follow-symlinks`,
   components are opened without `O_NOFOLLOW`, so symlinks resolve. The
   identity of what they resolve to is still checked against the record.
 - Final names are published without clobbering. Each `.partial` is
@@ -261,14 +267,18 @@ that each part's size on disk is at most `--max-size`.
 central-directory signature and ignores everything after it, so an archive
 with a corrupt central directory or end record would still pass. Verification
 therefore also checks the structure itself, with its own small parser in
-`zipcheck.py`. The writer records, for every entry, its name, method,
-general-purpose flags, compressed and uncompressed sizes, CRC field, AES
-extra field, Zip64 extra field and local-header offset. The parser reads the
-end of central directory record, and the Zip64 end record and locator when
-present. It checks that their entry counts agree, and that the central
-directory's offset and size lie inside the file and end exactly where the
-end records begin. It then parses every central entry and compares every
-recorded field. Any difference fails verification.
+`zipcheck.py`. The parser reads the end of central directory record, and the
+Zip64 end record and locator when present. It checks that their entry counts
+agree, and that the central directory ends exactly where the end records
+begin. It then parses every central entry and checks it against the file
+itself. The local header at the recorded offset must have the same name,
+flags, method and AES field. The data descriptor after the data must have
+the same CRC and sizes. Entries must be contiguous, from offset 0 to the
+start of the central directory. Every entry must be AE-2 AES-256 with a zero
+CRC. Finally, the list of names and uncompressed sizes must equal what the
+writer recorded. Any difference fails verification. Checking the central
+directory against the bytes on disk catches the same corruption as
+predicting every field, without duplicating stream-zip's layout logic.
 
 The standard library's `zipfile` is not enough on its own. It accepts a
 central entry whose sizes or CRC were changed. Tests still use it as an
@@ -332,6 +342,41 @@ burden on Mac recipients. It remains a reasonable later `--format 7z` backend. N
 keeps the tool pure Python. Renaming files to random IDs was rejected. It
 breaks the result for the recipient unless they also run a restore step.
 
+### 6.8 Other behavior
+
+- **Part names.** A run that produces one part writes exactly the `-o`
+  name, even with `--max-size`. Two or more parts are named
+  `NAME-partNN-of-MM.zip`. Part numbers have as many digits as the part count
+  needs, and at least two, so the names sort in order.
+- **Existing outputs.** Before writing, the run fails with exit 3 if the
+  `-o` name exists, or any file named `NAME-part` + digits + `-of-` +
+  digits + `.zip`. `--force` lifts this, and replaces only the names this run
+  produces (§6.5). Other old parts are listed in a warning, never deleted.
+- **Output inside an input.** The walker skips the output name, any
+  existing part name for it, and `.partial` files.
+- **Dry run.** `--dry-run` needs no password. It plans from worst-case
+  bounds, so it reports "at most N parts".
+- **Timestamps.** DOS timestamps in local time are clamped to 1980-01-01
+  00:00:00 through 2107-12-31 23:59:58, with one warning per clamped file.
+- **File names.** Names that do not decode as UTF-8 stop the run with exit 2.
+  Archive paths are normalized to NFC. Two paths that are equal after
+  `str.casefold()` are a collision, because they would clash when extracted
+  on macOS or Windows.
+- **Manifest collision.** If an input already maps to `MANIFEST.txt` at the
+  archive root, `--manifest` fails with exit 2.
+- **Interrupt.** Ctrl-C removes this run's `.partial` files and exits 130.
+- **Generated password.** `--generate-password` prints the password once,
+  to stderr, after every part has verified (or passed the size check under
+  `--no-verify`) and just before publication. A run that fails earlier
+  prints no password. If publication then fails and rolls back, the run
+  says that no archive was written.
+- **Password handling.** Passwords are encoded as UTF-8, as 7-Zip and
+  libarchive expect. `stream-zip` hands a `str` password to pycryptodome,
+  which encodes it as Latin-1, so zipseal passes the UTF-8 bytes decoded as
+  Latin-1. Without that, non-ASCII passwords would not open elsewhere. Generated passwords
+  use only ASCII letters and digits. A non-ASCII password, or one shorter
+  than 12 characters, prints a warning. An empty password is an error.
+
 ## 7. Security notes for the README
 
 - AES-256 (WinZip AE-2) protects file contents. It does **not** hide file
@@ -359,7 +404,7 @@ breaks the result for the recipient unless they also run a restore step.
 ## 8. Implementation plan
 
 The detailed, tracked version of this plan is
-[`dev-docs/plans/2026-10-08-v1-implementation.md`](dev-docs/plans/2026-10-08-v1-implementation.md).
+[`dev-docs/plans/archive/2026-10-08-v1-implementation.md`](dev-docs/plans/archive/2026-10-08-v1-implementation.md).
 This section is the summary.
 
 1. **Scaffold.** Add `pyproject.toml` with `stream-zip`, `stream-unzip` and
@@ -393,12 +438,14 @@ Tests (pytest, using generated temporary files):
 
 ## 9. Open questions
 
-- Should a single file over the cap be split with 7-Zip in v1, or stay an
-  error?
-- Is `--legacy-zipcrypto` needed for any real recipient?
-- Should the manifest live inside each part (private) or beside the parts
-  (readable without the password, but it leaks names)? The draft puts it
-  inside.
+These were decided on 2026-10-08 by adopting the plan's recommendations.
+Reopen one if a real recipient needs something else.
+
+- A single file over the cap stays an error in v1, with a 7-Zip hint (§6.4).
+- There is no `--legacy-zipcrypto` in v1. ZipCrypto is broken, and no
+  recipient has needed it yet.
+- The manifest lives only inside the parts. A manifest beside the parts
+  would leak the names that `--hide-names` hides.
 
 ## 10. References
 

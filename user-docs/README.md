@@ -2,15 +2,13 @@
 
 Last reviewed: 2026-10-08
 
-This folder holds documentation for people who run `zipseal` or receive its
-archives. Nothing is here yet, because nothing is implemented.
+Documentation for people who run `zipseal` or receive its archives.
 
-Planned pages, written in Phase 7 of the v1 plan:
-
-- Install and quick start.
-- CLI reference, generated from or checked against `zipseal --help`.
-- Opening the archives on macOS, Windows and Linux (`SPEC.md` §7).
-- Security notes: what AES-256 protects and what it leaves visible.
+- [Quick start](quick-start.md): install, and the common commands.
+- [CLI reference](cli.md): every option and exit code.
+- [Opening the archives](opening-archives.md): which tools work on macOS,
+  Windows and Linux.
+- [Security notes](security.md): what is protected and what is visible.
 
 Every page here carries a `Last reviewed:` marker. Re-read a page against the
 current CLI before you bump its date.

@@ -2,7 +2,7 @@
 
 Date: 2026-10-08
 Versions: `stream-zip` 0.0.84, `stream-unzip` 0.0.101, Python 3.12 via `uvx`
-Feeds: [`../plans/2026-10-08-v1-implementation.md`](../plans/2026-10-08-v1-implementation.md), `SPEC.md` §6.2, §6.6, §6.7
+Feeds: [`../plans/archive/2026-10-08-v1-implementation.md`](../plans/archive/2026-10-08-v1-implementation.md), `SPEC.md` §6.2, §6.6, §6.7
 
 ## Question
 
@@ -30,6 +30,9 @@ versions. Claims marked "source" come from that reading. Claims marked
 | 7 | `stream_zip` takes `password: str`. `stream_unzip` takes `password: bytes` and by default also accepts ZipCrypto and AE-1 through `allowed_encryption_mechanisms`. | Tested (signatures) |
 | 8 | `stream-zip` pulls the next member only after the current one is finished. Output is re-chunked to `chunk_size` (65,536 by default), with a flush after each local header. | Source |
 | 9 | Extra fields per entry: extended timestamp 9 bytes, AES 11 bytes, Zip64 local 20 bytes when `ZIP_64`. | Source |
+| 11 | `stream_zip(password=str)` derives keys from the Latin-1 encoding of the string (pycryptodome's `tobytes`). A UTF-8 password must be passed as `utf8_bytes.decode("latin-1")`. | Tested in Phase 3. `tar --passphrase` (libarchive) opens archives with non-ASCII passwords only with this fix. |
+| 12 | With Zip64 end records, every 16-bit EOCD field (disk numbers and counts) is `0xFFFF`. | Tested in Phase 3 |
+| 13 | Encrypted directory entries carry 28 bytes of AES overhead and no data descriptor (flags `0x801`). | Tested in Phase 3 |
 | 10 | With only `ZIP_32` or `NO_COMPRESSION_32` members, entry 65,536 raises `CentralDirectoryNumberOfEntriesOverflowError`. The end records are upgraded to Zip64 (98 bytes instead of 22) only if a 64-bit member is present. Switching members from index 65,534 onward to `ZIP_64` produced a valid 65,537-entry archive with Zip64 end records. | Tested (corrected 2026-10-08 after the Codex re-review) |
 
 Measured archive sizes, one entry each, password set:

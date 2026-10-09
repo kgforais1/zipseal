@@ -1,0 +1,26 @@
+# Tracked files matching these globs fail the commit (hooks/scripts/check_forbidden_paths.py),
+# even if they were force-added. See dev-docs/README.md "Data that must never be committed".
+
+# Local inputs, sample archives and scratch:
+sample-data/
+.context/
+# Archives, partial writes and volumes:
+*.zip
+*.ZIP
+*.7z
+*.partial
+# Personal documents and images (tests generate their own inputs):
+*.png
+*.jpg
+*.jpeg
+*.heic
+*.gif
+*.pdf
+*.docx
+*.xlsx
+*.csv
+# Secrets:
+*.pem
+*.key
+*.p12
+.env
