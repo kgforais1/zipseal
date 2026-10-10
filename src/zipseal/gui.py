@@ -159,7 +159,8 @@ def build_options(spec: JobSpec) -> Options:
     """
     if not spec.paths:
         raise UsageError("add at least one file or folder")
-    if not str(spec.output).strip():
+    if not spec.output.name:
+        # An empty output box arrives as `Path("")`, which is `Path(".")`.
         raise UsageError("choose an output name")
     excludes = [line.strip() for line in spec.excludes.splitlines() if line.strip()]
     return Options(
@@ -249,7 +250,11 @@ class Controller:
                 return events
 
     def take_generated_password(self) -> Password | None:
-        """Hand the generated password to the caller exactly once."""
+        """Hand the generated password to the caller exactly once.
+
+        Only call this after a `Done` event, on the main thread: the worker reads
+        nothing else from the controller, and a failed run has already cleared it.
+        """
         password, self._generated = self._generated, None
         return password
 
@@ -279,6 +284,11 @@ class Controller:
             self.events.put(Error(UNEXPECTED))
         else:
             self.events.put(Done())
+            # A successful run keeps it: the view takes it for the modal.
+            return
+        # A failed run never shows a password, and nothing can be taking it while
+        # this happens, because a take only ever follows a `Done`.
+        self.clear_password()
 
 
 def main() -> int:
