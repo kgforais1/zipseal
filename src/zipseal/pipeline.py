@@ -14,6 +14,7 @@ from zipseal.options import Options
 from zipseal.output import Output
 from zipseal.passwords import Password
 from zipseal.plan import Layout, PartBudget
+from zipseal.progress import Progress
 from zipseal.verify import verify_part
 from zipseal.write import Extra, PartResult, write_part
 
@@ -93,6 +94,7 @@ def write_archive(
     options: Options,
     collection: Collection,
     get_password: Callable[[Options], Password],
+    progress: Progress | None = None,
     err: TextIO | None = None,
 ) -> list[PartResult]:
     log: TextIO = err or sys.stderr
@@ -119,15 +121,15 @@ def write_archive(
     try:
         results: list[PartResult] = []
 
-        progress = log.isatty()
-
         def one_part(queue: deque[FileEntry]) -> None:
             path = out.new_partial(len(results) + 1)
-            if progress:
-                print(f"zipseal: writing part {len(results) + 1} ...", file=log, flush=True)
+            if progress is not None:
+                progress.part_started(len(results) + 1)
             budget = PartBudget(layout)
             results.append(
-                write_part(collection, queue, budget, password, options.level, path, extras)
+                write_part(
+                    collection, queue, budget, password, options.level, path, extras, progress
+                )
             )
 
         if groups is not None:
@@ -142,15 +144,15 @@ def write_archive(
             while queue:
                 one_part(queue)
 
-        if progress and not options.no_verify:
-            print(f"zipseal: verifying {len(results)} part(s) ...", file=log, flush=True)
-        for r in results:
+        for number, r in enumerate(results, 1):
             size = os.stat(r.path).st_size
             if options.max_size is not None and size > options.max_size:
                 raise VerifyError(f"{r.path.name}: {size:,} bytes exceeds --max-size")
             if not options.no_verify:
                 inner = (r.inner_size, r.inner_tail) if options.hide_names else None
                 verify_part(r.path, password, r.records, inner=inner)
+            if progress is not None:
+                progress.part_verified(number, size)
         finals = out.final_names(len(results))
         if password.generated:
             print(f"zipseal: generated password: {password.value}", file=log)

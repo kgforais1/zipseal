@@ -25,6 +25,7 @@ from zipseal.collect import DOS_MIN, Collection, FileEntry
 from zipseal.errors import WriteError
 from zipseal.passwords import Password
 from zipseal.plan import PartBudget
+from zipseal.progress import Progress
 from zipseal.sources import read_chunks
 
 OUTPUT_CHUNK = 1 << 16
@@ -216,10 +217,13 @@ def write_part(
     level: int,
     path: Path,
     extras: list[Extra] | None = None,
+    progress: Progress | None = None,
 ) -> PartResult:
     """Write entries from the front of `queue` to a new file at `path` until one does
     not fit `budget`. Admitted entries are removed from the queue. `extras` are
     appended to the part; their size must already be reserved in the layout.
+
+    `progress`, when given, hears `bytes_written` for every chunk written here.
     """
     layout = budget.layout
     result = PartResult(path)
@@ -256,6 +260,11 @@ def write_part(
                 written = os.write(fd, view)
                 view = view[written:]
             result.size += len(chunk)
+            if progress is not None:
+                # One place covers both shapes: the chunk stream from `_Members`,
+                # and the --hide-names outer entry that tees the inner zip into
+                # itself. Either way the count is the encrypted bytes on disk.
+                progress.bytes_written(result.size)
         os.fsync(fd)
     except OSError as exc:
         raise WriteError(f"{path}: {exc.strerror}") from None

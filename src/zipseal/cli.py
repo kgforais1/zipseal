@@ -10,7 +10,7 @@ import sys
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from typing import NoReturn
+from typing import NoReturn, TextIO
 
 from zipseal import __version__, passwords
 from zipseal.errors import EXIT_INTERRUPT, EXIT_OK, UsageError, ZipsealError
@@ -163,6 +163,37 @@ def get_password(args: argparse.Namespace) -> Password:
     return passwords.from_prompt()
 
 
+class _TtyProgress:
+    """The CLI's progress lines, as one `Progress` implementation.
+
+    `part_started` prints a line per part. The one-off "verifying N part(s)" line
+    comes from the first `part_verified` event, naming the parts this run wrote,
+    which is the highest part number `part_started` reported. `bytes_written` is
+    per chunk and would only add noise, so it is ignored.
+
+    `verifying` is false for a `--no-verify` run: nothing is decrypted, so there
+    is no verifying line to print.
+    """
+
+    def __init__(self, out: TextIO, *, verifying: bool = True) -> None:
+        self.out = out
+        self.verifying = verifying
+        self.parts = 0
+        self._announced = False
+
+    def part_started(self, number: int) -> None:
+        self.parts = max(self.parts, number)
+        print(f"zipseal: writing part {number} ...", file=self.out, flush=True)
+
+    def bytes_written(self, written: int) -> None:
+        """The CLI reports finished parts, not bytes."""
+
+    def part_verified(self, number: int, size: int) -> None:
+        if self.verifying and not self._announced:
+            self._announced = True
+            print(f"zipseal: verifying {self.parts} part(s) ...", file=self.out, flush=True)
+
+
 @dataclass(frozen=True)
 class Command:
     """One parsed command line: what to archive, and where the password comes from."""
@@ -198,7 +229,10 @@ def parse_args(argv: Sequence[str] | None = None) -> Command:
 
 def run(command: Command) -> int:
     """Run the parsed command line through the shared core, warnings to stderr."""
-    return run_job(command.options, command.get_password)
+    log = sys.stderr
+    verifying = not command.options.no_verify
+    progress = _TtyProgress(log, verifying=verifying) if log.isatty() else None
+    return run_job(command.options, command.get_password, progress=progress, warn=log)
 
 
 def main(argv: Sequence[str] | None = None) -> int:

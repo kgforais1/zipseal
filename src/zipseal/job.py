@@ -5,14 +5,14 @@ its widgets into `Options` and points `warn` at its log area. Both call
 `run_job`, so neither front end can skip a step: the strength check, the
 size-cap check and the verification loop all live here.
 
-`progress` is accepted and unused for now. The GUI plan adds the `Progress`
-protocol and hooks it into `pipeline.py` and `write.py`, which is when the CLI's
-TTY progress lines move onto it.
+`progress` is an optional `Progress` implementation, which the CLI fills with its
+TTY progress lines and the GUI will fill with a progress bar. It is called in
+order from the thread that runs this function.
 """
 
 import sys
 from collections.abc import Callable
-from typing import Any, TextIO
+from typing import TextIO
 
 from zipseal import passwords
 from zipseal.collect import Collection, collect
@@ -20,6 +20,7 @@ from zipseal.errors import EXIT_OK, InputError
 from zipseal.options import Options
 from zipseal.passwords import Password
 from zipseal.pipeline import estimate_parts, write_archive
+from zipseal.progress import Progress
 
 
 def print_dry_run(collection: Collection, options: Options, out: TextIO) -> None:
@@ -41,7 +42,7 @@ def print_dry_run(collection: Collection, options: Options, out: TextIO) -> None
 def run_job(
     options: Options,
     get_password: Callable[[Options], Password],
-    progress: Any | None = None,
+    progress: Progress | None = None,
     warn: TextIO | None = None,
 ) -> int:
     """Collect, then write and verify one archive, or only plan it with `dry_run`.
@@ -71,7 +72,7 @@ def run_job(
         if options.dry_run:
             print_dry_run(collection, options, sys.stdout)
             return EXIT_OK
-        results = write_archive(options, collection, checked, err=log)
+        results = write_archive(options, collection, checked, progress=progress, err=log)
         total = sum(r.size for r in results)
         noun = "part" if len(results) == 1 else "parts"
         names = ", ".join(r.path.name for r in results)
