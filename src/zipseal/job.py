@@ -1,0 +1,83 @@
+"""The shared core: run one archive job from `Options` (SPEC.md §5).
+
+`cli.py` turns argparse into `Options` and points `warn` at stderr; the GUI turns
+its widgets into `Options` and points `warn` at its log area. Both call
+`run_job`, so neither front end can skip a step: the strength check, the
+size-cap check and the verification loop all live here.
+
+`progress` is accepted and unused for now. The GUI plan adds the `Progress`
+protocol and hooks it into `pipeline.py` and `write.py`, which is when the CLI's
+TTY progress lines move onto it.
+"""
+
+import sys
+from collections.abc import Callable
+from typing import Any, TextIO
+
+from zipseal import passwords
+from zipseal.collect import Collection, collect
+from zipseal.errors import EXIT_OK, InputError
+from zipseal.options import Options
+from zipseal.passwords import Password
+from zipseal.pipeline import estimate_parts, write_archive
+
+
+def print_dry_run(collection: Collection, options: Options, out: TextIO) -> None:
+    """List what would be archived, and how many parts it would need."""
+    total = 0
+    for entry in collection.entries:
+        total += entry.size
+        print(f"{entry.size:>14,}  {entry.arcname}", file=out)
+    count = len(collection.entries)
+    print(f"{count:,} entries, {total:,} bytes before compression", file=out)
+    if options.max_size is not None:
+        parts = estimate_parts(options, collection.entries)
+        print(
+            f"at most {parts} part{'s' if parts != 1 else ''} of {options.max_size:,} bytes",
+            file=out,
+        )
+
+
+def run_job(
+    options: Options,
+    get_password: Callable[[Options], Password],
+    progress: Any | None = None,
+    warn: TextIO | None = None,
+) -> int:
+    """Collect, then write and verify one archive, or only plan it with `dry_run`.
+
+    Returns 0, or raises `ZipsealError`: `cli.main` turns it into an exit code
+    and the GUI turns it into a dialog. `warn` is where every warning goes,
+    including the password strength ones.
+    """
+    log = warn if warn is not None else sys.stderr
+
+    def checked(_options: Options) -> Password:
+        # The core checks every password, so no front end can skip the empty-password
+        # rejection, and the warning about a weak one lands in the caller's sink.
+        password = get_password(_options)
+        passwords.check_strength(password, log)
+        return password
+
+    with collect(
+        options.paths,
+        excludes=options.all_excludes(),
+        follow_symlinks=options.follow_symlinks,
+        output=options.output,
+        warn=log,
+    ) as collection:
+        if not collection.entries:
+            raise InputError("nothing to archive: every input was skipped or excluded")
+        if options.dry_run:
+            print_dry_run(collection, options, sys.stdout)
+            return EXIT_OK
+        results = write_archive(options, collection, checked, err=log)
+        total = sum(r.size for r in results)
+        noun = "part" if len(results) == 1 else "parts"
+        names = ", ".join(r.path.name for r in results)
+        print(
+            f"zipseal: wrote {len(results)} {noun} ({total:,} bytes) in "
+            f"{results[0].path.parent}: {names}",
+            file=log,
+        )
+        return EXIT_OK

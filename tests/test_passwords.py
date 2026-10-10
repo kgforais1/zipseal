@@ -180,7 +180,10 @@ def test_cli_usage_errors_exit_1(capsys: pytest.CaptureFixture[str]) -> None:
 
 
 def test_cli_excludes() -> None:
-    args = cli.parse_args(["a", "-o", "x.zip", "--exclude", "*.tmp"])
-    assert args.excludes == [".DS_Store", "._*", "Thumbs.db", "*.tmp"]
-    args = cli.parse_args(["a", "-o", "x.zip", "--no-default-excludes", "--exclude", "*.tmp"])
-    assert args.excludes == ["*.tmp"]
+    command = cli.parse_args(["a", "-o", "x.zip", "--exclude", "*.tmp"])
+    assert command.options.excludes == ["*.tmp"]
+    assert command.options.default_excludes
+    assert command.options.all_excludes() == [".DS_Store", "._*", "Thumbs.db", "*.tmp"]
+    command = cli.parse_args(["a", "-o", "x.zip", "--no-default-excludes", "--exclude", "*.tmp"])
+    assert not command.options.default_excludes
+    assert command.options.all_excludes() == ["*.tmp"]

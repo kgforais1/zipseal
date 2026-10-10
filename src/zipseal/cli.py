@@ -1,19 +1,23 @@
-"""Command-line entry point: argument parsing, password sources and exit codes."""
+"""Command-line entry point: argument parsing, password sources and exit codes.
+
+This module is one front end on top of `job.run_job`, the core the CLI and the
+GUI share. It turns argv into `Options` and points the core's `warn` sink at
+stderr; it holds no archive logic.
+"""
 
 import argparse
 import sys
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
+from dataclasses import dataclass
 from pathlib import Path
-from typing import NoReturn, TextIO
+from typing import NoReturn
 
 from zipseal import __version__, passwords
-from zipseal.collect import Collection, collect
-from zipseal.errors import EXIT_INTERRUPT, EXIT_OK, InputError, UsageError, ZipsealError
+from zipseal.errors import EXIT_INTERRUPT, EXIT_OK, UsageError, ZipsealError
+from zipseal.job import run_job
+from zipseal.options import DEFAULT_EXCLUDES, Options
 from zipseal.passwords import Password
-from zipseal.pipeline import estimate_parts, write_archive
 from zipseal.sizes import parse_size
-
-DEFAULT_EXCLUDES = (".DS_Store", "._*", "Thumbs.db")
 
 EPILOG = """\
 examples:
@@ -148,61 +152,53 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
-    args = build_parser().parse_args(argv)
-    args.excludes = ([] if args.no_default_excludes else list(DEFAULT_EXCLUDES)) + args.exclude
-    return args
-
-
 def get_password(args: argparse.Namespace) -> Password:
+    """Pick a password source (SPEC.md §4). Its strength is checked by the core."""
     if args.generate_password:
-        password = passwords.generate()
-    elif args.password_env:
-        password = passwords.from_env(args.password_env)
-    elif args.password_file:
-        password = passwords.from_file(args.password_file)
-    else:
-        password = passwords.from_prompt()
-    passwords.check_strength(password)
-    return password
+        return passwords.generate()
+    if args.password_env:
+        return passwords.from_env(args.password_env)
+    if args.password_file:
+        return passwords.from_file(args.password_file)
+    return passwords.from_prompt()
 
 
-def print_dry_run(collection: Collection, args: argparse.Namespace, out: TextIO) -> None:
-    total = 0
-    for entry in collection.entries:
-        total += entry.size
-        print(f"{entry.size:>14,}  {entry.arcname}", file=out)
-    count = len(collection.entries)
-    print(f"{count:,} entries, {total:,} bytes before compression", file=out)
-    if args.max_size is not None:
-        parts = estimate_parts(args, collection.entries)
-        print(
-            f"at most {parts} part{'s' if parts != 1 else ''} of {args.max_size:,} bytes", file=out
-        )
+@dataclass(frozen=True)
+class Command:
+    """One parsed command line: what to archive, and where the password comes from."""
+
+    options: Options
+    get_password: Callable[[Options], Password]
 
 
-def run(args: argparse.Namespace) -> int:
-    with collect(
-        args.paths,
-        excludes=args.excludes,
-        follow_symlinks=args.follow_symlinks,
+def options_from_args(args: argparse.Namespace) -> Options:
+    """Build the core's `Options` from argparse's namespace."""
+    return Options(
+        paths=list(args.paths),
         output=args.output,
-    ) as collection:
-        if not collection.entries:
-            raise InputError("nothing to archive: every input was skipped or excluded")
-        if args.dry_run:
-            print_dry_run(collection, args, sys.stdout)
-            return EXIT_OK
-        results = write_archive(args, collection, get_password)
-        total = sum(r.size for r in results)
-        noun = "part" if len(results) == 1 else "parts"
-        names = ", ".join(r.path.name for r in results)
-        print(
-            f"zipseal: wrote {len(results)} {noun} ({total:,} bytes) in "
-            f"{results[0].path.parent}: {names}",
-            file=sys.stderr,
-        )
-        return EXIT_OK
+        max_size=args.max_size,
+        level=args.level,
+        excludes=list(args.exclude),
+        default_excludes=not args.no_default_excludes,
+        follow_symlinks=args.follow_symlinks,
+        hide_names=args.hide_names,
+        order=args.order,
+        manifest=args.manifest,
+        no_verify=args.no_verify,
+        force=args.force,
+        dry_run=args.dry_run,
+    )
+
+
+def parse_args(argv: Sequence[str] | None = None) -> Command:
+    """Parse argv into a `Command` for `run`."""
+    args = build_parser().parse_args(argv)
+    return Command(options_from_args(args), lambda _: get_password(args))
+
+
+def run(command: Command) -> int:
+    """Run the parsed command line through the shared core, warnings to stderr."""
+    return run_job(command.options, command.get_password)
 
 
 def main(argv: Sequence[str] | None = None) -> int:

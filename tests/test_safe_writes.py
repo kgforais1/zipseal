@@ -69,10 +69,10 @@ def test_force_overwrites_only_own_targets(src: Path, tmp_path: Path) -> None:
     (out / "b.zip").write_text("old single")
     (out / "b-part07-of-09.zip").write_text("stale part")
     (out / "unrelated.zip").write_text("leave me")
-    args = args_for([src], out / "b.zip", "--force")
+    options = args_for([src], out / "b.zip", "--force")
     err = io.StringIO()
-    with collect_for(args) as c:
-        pipeline.write_archive(args, c, lambda _: Password(PASSWORD), err=err)
+    with collect_for(options) as c:
+        pipeline.write_archive(options, c, lambda _: Password(PASSWORD), err=err)
     assert extract(out / "b.zip")
     assert (out / "b-part07-of-09.zip").read_text() == "stale part"
     assert (out / "unrelated.zip").read_text() == "leave me"
@@ -122,10 +122,10 @@ def test_backup_deletion_failure_after_commit_keeps_outputs(
         return real_unlink(path, *a, **kw)
 
     monkeypatch.setattr(output_mod.os, "unlink", fail_second_backup)
-    args = args_for([src], out / "b.zip", "--max-size", "400KB", "--force")
+    options = args_for([src], out / "b.zip", "--max-size", "400KB", "--force")
     err = io.StringIO()
-    with collect_for(args) as c:
-        results = pipeline.write_archive(args, c, lambda _: Password(PASSWORD), err=err)
+    with collect_for(options) as c:
+        results = pipeline.write_archive(options, c, lambda _: Password(PASSWORD), err=err)
     monkeypatch.undo()
     assert "could not delete old outputs" in err.getvalue()
     for r in results:
