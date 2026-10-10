@@ -1,6 +1,6 @@
 # zipseal
 
-Last reviewed: 2026-10-08
+Last reviewed: 2026-10-10
 
 [![CI](https://github.com/kgforais1/zipseal/actions/workflows/ci.yml/badge.svg)](https://github.com/kgforais1/zipseal/actions/workflows/ci.yml)
 
@@ -78,6 +78,7 @@ dates. See the [security notes](user-docs/security.md).
 ## Documentation
 
 - [Quick start](user-docs/quick-start.md)
+- [The zipseal window](user-docs/gui.md)
 - [CLI reference](user-docs/cli.md)
 - [Opening the archives](user-docs/opening-archives.md)
 - [Security notes](user-docs/security.md)

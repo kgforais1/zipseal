@@ -5,6 +5,22 @@ edits and refactors. User-visible changes go in [`CHANGELOG.md`](CHANGELOG.md).
 
 ## [Unreleased]
 
+### Added
+
+- Shared core for both front ends (`Options` in `options.py`, `run_job` in
+  `job.py`), so the CLI and the GUI cannot drift apart.
+- A `Progress` protocol (`progress.py`) wired into `pipeline.write_archive`,
+  `one_part`, the `write.py` chunk loop and the verify loop. The CLI's TTY
+  progress lines are now one `Progress` implementation.
+- GUI tests that run without a display: `tests/test_gui.py` drives the
+  controller headlessly, and a `gui` pytest marker covers tests that need a
+  real Tk window (deselected by default, run with `-m gui`).
+
+### Changed
+
+- `pipeline.py`, `write.py` and the test helpers take `Options` instead of an
+  `argparse.Namespace` (plan: `dev-docs/plans/2026-10-10-gui.md`).
+
 ## [0.1.0] - 2026-10-08
 
 ### Added

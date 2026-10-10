@@ -6,6 +6,17 @@ All notable user-facing changes are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- `zipseal-gui`, a Tkinter window over the same core. It adds files and
+  folders, sets the part size, level, excludes and name hiding, runs a dry
+  run, and shows progress and warnings in a log area (`user-docs/gui.md`).
+- A generated password is shown once in a modal after a successful run, never
+  in the log area, and the clipboard it may be copied to is cleared soon
+  after.
+- The window asks before replacing outputs from an earlier run, instead of
+  stopping, and nothing is saved between sessions.
+
 ## [0.1.0] - 2026-10-08
 
 ### Added

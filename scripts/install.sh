@@ -1,5 +1,5 @@
 #!/usr/bin/env sh
-# Install zipseal's commands (zipseal, and zipseal-gui once it exists) on PATH.
+# Install zipseal's commands (zipseal and zipseal-gui) on PATH.
 #
 # Usage: scripts/install.sh            # editable: picks up source changes
 #        scripts/install.sh --release  # snapshot copy of the current tree
@@ -34,4 +34,4 @@ case ":$PATH:" in
         exit 1
         ;;
 esac
-echo "install.sh: installed. Try: zipseal --help"
+echo "install.sh: installed. Try: zipseal --help, or zipseal-gui"

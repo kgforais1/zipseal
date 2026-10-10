@@ -1,13 +1,14 @@
 # AGENTS.md
 
-Last reviewed: 2026-10-08
+Last reviewed: 2026-10-10
 
 Single source of truth for AI coding agents in this repository. `CLAUDE.md` is a
 thin pointer back here.
 
 `zipseal` is a Python CLI that writes files and folders into AES-256 encrypted
 zips. It can split output into self-contained parts that each stay under a size
-cap. The design lives in [`SPEC.md`](SPEC.md).
+cap. `zipseal-gui` is a Tkinter window over the same core. The design lives in
+[`SPEC.md`](SPEC.md).
 
 ## Status
 
@@ -20,6 +21,7 @@ v0.1.0 is released. The v1 plan is complete and archived in
 | If you are… | Read |
 |---|---|
 | Implementing a feature | `SPEC.md` §4–§6 for behavior, then the active plan for order and tests |
+| Working on the GUI | `SPEC.md` §5.1, `src/zipseal/gui.py`, `src/zipseal/gui_view.py`, `user-docs/gui.md` |
 | Touching passwords, encryption, or file writes | `SPEC.md` §6.5–§6.7 and §7, then the security rules below |
 | Starting or finishing a plan, or logging done work | [`dev-docs/README.md`](dev-docs/README.md) |
 | Picking the next task | [`TODO.md`](TODO.md) and the active plan in `dev-docs/plans/` |
@@ -32,11 +34,13 @@ The project uses `uv`.
 ```sh
 uv sync                        # install dependencies
 uv run zipseal --help          # run the CLI
-uv run pytest                  # fast tests
+uv run zipseal-gui             # open the window (needs a display)
+uv run pytest                  # fast tests (the gui and slow suites are deselected)
 uv run pytest -m slow          # Zip64 / 4 GiB tests
+uv run pytest -m gui           # tests that need a real Tk display
 pre-commit run --all-files     # lint, format, secret scan, file-size policy
 uv run python scripts/make_samples.py  # rebuild sample archives in sample-data/
-scripts/install.sh             # put zipseal on PATH (editable uv tool install)
+scripts/install.sh             # put zipseal and zipseal-gui on PATH (editable)
 ```
 
 Run `pre-commit install` once per clone to enable the git hook.
@@ -48,7 +52,8 @@ SPEC.md               design; the source of truth for behavior
 TODO.md               future work only; never records finished work
 CHANGELOG.md          finished user-visible work
 CHANGELOG.dev.md      finished internal work (harness, hooks, CI, tests)
-src/zipseal/          cli, collect, plan, sources, write, verify, zipcheck, output, pipeline
+src/zipseal/          cli, collect, plan, sources, write, verify, zipcheck, output,
+                      pipeline, options, job, progress, gui, gui_view
 tests/                pytest; fixtures are generated in tmp_path
 user-docs/            docs for people who run zipseal or open its archives
 dev-docs/plans/       active plans; finished ones move to plans/archive/
@@ -65,7 +70,9 @@ These rules are the point of the tool. Treat a violation as a bug.
 
 - Never default to ZipCrypto. AES-256 (WinZip AE-2) is the only default.
 - Never put a password in argv, logs, exceptions, progress output, or test
-  output. `--generate-password` prints it once, to stderr only.
+  output. `--generate-password` prints it once, to `password_out`, which the
+  CLI points at stderr, and the GUI points nowhere: a generated password is
+  shown once in a modal (`SPEC.md` §5.1).
 - Never write plaintext to disk. That includes temp files, the `--hide-names`
   inner zip, and debug dumps.
 - Write parts as `.partial`, verify, then rename. Delete every `.partial` on
@@ -89,7 +96,10 @@ These rules are the point of the tool. Treat a violation as a bug.
 - Keep source files under 600 lines. `hooks/scripts/check_file_size.py` warns at
   600 and blocks at 1000.
 - Every behavior in the plan's test list gets a pytest test. Mark slow
-  tests with `@pytest.mark.slow`. Skip `7zz` tests when the binary is missing.
+  tests with `@pytest.mark.slow`, tests that need a real Tk display with
+  `@pytest.mark.gui`, and skip `7zz` tests when the binary is missing. Both
+  markers are deselected by `addopts`; run their suites with `-m`. The GUI
+  controller is plain Python with no Tk import, so it is tested headlessly.
 - If code and `SPEC.md` disagree, fix one of them in the same change. Do not
   leave the spec stale.
 - Follow the plan lifecycle and doc gardening rules in

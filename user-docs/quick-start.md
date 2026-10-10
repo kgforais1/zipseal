@@ -1,6 +1,6 @@
 # Quick start
 
-Last reviewed: 2026-10-08
+Last reviewed: 2026-10-10
 
 ## Install
 
@@ -52,6 +52,9 @@ zipseal reports/ -o bundle.zip --max-size 20MB --dry-run
 
 `--dry-run` lists what would be archived and the most parts it could take.
 It writes nothing and asks for no password.
+
+The same job, with a window instead of a command line, is in
+[the GUI guide](gui.md).
 
 Next: [CLI reference](cli.md), [opening the archives](opening-archives.md),
 and [security notes](security.md).

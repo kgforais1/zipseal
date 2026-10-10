@@ -1,4 +1,6 @@
 config:
   MD013: false # Prose and tables wrap freely.
+  MD024:
+    siblings_only: true # Changelogs reuse Added/Changed under every release.
   MD040: false # Usage blocks have no meaningful language.
   MD060: false # Tables use compact pipe style.
