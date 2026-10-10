@@ -13,16 +13,25 @@ if ! command -v uv >/dev/null 2>&1; then
     exit 1
 fi
 
+if [ "$#" -gt 1 ]; then
+    echo "usage: $0 [--release | --uninstall]" >&2
+    exit 2
+fi
+
 case "${1:-}" in
     "") uv tool install --force --editable "$repo" ;;
     --release) uv tool install --force "$repo" ;;
-    --uninstall) uv tool uninstall zipseal; exit 0 ;;
+    --uninstall) uv tool uninstall zipseal || true; exit 0 ;;
     *) echo "usage: $0 [--release | --uninstall]" >&2; exit 2 ;;
 esac
 
 bin=$(uv tool dir --bin)
 case ":$PATH:" in
     *":$bin:"*) ;;
-    *) echo "install.sh: $bin is not on PATH. Run: uv tool update-shell" >&2 ;;
+    *)
+        echo "install.sh: installed, but $bin is not on PATH." >&2
+        echo "install.sh: run 'uv tool update-shell', then open a new shell." >&2
+        exit 1
+        ;;
 esac
 echo "install.sh: installed. Try: zipseal --help"
