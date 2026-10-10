@@ -15,6 +15,7 @@ dependencies = [
 
 [project.scripts]
 zipseal = "zipseal.cli:main"
+zipseal-gui = "zipseal.gui:main"
 
 [dependency-groups]
 dev = [

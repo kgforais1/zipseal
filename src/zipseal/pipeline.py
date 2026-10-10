@@ -96,7 +96,15 @@ def write_archive(
     get_password: Callable[[Options], Password],
     progress: Progress | None = None,
     err: TextIO | None = None,
+    password_out: TextIO | None = None,
 ) -> list[PartResult]:
+    """Write, verify and publish every part.
+
+    `password_out` is where the generated password is printed once, after the last
+    part verifies and just before publication (SPEC.md §6.6). It defaults to
+    nowhere: a caller that keeps warnings in a log of its own must pass it
+    explicitly, so a generated password can never reach that log by accident.
+    """
     log: TextIO = err or sys.stderr
     entries = collection.entries
     out = Output(options.output, force=options.force, warn=log)
@@ -154,8 +162,8 @@ def write_archive(
             if progress is not None:
                 progress.part_verified(number, size)
         finals = out.final_names(len(results))
-        if password.generated:
-            print(f"zipseal: generated password: {password.value}", file=log)
+        if password.generated and password_out is not None:
+            print(f"zipseal: generated password: {password.value}", file=password_out)
         out.publish([r.path for r in results], finals)
         for r, final in zip(results, finals, strict=True):
             r.path = final

@@ -232,7 +232,13 @@ def run(command: Command) -> int:
     log = sys.stderr
     verifying = not command.options.no_verify
     progress = _TtyProgress(log, verifying=verifying) if log.isatty() else None
-    return run_job(command.options, command.get_password, progress=progress, warn=log)
+    return run_job(
+        command.options,
+        command.get_password,
+        progress=progress,
+        warn=log,
+        password_out=log,
+    )
 
 
 def main(argv: Sequence[str] | None = None) -> int:

@@ -44,14 +44,21 @@ def run_job(
     get_password: Callable[[Options], Password],
     progress: Progress | None = None,
     warn: TextIO | None = None,
+    out: TextIO | None = None,
+    password_out: TextIO | None = None,
 ) -> int:
     """Collect, then write and verify one archive, or only plan it with `dry_run`.
 
     Returns 0, or raises `ZipsealError`: `cli.main` turns it into an exit code
     and the GUI turns it into a dialog. `warn` is where every warning goes,
-    including the password strength ones.
+    including the password strength ones; `out` is where the dry-run plan goes.
+
+    `password_out` is where the generated password is printed once, after the last
+    part verifies and just before publication. It defaults to nowhere, so a front
+    end with a log of its own (the GUI) never shows the password there.
     """
     log = warn if warn is not None else sys.stderr
+    report = out if out is not None else sys.stdout
 
     def checked(_options: Options) -> Password:
         # The core checks every password, so no front end can skip the empty-password
@@ -70,9 +77,11 @@ def run_job(
         if not collection.entries:
             raise InputError("nothing to archive: every input was skipped or excluded")
         if options.dry_run:
-            print_dry_run(collection, options, sys.stdout)
+            print_dry_run(collection, options, report)
             return EXIT_OK
-        results = write_archive(options, collection, checked, progress=progress, err=log)
+        results = write_archive(
+            options, collection, checked, progress=progress, err=log, password_out=password_out
+        )
         total = sum(r.size for r in results)
         noun = "part" if len(results) == 1 else "parts"
         names = ", ".join(r.path.name for r in results)
