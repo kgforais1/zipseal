@@ -36,6 +36,7 @@ uv run pytest                  # fast tests
 uv run pytest -m slow          # Zip64 / 4 GiB tests
 pre-commit run --all-files     # lint, format, secret scan, file-size policy
 uv run python scripts/make_samples.py  # rebuild sample archives in sample-data/
+scripts/install.sh             # put zipseal on PATH (editable uv tool install)
 ```
 
 Run `pre-commit install` once per clone to enable the git hook.
