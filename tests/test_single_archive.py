@@ -277,17 +277,20 @@ def test_partial_planted_after_preflight_not_followed(
     out = tmp_path / "out/bundle.zip"
     victim = tmp_path / "victim.txt"
     victim.write_text("do not touch")
-    real = output_mod.Output.new_partial
+    real = output_mod.create_exclusive
+    planted: list[Path] = []
 
-    def plant(self, number):  # type: ignore[no-untyped-def]
-        path = real(self, number)
+    def plant(path: Path) -> int:
         path.symlink_to(victim)
-        return path
+        planted.append(path)
+        return real(path)
 
-    monkeypatch.setattr(output_mod.Output, "new_partial", plant)
+    monkeypatch.setattr(output_mod, "create_exclusive", plant)
     with pytest.raises(WriteError, match="refusing to write through"):
         archive([tree], out)
     assert victim.read_text() == "do not touch"
+    # The run did not create the planted name, so its cleanup leaves it alone.
+    assert planted and all(p.is_symlink() for p in planted)
 
 
 def test_leftover_partial_fails_preflight(tree: Path, tmp_path: Path) -> None:

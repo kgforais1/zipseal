@@ -34,6 +34,13 @@ class Progress(Protocol):
         """
         ...
 
+    def verifying(self, parts: int) -> None:
+        """Every part is written, and decrypting `parts` parts is about to start.
+
+        Not called for a `no_verify` run.
+        """
+        ...
+
     def part_verified(self, number: int, size: int) -> None:
         """Part `number` passed its post-write check, and `size` is its size on disk.
 

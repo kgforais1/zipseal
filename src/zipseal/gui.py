@@ -23,6 +23,7 @@ from __future__ import annotations
 import io
 import queue
 import threading
+import time
 import traceback
 from dataclasses import dataclass
 from pathlib import Path
@@ -48,7 +49,7 @@ class Log(NamedTuple):
 class ProgressUpdate(NamedTuple):
     """One of the core's `Progress` events, for the status line and the bar."""
 
-    phase: str  # "started", "bytes" or "verified"
+    phase: str  # "started", "bytes", "verifying" or "verified"
     number: int  # the part, or 0 when the phase has no part number
     value: int  # bytes written, or the verified part's size
 
@@ -112,18 +113,33 @@ class _LogSink(io.StringIO):
         """Nothing is buffered on disk, so `print(..., flush=True)` changes nothing."""
 
 
+BYTES_INTERVAL = 0.1  # seconds between byte-count events, so the queue stays short
+
+
 class _QueueProgress:
     """A `Progress` that puts events on the queue. It runs in the worker thread, so
-    the queue is the only thing it touches."""
+    the queue is the only thing it touches.
+
+    Byte counts are running totals, so each one replaces the last. At most one is
+    queued per `BYTES_INTERVAL`, which bounds the queue however fast the disk is.
+    """
 
     def __init__(self, events: queue.Queue[Event]) -> None:
         self._events = events
+        self._last_bytes = float("-inf")
 
     def part_started(self, number: int) -> None:
         self._events.put(ProgressUpdate("started", number, 0))
+        self._last_bytes = float("-inf")
 
     def bytes_written(self, written: int) -> None:
-        self._events.put(ProgressUpdate("bytes", 0, written))
+        now = time.monotonic()
+        if now - self._last_bytes >= BYTES_INTERVAL:
+            self._last_bytes = now
+            self._events.put(ProgressUpdate("bytes", 0, written))
+
+    def verifying(self, parts: int) -> None:
+        self._events.put(ProgressUpdate("verifying", 0, parts))
 
     def part_verified(self, number: int, size: int) -> None:
         self._events.put(ProgressUpdate("verified", number, size))
@@ -221,10 +237,10 @@ class Controller:
         """
         options = build_options(spec)
         secret: Password | None = None
-        if generate:
+        if generate and not spec.dry_run:
             # Made here, on the main thread, before the worker exists (plan).
             self._generated = secret = passwords.generate()
-        elif not spec.dry_run:
+        elif not spec.dry_run and not generate:
             if password != confirm:
                 raise UsageError("the two passwords do not match")
             secret = Password(password)

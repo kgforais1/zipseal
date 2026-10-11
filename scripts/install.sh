@@ -21,7 +21,15 @@ fi
 case "${1:-}" in
     "") uv tool install --force --editable "$repo" ;;
     --release) uv tool install --force "$repo" ;;
-    --uninstall) uv tool uninstall zipseal || true; exit 0 ;;
+    --uninstall)
+        # Not installed counts as done; any other failure is reported.
+        if uv tool list | grep -q '^zipseal '; then
+            uv tool uninstall zipseal
+        else
+            echo "install.sh: zipseal is not installed"
+        fi
+        exit 0
+        ;;
     *) echo "usage: $0 [--release | --uninstall]" >&2; exit 2 ;;
 esac
 

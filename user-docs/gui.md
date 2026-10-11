@@ -87,10 +87,13 @@ Both fields are cleared after every run, whether it worked or not.
 After a successful run, a window shows the generated password once. Copy it
 with the `Copy` button or with your keyboard, then close the window.
 
-`Copy` puts the password on your clipboard, and other apps can read a
-clipboard. zipseal clears it when you close that window, and again 60 seconds
+Either way of copying puts the password on your clipboard, and other apps
+can read a clipboard. zipseal clears it when you close that window, and again 60 seconds
 after you copy. Other apps can still take it in between, so copy it and move
 on. The password is never written to the log area.
+
+You cannot close the main window while an archive is being written. That
+keeps a generated password from being lost before it is shown.
 
 ### If something goes wrong
 

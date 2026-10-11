@@ -237,6 +237,28 @@ def test_a_dry_run_asks_for_no_password(tmp_path: Path) -> None:
     assert controller.take_generated_password() is None
 
 
+def test_a_dry_run_with_generate_makes_no_password(tmp_path: Path) -> None:
+    """A dry run writes no archive, so there is no password to show."""
+    controller = Controller()
+    events = start(controller, spec(tmp_path, dry_run=True), generate=True)
+    assert isinstance(events[-1], Done)
+    assert controller.take_generated_password() is None
+
+
+def test_byte_events_are_throttled(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Running totals replace each other, so only one per interval is queued."""
+    from zipseal import gui
+
+    clock = iter([0.0, 0.01, 0.02, 0.5, 0.51])
+    monkeypatch.setattr(gui.time, "monotonic", lambda: next(clock))
+    events: queue.Queue[object] = queue.Queue()
+    progress = gui._QueueProgress(events)  # type: ignore[arg-type]
+    for written in (10, 20, 30, 40, 50):
+        progress.bytes_written(written)
+    queued = [events.get_nowait() for _ in range(events.qsize())]
+    assert [e.value for e in queued] == [10, 40]  # type: ignore[attr-defined]
+
+
 def test_an_empty_password_is_rejected_by_the_core(tmp_path: Path) -> None:
     controller = Controller()
     events = start(controller, spec(tmp_path), password="", confirm="")
@@ -283,8 +305,10 @@ def test_progress_events_reach_the_view(tmp_path: Path) -> None:
     assert [(e.phase, e.number, e.value) for e in progress(events) if e.phase == "started"] == [
         ("started", 1, 0)
     ]
+    size = (tmp_path / "out" / "b.zip").stat().st_size
     written = [e.value for e in progress(events) if e.phase == "bytes"]
-    assert written == sorted(written) and written
+    assert written and written == sorted(written)
+    assert 0 < written[0] and written[-1] <= size
     verified = [e for e in progress(events) if e.phase == "verified"]
     assert [(e.number, e.value) for e in verified] == [
         (1, (tmp_path / "out" / "b.zip").stat().st_size)

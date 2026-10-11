@@ -43,6 +43,8 @@ class View:
         self.root = root
         self.controller = controller if controller is not None else Controller()
         self._clipboard: str | None = None
+        self._clipboard_timer: str | None = None
+        self._busy = False
 
         root.title("zipseal")
         root.columnconfigure(0, weight=1)
@@ -230,7 +232,8 @@ class View:
         """Read the window, ask about overwriting, then hand the job to the worker."""
         try:
             spec = self._read_form(dry_run=dry_run)
-            clashes = existing_outputs(build_options(spec))
+            # A dry run writes nothing, so it has nothing to overwrite.
+            clashes = [] if spec.dry_run else existing_outputs(build_options(spec))
         except ZipsealError as exc:
             self._report(str(exc))
             return
@@ -273,6 +276,8 @@ class View:
             self.status.set(f"writing part {number} …")
         elif phase == "bytes":
             self.status.set(f"{value:,} bytes written")
+        elif phase == "verifying":
+            self.status.set(f"verifying {value} part(s) …")
         else:
             self.status.set(f"part {number} verified, {value:,} bytes")
 
@@ -298,12 +303,14 @@ class View:
 
     def _clear_fields(self) -> None:
         """Blank both password fields after every run, success or failure."""
-        self.password.delete(0, "end")
-        self.confirm.delete(0, "end")
+        # Re-enable the fields first: a disabled entry ignores `delete`.
         self.generate.set(False)
         self._mask_fields()
+        self.password.delete(0, "end")
+        self.confirm.delete(0, "end")
 
     def _set_busy(self, busy: bool) -> None:
+        self._busy = busy
         for widget in (self.dry_button, self.run_button):
             widget.configure(state="disabled" if busy else "normal")
         if busy:
@@ -318,7 +325,14 @@ class View:
         self.log.configure(state="disabled")
 
     def _quit(self) -> None:
-        """Close the window, clearing the clipboard first if it holds a password."""
+        """Close the window, clearing the clipboard first if it holds a password.
+
+        Not while a job runs: closing would kill the worker, and a generated
+        password would be lost before its modal could show it.
+        """
+        if self._busy:
+            messagebox.showinfo("zipseal", "An archive is being written. Wait for it to finish.")
+            return
         self._clear_clipboard()
         self.root.destroy()
 
@@ -359,6 +373,8 @@ class View:
             top.destroy()
 
         # Selected, so the keyboard can copy it without a "show password" toggle.
+        # A keyboard copy goes through `_copy` too, so it gets the same cleanup.
+        shown.bind("<<Copy>>", lambda _event: (self._copy(shown.get()), "break")[1])
         shown.select_range(0, "end")
         shown.focus_set()
         top.grab_set()
@@ -373,7 +389,10 @@ class View:
         self.root.clipboard_clear()
         self.root.clipboard_append(value)
         self._clipboard = value
-        self.root.after(CLIPBOARD_MS, self._clear_clipboard)
+        # Restart the timer, so an older copy's timer cannot clear this one early.
+        if self._clipboard_timer is not None:
+            self.root.after_cancel(self._clipboard_timer)
+        self._clipboard_timer = self.root.after(CLIPBOARD_MS, self._clear_clipboard)
 
     def _clear_clipboard(self) -> None:
         """Clear the clipboard only if it still holds the password.
@@ -382,6 +401,9 @@ class View:
         effort: it compares inside a `TclError` guard and gives up quietly.
         """
         secret, self._clipboard = self._clipboard, None
+        if self._clipboard_timer is not None:
+            self.root.after_cancel(self._clipboard_timer)
+            self._clipboard_timer = None
         if secret is None:
             return
         try:

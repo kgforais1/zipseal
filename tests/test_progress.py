@@ -36,6 +36,9 @@ class Recorder:
     def bytes_written(self, written: int) -> None:
         self.events.append(("bytes", self.part, written))
 
+    def verifying(self, parts: int) -> None:
+        self.events.append(("verifying", 0, parts))
+
     def part_verified(self, number: int, size: int) -> None:
         self.events.append(("verified", number, size))
 
@@ -91,6 +94,8 @@ def test_bytes_grow_and_end_at_the_part_size(tmp_path: Path) -> None:
         elif kind == "bytes":
             assert value > seen[number], "byte counts only grow"
             seen[number] = value
+        elif kind == "verifying":
+            assert value == len(results)
         else:
             assert kind == "verified"
             assert value == seen[number] == results[number - 1].size
@@ -101,6 +106,11 @@ def test_parts_are_written_before_any_is_verified(tmp_path: Path) -> None:
     results, rec = archive_with(tmp_path, "--max-size", "400KB")
     assert rec.numbers("started") == list(range(1, len(results) + 1))
     assert rec.numbers("verified") == rec.numbers("started")
+    kinds = [kind for kind, _, _ in rec.events]
+    first_check = kinds.index("verifying")
+    assert "started" not in kinds[first_check:]
+    assert kinds[first_check + 1 :].count("verified") == len(results)
+    assert ("verifying", 0, len(results)) in rec.events
 
 
 def test_planned_parts_report_the_same_shape(tmp_path: Path) -> None:
@@ -155,8 +165,8 @@ def test_run_job_forwards_progress(tmp_path: Path) -> None:
     options = Options(paths=[src], output=tmp_path / "out/b.zip")
     assert run_job(options, lambda _: Password(PASSWORD), progress=rec) == EXIT_OK
     kinds = [kind for kind, _, _ in rec.events]
-    assert kinds[0] == "started" and kinds[-1] == "verified"
-    assert set(kinds[1:-1]) == {"bytes"}
+    assert kinds[0] == "started" and kinds[-2:] == ["verifying", "verified"]
+    assert set(kinds[1:-2]) == {"bytes"}
     assert rec.of("verified")[0][2] == (tmp_path / "out/b.zip").stat().st_size
     assert (tmp_path / "out/b.zip").exists()
 
@@ -178,6 +188,7 @@ def test_tty_progress_lines() -> None:
     progress.bytes_written(64)
     progress.part_started(2)
     progress.bytes_written(64)
+    progress.verifying(2)
     progress.part_verified(1, 100)
     progress.part_verified(2, 200)
     assert out.getvalue() == (
@@ -187,12 +198,12 @@ def test_tty_progress_lines() -> None:
     )
 
 
-def test_tty_progress_is_silent_without_verification() -> None:
+def test_tty_progress_announces_verification_before_it_runs() -> None:
     out = io.StringIO()
-    progress = cli._TtyProgress(out, verifying=False)
+    progress = cli._TtyProgress(out)
     progress.part_started(1)
-    progress.part_verified(1, 100)
-    assert out.getvalue() == "zipseal: writing part 1 ...\n"
+    progress.verifying(1)
+    assert out.getvalue() == "zipseal: writing part 1 ...\nzipseal: verifying 1 part(s) ...\n"
 
 
 class _FakeTty(io.StringIO):

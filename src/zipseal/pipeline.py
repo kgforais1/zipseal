@@ -130,13 +130,13 @@ def write_archive(
         results: list[PartResult] = []
 
         def one_part(queue: deque[FileEntry]) -> None:
-            path = out.new_partial(len(results) + 1)
+            path, fd = out.new_partial(len(results) + 1)
             if progress is not None:
                 progress.part_started(len(results) + 1)
             budget = PartBudget(layout)
             results.append(
                 write_part(
-                    collection, queue, budget, password, options.level, path, extras, progress
+                    collection, queue, budget, password, options.level, path, extras, progress, fd
                 )
             )
 
@@ -152,6 +152,8 @@ def write_archive(
             while queue:
                 one_part(queue)
 
+        if progress is not None and not options.no_verify:
+            progress.verifying(len(results))
         for number, r in enumerate(results, 1):
             size = os.stat(r.path).st_size
             if options.max_size is not None and size > options.max_size:

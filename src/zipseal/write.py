@@ -23,6 +23,7 @@ from stream_zip import NO_COMPRESSION_32, NO_COMPRESSION_64, ZIP_32, ZIP_64, str
 from zipseal import plan
 from zipseal.collect import DOS_MIN, Collection, FileEntry
 from zipseal.errors import WriteError
+from zipseal.output import create_exclusive
 from zipseal.passwords import Password
 from zipseal.plan import PartBudget
 from zipseal.progress import Progress
@@ -185,17 +186,6 @@ class _Members:
             self._settle()
 
 
-def create_exclusive(path: Path) -> int:
-    """Create a new file with mode 0600. Never follow or reuse an existing name."""
-    flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW
-    try:
-        return os.open(path, flags, 0o600)
-    except FileExistsError:
-        raise WriteError(f"{path}: already exists; refusing to write through it") from None
-    except OSError as exc:
-        raise WriteError(f"{path}: {exc.strerror}") from None
-
-
 class _Tee:
     """Count the inner zip's bytes on their way into the outer entry."""
 
@@ -218,12 +208,14 @@ def write_part(
     path: Path,
     extras: list[Extra] | None = None,
     progress: Progress | None = None,
+    fd: int | None = None,
 ) -> PartResult:
     """Write entries from the front of `queue` to a new file at `path` until one does
     not fit `budget`. Admitted entries are removed from the queue. `extras` are
     appended to the part; their size must already be reserved in the layout.
 
     `progress`, when given, hears `bytes_written` for every chunk written here.
+    `fd`, when given, is the already-created file at `path`; this function closes it.
     """
     layout = budget.layout
     result = PartResult(path)
@@ -252,7 +244,8 @@ def write_part(
     else:
         stream = inner
 
-    fd = create_exclusive(path)
+    if fd is None:
+        fd = create_exclusive(path)
     try:
         for chunk in stream:
             view = memoryview(chunk)

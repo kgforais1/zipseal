@@ -87,10 +87,16 @@ class Output:
 
     # ── while writing ─────────────────────────────────────────────────────────
 
-    def new_partial(self, number: int) -> Path:
+    def new_partial(self, number: int) -> tuple[Path, int]:
+        """Create the next `.partial` file and return its path and open descriptor.
+
+        The path is registered for cleanup only after this run has created it, so a
+        failed create never deletes a file another run owns.
+        """
         path = self.dir / f"{self.stem}-part{number:02d}{self.suffix}.partial"
+        fd = create_exclusive(path)
         self.partials.append(path)
-        return path
+        return path, fd
 
     def final_names(self, count: int) -> list[Path]:
         if count == 1:
@@ -180,3 +186,14 @@ class Output:
             except FileNotFoundError:
                 pass
         self.partials.clear()
+
+
+def create_exclusive(path: Path) -> int:
+    """Create a new file with mode 0600. Never follow or reuse an existing name."""
+    flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW
+    try:
+        return os.open(path, flags, 0o600)
+    except FileExistsError:
+        raise WriteError(f"{path}: already exists; refusing to write through it") from None
+    except OSError as exc:
+        raise WriteError(f"{path}: {exc.strerror}") from None
