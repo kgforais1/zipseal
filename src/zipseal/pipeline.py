@@ -130,10 +130,10 @@ def write_archive(
         results: list[PartResult] = []
 
         def one_part(queue: deque[FileEntry]) -> None:
-            path, fd = out.new_partial(len(results) + 1)
             if progress is not None:
                 progress.part_started(len(results) + 1)
             budget = PartBudget(layout)
+            path, fd = out.new_partial(len(results) + 1)
             results.append(
                 write_part(
                     collection, queue, budget, password, options.level, path, extras, progress, fd

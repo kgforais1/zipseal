@@ -225,6 +225,8 @@ class View:
     def run(self) -> None:
         """Show the window and start polling the queue."""
         self.root.protocol("WM_DELETE_WINDOW", self._quit)
+        # macOS sends the app menu's Quit (Cmd-Q) here, so it gets the same guard.
+        self.root.createcommand("::tk::mac::Quit", self._quit)
         self.root.after(POLL_MS, self._poll)
         self.root.mainloop()
 

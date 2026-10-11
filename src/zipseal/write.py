@@ -217,32 +217,38 @@ def write_part(
     `progress`, when given, hears `bytes_written` for every chunk written here.
     `fd`, when given, is the already-created file at `path`; this function closes it.
     """
-    layout = budget.layout
-    result = PartResult(path)
-    counter = _Counter(level)
-    members = _Members(collection, queue, budget, counter, extras or [])
-    inner = stream_zip(
-        members,
-        chunk_size=OUTPUT_CHUNK,
-        get_compressobj=counter.factory,
-        extended_timestamps=False,
-        password=None if layout.hide_names else password.for_stream_zip(),
-    )
-    tee: _Tee | None = None
-    outer_counter: _Counter | None = None
-    if layout.hide_names:
-        tee = _Tee(inner)
-        outer_counter = _Counter(0)
-        method = ZIP_64 if layout.outer64 else ZIP_32
-        stream = stream_zip(
-            [(plan.OUTER_NAME, DOS_MIN, stat.S_IFREG | 0o600, method, tee)],
+    try:
+        layout = budget.layout
+        result = PartResult(path)
+        counter = _Counter(level)
+        members = _Members(collection, queue, budget, counter, extras or [])
+        inner = stream_zip(
+            members,
             chunk_size=OUTPUT_CHUNK,
-            get_compressobj=outer_counter.factory,
+            get_compressobj=counter.factory,
             extended_timestamps=False,
-            password=password.for_stream_zip(),
+            password=None if layout.hide_names else password.for_stream_zip(),
         )
-    else:
-        stream = inner
+        tee: _Tee | None = None
+        outer_counter: _Counter | None = None
+        if layout.hide_names:
+            tee = _Tee(inner)
+            outer_counter = _Counter(0)
+            method = ZIP_64 if layout.outer64 else ZIP_32
+            stream = stream_zip(
+                [(plan.OUTER_NAME, DOS_MIN, stat.S_IFREG | 0o600, method, tee)],
+                chunk_size=OUTPUT_CHUNK,
+                get_compressobj=outer_counter.factory,
+                extended_timestamps=False,
+                password=password.for_stream_zip(),
+            )
+        else:
+            stream = inner
+    except BaseException:
+        # A caller-supplied fd is ours to close, even if setup fails.
+        if fd is not None:
+            os.close(fd)
+        raise
 
     if fd is None:
         fd = create_exclusive(path)
