@@ -13,7 +13,7 @@ An item that needs more than a few lines of thought gets a plan in
 
 ## Next
 
-- Build the desktop GUI ([plan](dev-docs/plans/2026-10-10-gui.md)).
+- Nothing scheduled. Pick from Later.
 
 ## Later
 
