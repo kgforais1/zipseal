@@ -2,7 +2,6 @@
 
 import os
 import sys
-from argparse import Namespace
 from collections import deque
 from collections.abc import Callable
 from datetime import datetime
@@ -11,9 +10,11 @@ from typing import TextIO
 from zipseal import plan
 from zipseal.collect import DOS_MAX, DOS_MIN, Collection, FileEntry
 from zipseal.errors import InputError, VerifyError, WriteError
+from zipseal.options import Options
 from zipseal.output import Output
 from zipseal.passwords import Password
 from zipseal.plan import Layout, PartBudget
+from zipseal.progress import Progress
 from zipseal.verify import verify_part
 from zipseal.write import Extra, PartResult, write_part
 
@@ -53,12 +54,12 @@ class _Manifest:
         )
 
 
-def make_layout(args: Namespace, entries: list[FileEntry], manifest: _Manifest | None) -> Layout:
-    layout = Layout(args.max_size, hide_names=args.hide_names)
+def make_layout(options: Options, entries: list[FileEntry], manifest: _Manifest | None) -> Layout:
+    layout = Layout(options.max_size, hide_names=options.hide_names)
     if manifest is not None:
         layout.reserve = manifest.reserve(layout.encrypted)
-    if args.hide_names:
-        layout.outer64 = plan.outer_zip64(args.max_size, _worst_inner(entries))
+    if options.hide_names:
+        layout.outer64 = plan.outer_zip64(options.max_size, _worst_inner(entries))
     return layout
 
 
@@ -79,35 +80,44 @@ def check_fits(entries: list[FileEntry], layout: Layout) -> None:
         )
 
 
-def estimate_parts(args: Namespace, entries: list[FileEntry]) -> int:
+def estimate_parts(options: Options, entries: list[FileEntry]) -> int:
     """The "at most N parts" figure for --dry-run."""
-    manifest = _Manifest(entries) if args.manifest else None
-    layout = make_layout(args, entries, manifest)
+    manifest = _Manifest(entries) if options.manifest else None
+    layout = make_layout(options, entries, manifest)
     check_fits(entries, layout)
     if layout.max_size is None:
         return 1
-    return len(plan.assign_upfront(entries, layout, args.order))
+    return len(plan.assign_upfront(entries, layout, options.order))
 
 
 def write_archive(
-    args: Namespace,
+    options: Options,
     collection: Collection,
-    get_password: Callable[[Namespace], Password],
+    get_password: Callable[[Options], Password],
+    progress: Progress | None = None,
     err: TextIO | None = None,
+    password_out: TextIO | None = None,
 ) -> list[PartResult]:
+    """Write, verify and publish every part.
+
+    `password_out` is where the generated password is printed once, after the last
+    part verifies and just before publication (SPEC.md §6.6). It defaults to
+    nowhere: a caller that keeps warnings in a log of its own must pass it
+    explicitly, so a generated password can never reach that log by accident.
+    """
     log: TextIO = err or sys.stderr
     entries = collection.entries
-    out = Output(args.output, force=args.force, warn=log)
+    out = Output(options.output, force=options.force, warn=log)
     out.preflight()
-    manifest = _Manifest(entries) if args.manifest else None
-    layout = make_layout(args, entries, manifest)
+    manifest = _Manifest(entries) if options.manifest else None
+    layout = make_layout(options, entries, manifest)
     check_fits(entries, layout)
 
     # Upfront assignment for --order size and --manifest (§6.3); else stream.
     groups: list[list[FileEntry]] | None = None
     extras: list[Extra] = []
-    if layout.max_size is not None and (args.order == "size" or manifest is not None):
-        groups = plan.assign_upfront(entries, layout, args.order)
+    if layout.max_size is not None and (options.order == "size" or manifest is not None):
+        groups = plan.assign_upfront(entries, layout, options.order)
     if manifest is not None:
         if groups is None:
             groups = [list(entries)]
@@ -115,19 +125,19 @@ def write_archive(
         data = manifest.render([part_of_arc[e.arcname] for e in entries], len(groups))
         extras = [Extra(manifest.entry, data)]
 
-    password = get_password(args)
+    password = get_password(options)
     try:
         results: list[PartResult] = []
 
-        progress = log.isatty()
-
         def one_part(queue: deque[FileEntry]) -> None:
-            path = out.new_partial(len(results) + 1)
-            if progress:
-                print(f"zipseal: writing part {len(results) + 1} ...", file=log, flush=True)
+            if progress is not None:
+                progress.part_started(len(results) + 1)
             budget = PartBudget(layout)
+            path, fd = out.new_partial(len(results) + 1)
             results.append(
-                write_part(collection, queue, budget, password, args.level, path, extras)
+                write_part(
+                    collection, queue, budget, password, options.level, path, extras, progress, fd
+                )
             )
 
         if groups is not None:
@@ -142,18 +152,20 @@ def write_archive(
             while queue:
                 one_part(queue)
 
-        if progress and not args.no_verify:
-            print(f"zipseal: verifying {len(results)} part(s) ...", file=log, flush=True)
-        for r in results:
+        if progress is not None and not options.no_verify:
+            progress.verifying(len(results))
+        for number, r in enumerate(results, 1):
             size = os.stat(r.path).st_size
-            if args.max_size is not None and size > args.max_size:
+            if options.max_size is not None and size > options.max_size:
                 raise VerifyError(f"{r.path.name}: {size:,} bytes exceeds --max-size")
-            if not args.no_verify:
-                inner = (r.inner_size, r.inner_tail) if args.hide_names else None
+            if not options.no_verify:
+                inner = (r.inner_size, r.inner_tail) if options.hide_names else None
                 verify_part(r.path, password, r.records, inner=inner)
+            if progress is not None:
+                progress.part_verified(number, size)
         finals = out.final_names(len(results))
-        if password.generated:
-            print(f"zipseal: generated password: {password.value}", file=log)
+        if password.generated and password_out is not None:
+            print(f"zipseal: generated password: {password.value}", file=password_out)
         out.publish([r.path for r in results], finals)
         for r, final in zip(results, finals, strict=True):
             r.path = final

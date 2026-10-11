@@ -1,6 +1,6 @@
 # TODO
 
-Last reviewed: 2026-10-08
+Last reviewed: 2026-10-10
 
 Future work only. Each item is something nobody has started or finished.
 
@@ -17,4 +17,6 @@ An item that needs more than a few lines of thought gets a plan in
 
 ## Later
 
+- Add drag-and-drop to the GUI via `tkinterdnd2` ([GUI plan](dev-docs/plans/2026-10-10-gui.md)).
+- Package the GUI as a signed, double-clickable macOS `.app` with PyInstaller or Briefcase ([GUI plan](dev-docs/plans/2026-10-10-gui.md)).
 - Consider `--format 7z`, `--oversize=volumes` and `--tight` (`SPEC.md` §6.2, §6.4, §6.7).

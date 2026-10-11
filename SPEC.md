@@ -1,10 +1,11 @@
 # zipseal — plan and design specification
 
 Status: implemented and released as v0.1.0, 2026-10-08. Drafted 2026-10-07.
-Last reviewed: 2026-10-08
+Last reviewed: 2026-10-10
 
 `zipseal` is a CLI that takes files and folders and writes them into one
 password-protected zip, or into several zips that each stay under a size cap.
+A Tkinter front end, `zipseal-gui`, covers the same core (§5.1).
 
 ## 1. Goals and non-goals
 
@@ -18,10 +19,11 @@ Goals:
 - Verify every archive after writing it, by decrypting it and checking CRCs.
 - Keep passwords out of shell history and the process list.
 - Optionally hide file names with `--hide-names` (see §6.7).
+- Offer the same job through a GUI, for people who do not want a terminal
+  (see §5.1).
 
 Non-goals for v1:
 
-- A GUI.
 - Extracting archives. Recipients use 7-Zip, Keka, or similar.
 - Splitting a single file across parts. A file larger than `--max-size` is an
   error in v1 (see §6.4).
@@ -88,7 +90,10 @@ oversized file), `3` write or verify failure.
 
 The built modules add `sources.py` (safe source reads), `zipcheck.py`
 (structural verification), `output.py` (naming and publication),
-`pipeline.py` (orchestration) and `passwords.py`. The original sketch:
+`pipeline.py` (orchestration) and `passwords.py`. Three modules make the core
+shareable between the two front ends: `options.py` (the typed `Options` every
+front end builds), `job.py` (`run_job`, the body of a whole job) and
+`progress.py` (the `Progress` protocol). The original sketch:
 
 ```
 cli.py        argument parsing, password acquisition, exit codes
@@ -98,8 +103,68 @@ write.py      streams one part through stream-zip, counting bytes
 verify.py     re-reads each part with stream-unzip and checks names + CRCs
 ```
 
-Packaging: a `pyproject.toml` with a `zipseal` console script. Run it with
-`uv run zipseal …` or install it with `uv tool install .`.
+Packaging: a `pyproject.toml` with `zipseal` and `zipseal-gui` console scripts.
+Run them with `uv run zipseal …` and `uv run zipseal-gui`, or install both
+with `uv tool install .`.
+
+### 5.1 The GUI
+
+The GUI is a second front end over the same core. It holds no archive logic,
+and the CLI holds none either: both build an `Options` and call `run_job`.
+
+**The window** (top to bottom) is the input list with `Add files…`,
+`Add folder…` and `Remove`; the output name with a `Save as…` picker; options
+for the maximum part size (presets plus a custom value), compression level,
+`Hide names`, excludes (one glob per line), `Follow symlinks` and
+`Overwrite existing files`; two masked password fields, or a `Generate a
+password` checkbox; `Dry run` and `Create archive`; an indeterminate progress
+bar with a status line; and a log area.
+
+The window maps to the CLI's flags: the size box to `--max-size`, the level
+box to `--level`, and the overwrite checkbox to `--force`. The defaults the
+window does not offer stay as they are for the CLI: `default_excludes` on,
+`--order path`, no manifest and no `--no-verify`.
+
+**The controller and the view** are separate. `gui.py` holds `Controller`,
+which builds the `Options` from the window's plain values, checks that the two
+password fields match, generates a password on the calling thread, and runs
+one job in a daemon thread. It reports through a `queue.Queue` of small events
+(`Log`, `ProgressUpdate`, `Error`, `Done`), and imports no Tk, so it is
+testable without a display. `gui_view.py` is the Tk window and the only module
+that imports Tk; `gui.main` imports it, so importing `zipseal.gui` needs no
+display. The view reads the window into a `JobSpec`, calls the controller, and
+drains the queue with `after()`. The worker never touches a widget.
+
+**Overwrite.** When the output name or one of its old part names exists and
+`Overwrite existing files` is unticked, the window asks before running
+instead of failing (§6.5). A yes runs with `force`; a no does nothing.
+
+**The password sink.** The core prints a generated password once, to a
+`password_out` stream given by the front end, just before publication. It is
+not part of `run_job`'s four positional parameters: the CLI points it at
+stderr, and a front end with a log of its own passes nothing, so the core has
+nowhere to put it. The GUI passes nothing, so a generated password never
+reaches the log area.
+
+**Security rules for the GUI:**
+
+- Both password fields are always masked. There is no show-password toggle.
+- A generated password is made on the main thread, before the worker exists,
+  and reaches the worker only through the `get_password` callback. It is held
+  nowhere else, and the controller drops it when a run fails.
+- It is shown only in a modal, after every part has verified, with a `Copy`
+  button and a warning that other apps can read the clipboard.
+- Clearing the clipboard is best effort: on modal close, 60 seconds after a
+  copy, and when the window closes. Each clear compares `clipboard_get()`
+  inside a `TclError` guard and clears only what it still holds.
+- Both password fields are cleared after every run, successful or not.
+- Nothing is persisted: no settings, no history, no recent files.
+- Error dialogs show `ZipsealError` messages only. An unexpected exception
+  shows one generic line, not a traceback with locals.
+
+The GUI has no cancel button and no drag-and-drop. A run in progress cannot
+be stopped from the window, so closing it mid-run can leave `.partial` files
+that the next run reports (§6.5).
 
 ## 6. Key design decisions
 
@@ -400,6 +465,9 @@ breaks the result for the recipient unless they also run a restore step.
 - Python cannot reliably wipe a password from memory. It lives for the run.
 - All parts share one password. That is a convenience trade-off and is fine
   with AES-256.
+- The GUI's log area is a log. A generated password is never printed there: it
+  is shown once in a modal, and the clipboard it may be copied to is cleared
+  best-effort soon after (§5.1).
 
 ## 8. Implementation plan
 

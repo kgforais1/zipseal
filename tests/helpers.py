@@ -2,13 +2,13 @@ import io
 import os
 import shutil
 import sys
-from argparse import Namespace
 from pathlib import Path
 
 from stream_unzip import stream_unzip
 
 from zipseal import cli
 from zipseal.collect import Collection, collect
+from zipseal.options import Options
 from zipseal.passwords import Password
 from zipseal.pipeline import write_archive
 from zipseal.write import PartResult
@@ -29,16 +29,16 @@ def make_tree(root: Path, files: dict[str, bytes | str]) -> None:
         p.write_bytes(data.encode() if isinstance(data, str) else data)
 
 
-def args_for(inputs: list[Path], output: Path, *extra: str) -> Namespace:
-    return cli.parse_args([*map(str, inputs), "-o", str(output), *extra])
+def args_for(inputs: list[Path], output: Path, *extra: str) -> Options:
+    return cli.parse_args([*map(str, inputs), "-o", str(output), *extra]).options
 
 
-def collect_for(args: Namespace) -> Collection:
+def collect_for(options: Options) -> Collection:
     return collect(
-        args.paths,
-        excludes=args.excludes,
-        follow_symlinks=args.follow_symlinks,
-        output=args.output,
+        options.paths,
+        excludes=options.all_excludes(),
+        follow_symlinks=options.follow_symlinks,
+        output=options.output,
         warn=io.StringIO(),
     )
 
@@ -46,9 +46,9 @@ def collect_for(args: Namespace) -> Collection:
 def archive(
     inputs: list[Path], output: Path, *extra: str, password: str = PASSWORD
 ) -> list[PartResult]:
-    args = args_for(inputs, output, *extra)
-    with collect_for(args) as c:
-        return write_archive(args, c, lambda _: Password(password), err=io.StringIO())
+    options = args_for(inputs, output, *extra)
+    with collect_for(options) as c:
+        return write_archive(options, c, lambda _: Password(password), err=io.StringIO())
 
 
 def extract(path: Path, password: str = PASSWORD) -> dict[str, bytes]:

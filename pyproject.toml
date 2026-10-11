@@ -15,6 +15,7 @@ dependencies = [
 
 [project.scripts]
 zipseal = "zipseal.cli:main"
+zipseal-gui = "zipseal.gui:main"
 
 [dependency-groups]
 dev = [
@@ -30,10 +31,11 @@ build-backend = "uv_build"
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["tests"]
-addopts = "-m 'not slow'"
+addopts = "-m 'not slow and not gui'"
 markers = [
     "slow: long-running tests (Zip64, huge entry counts). Run with -m slow.",
     "sevenzip: needs the 7zz binary; skipped when it is missing.",
+    "gui: needs a real Tk display. Run with -m gui.",
 ]
 
 [tool.basedpyright]

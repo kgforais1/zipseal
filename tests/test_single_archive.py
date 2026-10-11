@@ -130,23 +130,23 @@ def test_force_replaces(tree: Path, tmp_path: Path) -> None:
 
 def test_growing_file_fails(tree: Path, tmp_path: Path) -> None:
     out = tmp_path / "out/bundle.zip"
-    args = args_for([tree], out)
-    with collect_for(args) as c:
+    options = args_for([tree], out)
+    with collect_for(options) as c:
         with open(tree / "a.txt", "a") as fh:
             fh.write("more")
         with pytest.raises(WriteError, match="file size changed"):
-            write_archive(args, c, lambda _: Password(PASSWORD), err=io.StringIO())
+            write_archive(options, c, lambda _: Password(PASSWORD), err=io.StringIO())
     assert not out.exists()
     assert leftovers(out.parent) == []
 
 
 def test_shrinking_file_fails(tree: Path, tmp_path: Path) -> None:
     out = tmp_path / "out/bundle.zip"
-    args = args_for([tree], out)
-    with collect_for(args) as c:
+    options = args_for([tree], out)
+    with collect_for(options) as c:
         (tree / "sub/text.txt").write_text("short")
         with pytest.raises(WriteError, match="file size changed"):
-            write_archive(args, c, lambda _: Password(PASSWORD), err=io.StringIO())
+            write_archive(options, c, lambda _: Password(PASSWORD), err=io.StringIO())
     assert leftovers(out.parent) == []
 
 
@@ -154,39 +154,39 @@ def test_file_swapped_for_symlink_fails(tree: Path, tmp_path: Path) -> None:
     out = tmp_path / "out/bundle.zip"
     secret = tmp_path / "secret.txt"
     secret.write_text("SECRET")  # same size as "hello\n"
-    args = args_for([tree], out)
-    with collect_for(args) as c:
+    options = args_for([tree], out)
+    with collect_for(options) as c:
         (tree / "a.txt").unlink()
         (tree / "a.txt").symlink_to(secret)
         with pytest.raises(WriteError, match="changed since it was collected"):
-            write_archive(args, c, lambda _: Password(PASSWORD), err=io.StringIO())
+            write_archive(options, c, lambda _: Password(PASSWORD), err=io.StringIO())
     assert not out.exists()
 
 
 def test_parent_folder_swapped_fails(tree: Path, tmp_path: Path) -> None:
     """A swapped folder holding a hard link to the original file is still refused."""
     out = tmp_path / "out/bundle.zip"
-    args = args_for([tree], out)
-    with collect_for(args) as c:
+    options = args_for([tree], out)
+    with collect_for(options) as c:
         (tree / "sub").rename(tmp_path / "old-sub")
         (tree / "sub").mkdir()
         for name in ("r.bin", "text.txt"):
             os.link(tmp_path / "old-sub" / name, tree / "sub" / name)
         with pytest.raises(WriteError, match="a folder above it changed"):
-            write_archive(args, c, lambda _: Password(PASSWORD), err=io.StringIO())
+            write_archive(options, c, lambda _: Password(PASSWORD), err=io.StringIO())
 
 
 def test_file_swapped_for_fifo_fails_fast(tree: Path, tmp_path: Path) -> None:
     out = tmp_path / "out/bundle.zip"
-    args = args_for([tree], out)
+    options = args_for([tree], out)
     errors: list[BaseException] = []
-    with collect_for(args) as c:
+    with collect_for(options) as c:
         (tree / "a.txt").unlink()
         os.mkfifo(tree / "a.txt")
 
         def go() -> None:
             try:
-                write_archive(args, c, lambda _: Password(PASSWORD), err=io.StringIO())
+                write_archive(options, c, lambda _: Password(PASSWORD), err=io.StringIO())
             except BaseException as exc:  # noqa: BLE001
                 errors.append(exc)
 
@@ -277,17 +277,20 @@ def test_partial_planted_after_preflight_not_followed(
     out = tmp_path / "out/bundle.zip"
     victim = tmp_path / "victim.txt"
     victim.write_text("do not touch")
-    real = output_mod.Output.new_partial
+    real = output_mod.create_exclusive
+    planted: list[Path] = []
 
-    def plant(self, number):  # type: ignore[no-untyped-def]
-        path = real(self, number)
+    def plant(path: Path) -> int:
         path.symlink_to(victim)
-        return path
+        planted.append(path)
+        return real(path)
 
-    monkeypatch.setattr(output_mod.Output, "new_partial", plant)
+    monkeypatch.setattr(output_mod, "create_exclusive", plant)
     with pytest.raises(WriteError, match="refusing to write through"):
         archive([tree], out)
     assert victim.read_text() == "do not touch"
+    # The run did not create the planted name, so its cleanup leaves it alone.
+    assert planted and all(p.is_symlink() for p in planted)
 
 
 def test_leftover_partial_fails_preflight(tree: Path, tmp_path: Path) -> None:
@@ -335,7 +338,7 @@ def test_no_progress_lines_when_not_a_tty(tree: Path, tmp_path: Path) -> None:
     import io as _io
 
     err = _io.StringIO()
-    args = args_for([tree], tmp_path / "out/b.zip")
-    with collect_for(args) as c:
-        write_archive(args, c, lambda _: Password(PASSWORD), err=err)
+    options = args_for([tree], tmp_path / "out/b.zip")
+    with collect_for(options) as c:
+        write_archive(options, c, lambda _: Password(PASSWORD), err=err)
     assert "writing part" not in err.getvalue()
