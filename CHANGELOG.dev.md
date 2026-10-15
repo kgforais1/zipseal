@@ -7,6 +7,10 @@ edits and refactors. User-visible changes go in [`CHANGELOG.md`](CHANGELOG.md).
 
 ### Added
 
+- `dependency-audit.yml`: re-runs ci.yml's uv.lock `pip-audit` weekly, so a
+  new advisory fails a scheduled run on a quiet repo, and checks the
+  SHA-pinned actions with zizmor's `known-vulnerable-actions` audit on PRs and
+  weekly (Dependabot alerts never cover SHA-pinned actions).
 - Shared core for both front ends (`Options` in `options.py`, `run_job` in
   `job.py`), so the CLI and the GUI cannot drift apart.
 - A `Progress` protocol (`progress.py`) wired into `pipeline.write_archive`,
