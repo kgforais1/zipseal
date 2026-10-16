@@ -7,9 +7,8 @@ Linked: `TODO.md` "SHA-pin the CI tooling and guard it"
 ## Goal
 
 Several surfaces in CI still resolve a version at run time instead of pinning an
-immutable identifier. All are the same threat class as the `uses:` SHA pins that
-PR #6 established. Finish the job, add a guard so it cannot silently regress,
-and record what remains open rather than implying full coverage.
+immutable identifier. Finish the job, add a guard so it cannot silently
+regress, and record what remains open rather than implying full coverage.
 
 ## Background
 
