@@ -12,6 +12,13 @@
 # no tag cannot be checked, so keep pins on releases). Only that audit fails
 # the job; other zizmor findings are out of scope here.
 #
+# uvx: every call passes --no-build and pins an exact version. Without
+# --no-build, uv falls back to building an sdist through its PEP 517 backend,
+# which runs arbitrary code at install time; with it, a missing wheel fails the
+# job loudly instead. The pins stop a new upstream release from reaching CI
+# unreviewed. All three tools ship wheels, so neither guard can bite in
+# practice. Bump them by hand (or move them into a [dependency-groups] entry).
+#
 # Actions usage: ~1 Linux minute per job per run; weekly plus PRs.
 #
 # GitHub disables scheduled workflows in a public repository after 60 days
@@ -44,7 +51,7 @@ jobs:
       - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7  # v10.2.0
       # Same scope as ci.yml's audit job.
       - run: uv export --locked --no-dev --no-hashes --format requirements-txt -o "$RUNNER_TEMP/req.txt"
-      - run: uvx pip-audit -r "$RUNNER_TEMP/req.txt"
+      - run: uvx --no-build pip-audit==2.10.1 -r "$RUNNER_TEMP/req.txt"
 
   vulnerable-actions:
     name: Known-vulnerable actions (zizmor)
@@ -66,7 +73,7 @@ jobs:
             exit 1
           fi
           set +e
-          uvx --python 3.12 zizmor==1.31.0 --format=json . > "$RUNNER_TEMP/zizmor.json"
+          uvx --no-build --python 3.12 zizmor==1.31.0 --format=json . > "$RUNNER_TEMP/zizmor.json"
           rc=$?
           set -e
           # 0 = no findings, 10-14 = findings by severity; anything else
@@ -80,6 +87,11 @@ jobs:
           import os
           import sys
 
+          def wf_escape(value):
+              # A workflow command ends at the first newline and treats % as an
+              # escape, so raw advisory text could inject runner commands.
+              return str(value).replace("%", "%25").replace("\r", "%0D").replace("\n", "%0A")
+
           findings = [
               f for f in json.load(open(os.path.join(os.environ["RUNNER_TEMP"], "zizmor.json")))
               if f["ident"] == "known-vulnerable-actions" and not f.get("ignored")
@@ -90,7 +102,16 @@ jobs:
               path = key.get("Local", {}).get("verbatim_path", "?") if isinstance(key, dict) else "?"
               line = loc.get("concrete", {}).get("location", {}).get("start_point", {}).get("row", 0) + 1
               note = loc.get("symbolic", {}).get("annotation", "")
-              print(f"::error file={path},line={line}::{f['desc']}: {note}")
+              print(
+                  "::error file="
+                  + wf_escape(path)
+                  + ",line="
+                  + str(line)
+                  + "::"
+                  + wf_escape(f["desc"])
+                  + ": "
+                  + wf_escape(note)
+              )
           print(f"{len(findings)} known-vulnerable action reference(s)")
           sys.exit(1 if findings else 0)
           PY
