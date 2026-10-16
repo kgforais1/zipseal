@@ -1,8 +1,8 @@
 # Plan: SHA-pin the pre-commit hook revs, pin uv, and guard all three
 
 Date: 2026-10-15
-Status: draft
-Linked: `TODO.md` "SHA-pin the CI tooling and guard it"
+Status: complete
+Linked: `TODO.md` "SHA-pin the CI tooling and guard it" (done, item removed)
 
 ## Goal
 
@@ -363,39 +363,39 @@ Tick a box only when done and verified, per the lifecycle in `dev-docs/README.md
 
 ### Commit 1: pin, and close the loopholes
 
-- [ ] Re-point the four `rev:` values at the commit SHAs of the tags already in
+- [x] Re-point the four `rev:` values at the commit SHAs of the tags already in
       the file, versions unchanged (gitleaks v8.30.0 becomes `6eaad03…`).
-- [ ] Rewrite the `.pre-commit-config.yaml` header bump instruction in this same
+- [x] Rewrite the `.pre-commit-config.yaml` header bump instruction in this same
       commit, since the trap it describes is created here.
-- [ ] Add `hooks/scripts/check_pins.py` and register it, covering rules 1, 2
+- [x] Add `hooks/scripts/check_pins.py` and register it, covering rules 1, 2
       and 3, with each pinned `rev` carrying its tag comment.
-- [ ] Declare PyYAML in the `dev` dependency group and run `uv lock`, so the
+- [x] Declare PyYAML in the `dev` dependency group and run `uv lock`, so the
       `uv run python` hook entry has its import. Without the relock,
       `uv sync --locked` fails in CI and the hook dies on `ModuleNotFoundError`.
-- [ ] Verify the guard against the fixture matrix in Verification, including
+- [x] Verify the guard against the fixture matrix in Verification, including
       that it fails closed.
-- [ ] Confirm the four pinned hooks install and pass from their SHAs.
+- [x] Confirm the four pinned hooks install and pass from their SHAs.
 
 ### Commit 2: bump
 
-- [ ] Bump gitleaks to v8.30.1 (`83d9cd6…`) and ruff-pre-commit to v0.17.1
+- [x] Bump gitleaks to v8.30.1 (`83d9cd6…`) and ruff-pre-commit to v0.17.1
       (`38bfb07c…`).
-- [ ] Confirm each new SHA matches its new tag comment.
-- [ ] Re-run the full pre-commit gate and confirm ruff 0.17 did not change any
+- [x] Confirm each new SHA matches its new tag comment.
+- [x] Re-run the full pre-commit gate and confirm ruff 0.17 did not change any
       finding.
 
 ### Task 2: pin uv
 
-- [ ] Add `with: version: "0.12.24"` to all five `setup-uv` steps, merging into
+- [x] Add `with: version: "0.12.24"` to all five `setup-uv` steps, merging into
       the existing `with:` block at `ci.yml:47` rather than duplicating it.
-- [ ] Re-run the whole Verification block **under uv 0.12.24**, not the local uv.
+- [x] Re-run the whole Verification block **under uv 0.12.24**, not the local uv.
 
 ### Close out
 
-- [ ] Log in `CHANGELOG.dev.md` and delete the `TODO.md` item.
-- [ ] Document the new hook where the repo tracks its own hooks: the hooks
+- [x] Log in `CHANGELOG.dev.md` and delete the `TODO.md` item.
+- [x] Document the new hook where the repo tracks its own hooks: the hooks
       table in `dev-docs/README.md` and `AGENTS.md`, in the same commit.
-- [ ] Set `Status:` and move to `plans/archive/`.
+- [x] Set `Status:` and move to `plans/archive/`.
 
 ## Verification
 
@@ -460,19 +460,17 @@ These catch the specific mistakes the happy path would miss:
   bad = 0
   for repo, rev, tag in entries:
       problems = []
+      if "://" in repo or repo.startswith("git@"):
+          url = repo  # full URL or SCP form: ls-remote takes either as-is
+      else:
+          url = f"https://github.com/{repo}"
       if not re.fullmatch(r"[0-9a-f]{40}", rev):
           problems.append(f"rev={rev!r} is not a 40-char hex SHA")
       elif not tag:
           problems.append(f"pinned {rev} with no tag comment")
       else:
           out = subprocess.run(
-              [
-                  "git",
-                  "ls-remote",
-                  f"https://github.com/{repo}",
-                  f"refs/tags/{tag}",
-                  f"refs/tags/{tag}^{{}}",
-              ],
+              ["git", "ls-remote", url, f"refs/tags/{tag}", f"refs/tags/{tag}^{{}}"],
               capture_output=True,
               text=True,
               check=True,

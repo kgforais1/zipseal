@@ -13,10 +13,7 @@ An item that needs more than a few lines of thought gets a plan in
 
 ## Next
 
-- SHA-pin the CI tooling and guard it ([pinning plan](dev-docs/plans/2026-10-15-sha-pin-ci-tooling.md)).
-  Pin the four `.pre-commit-config.yaml` hook revs to commit SHAs and bump the two
-  that are behind, pin the uv version in all five `setup-uv` steps, and add a
-  policy hook so the pins cannot silently regress to tags.
+- Nothing scheduled. Pick from Later.
 
 ## Later
 
