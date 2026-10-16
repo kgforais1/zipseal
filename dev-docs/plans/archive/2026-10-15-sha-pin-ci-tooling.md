@@ -394,7 +394,8 @@ Tick a box only when done and verified, per the lifecycle in `dev-docs/README.md
 
 - [x] Log in `CHANGELOG.dev.md` and delete the `TODO.md` item.
 - [x] Document the new hook where the repo tracks its own hooks: the hooks
-      table in `dev-docs/README.md` and `AGENTS.md`, in the same commit.
+      table in `dev-docs/README.md`, in the same commit. (`AGENTS.md` needs no
+      change: it already points at that table.)
 - [x] Set `Status:` and move to `plans/archive/`.
 
 ## Verification

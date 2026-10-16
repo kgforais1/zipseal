@@ -27,21 +27,23 @@ from pathlib import Path
 
 import yaml
 
-SHA = re.compile(r"[0-9a-f]{40}")
 FULL_SHA = re.compile(r"\A[0-9a-f]{40}\Z")
-EXACT_VERSION = re.compile(r"\d+\.\d+\.\d+")
-REV_LINE = re.compile(r"^\s*rev:\s*([0-9a-f]{40})\b")
+EXACT_VERSION = re.compile(r"[0-9]+\.[0-9]+\.[0-9]+")
+REV_LINE = re.compile(r"""^\s*rev:\s*['"]?([0-9a-f]{40})\b""")
 COMMENT = re.compile(r"#[ \t]*\S")
 USES_SHA = re.compile(r"\A[^@\s]+@[0-9a-f]{40}\Z")
 
 SKIP_REPOS = {"local", "meta"}
 
 
-def _load(path: Path) -> tuple[object, list[str]]:
+def _read_text(path: Path) -> tuple[str | None, list[str]]:
     try:
-        text = path.read_bytes().decode("utf-8")
+        return path.read_bytes().decode("utf-8"), []
     except (OSError, UnicodeDecodeError) as exc:
         return None, [f"{path}: cannot read file: {exc}"]
+
+
+def _parse(path: Path, text: str) -> tuple[object, list[str]]:
     try:
         return yaml.safe_load(text), []
     except yaml.YAMLError as exc:
@@ -50,7 +52,10 @@ def _load(path: Path) -> tuple[object, list[str]]:
 
 def check_hook_revs(path: Path) -> list[str]:
     findings: list[str] = []
-    data, errors = _load(path)
+    text, errors = _read_text(path)
+    if errors or text is None:
+        return errors
+    data, errors = _parse(path, text)
     if errors:
         return errors
     repos = data.get("repos") if isinstance(data, dict) else None
@@ -68,11 +73,7 @@ def check_hook_revs(path: Path) -> list[str]:
     # Comment check is a raw-line pass: safe_load discards comments, and
     # alias rev lines carry no literal hex so the pattern skips them.
     # splitlines() handles \n, \r\n and lone \r alike.
-    try:
-        lines = path.read_bytes().decode("utf-8").splitlines()
-    except (OSError, UnicodeDecodeError) as exc:
-        return [f"{path}: cannot read file: {exc}"]
-    for number, line in enumerate(lines, 1):
+    for number, line in enumerate(text.splitlines(), 1):
         if line.lstrip().startswith("#"):
             continue
         if REV_LINE.search(line) and not COMMENT.search(line.split("rev:", 1)[1]):
@@ -104,7 +105,10 @@ def _iter_steps(data: object) -> list[tuple[dict, str]]:
 
 def check_workflow(path: Path) -> list[str]:
     findings: list[str] = []
-    data, errors = _load(path)
+    text, errors = _read_text(path)
+    if errors or text is None:
+        return errors
+    data, errors = _parse(path, text)
     if errors:
         return errors
     for node, where in _iter_steps(data):
@@ -125,10 +129,9 @@ def check_workflow(path: Path) -> list[str]:
 
 
 def scan(path: Path) -> list[str]:
-    posix = path.as_posix()
-    if posix == ".pre-commit-config.yaml":
+    if path.name == ".pre-commit-config.yaml":
         return check_hook_revs(path)
-    if ".github/workflows/" in posix:
+    if ".github/workflows/" in path.as_posix():
         return check_workflow(path)
     return []
 
