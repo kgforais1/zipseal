@@ -7,6 +7,10 @@ edits and refactors. User-visible changes go in [`CHANGELOG.md`](CHANGELOG.md).
 
 ### Added
 
+- `dependency-audit.yml`: re-runs ci.yml's uv.lock `pip-audit` weekly, so a
+  new advisory fails a scheduled run on a quiet repo, and checks the
+  SHA-pinned actions with zizmor's `known-vulnerable-actions` audit on PRs and
+  weekly (Dependabot alerts never cover SHA-pinned actions).
 - Shared core for both front ends (`Options` in `options.py`, `run_job` in
   `job.py`), so the CLI and the GUI cannot drift apart.
 - A `Progress` protocol (`progress.py`) wired into `pipeline.write_archive`,
@@ -18,8 +22,24 @@ edits and refactors. User-visible changes go in [`CHANGELOG.md`](CHANGELOG.md).
 
 ### Changed
 
+- Every `uvx` call in `ci.yml` and `dependency-audit.yml` now passes
+  `--no-build` and pins an exact version (`pip-audit==2.10.1`,
+  `pre-commit==4.7.0`, `zizmor==1.31.0`). `--no-build` stops uv from falling
+  back to an sdist build, which executes a package's PEP 517 backend at
+  install time; the pins stop an unreviewed upstream release from reaching CI.
+- ci.yml's audit job writes its requirements file to `$RUNNER_TEMP` instead of
+  the shared `/tmp`.
+- All three ci.yml jobs set `timeout-minutes`, which dependency-audit.yml
+  already did. The 6-hour default let a hung `apt-get`, `brew` or PyPI call run
+  until GitHub killed it.
 - `pipeline.py`, `write.py` and the test helpers take `Options` instead of an
   `argparse.Namespace` (plan: `dev-docs/plans/2026-10-10-gui.md`).
+
+### Fixed
+
+- `dependency-audit.yml` no longer prints advisory text unescaped. A newline in
+  a GitHub advisory description used to end the `::error` annotation, and the
+  rest of the text was parsed as runner commands.
 
 ## [0.1.0] - 2026-10-08
 

@@ -1,0 +1,122 @@
+# Weekly dependency audit plus a known-vulnerable-actions check.
+#
+# ci.yml's "Dependency audit" job only runs on push and PR, so on a quiet
+# repository a newly published advisory against uv.lock would never turn CI
+# red. The scheduled audit job re-runs the same check weekly; a failing run is
+# the notification. It is skipped on PRs, where ci.yml already runs it.
+#
+# vulnerable-actions: Dependabot alerts are never raised for actions pinned by
+# commit SHA (only for semver tags), and every action here is SHA-pinned, so
+# zizmor's known-vulnerable-actions audit checks them against GitHub's
+# advisory database. zizmor resolves each SHA to its release tag (a SHA with
+# no tag cannot be checked, so keep pins on releases). Only that audit fails
+# the job; other zizmor findings are out of scope here.
+#
+# uvx: every call passes --no-build and pins an exact version. Without
+# --no-build, uv falls back to building an sdist through its PEP 517 backend,
+# which runs arbitrary code at install time; with it, a missing wheel fails the
+# job loudly instead. The pins stop a new upstream release from reaching CI
+# unreviewed. All three tools ship wheels, so neither guard can bite in
+# practice. Bump them by hand (or move them into a [dependency-groups] entry).
+#
+# Actions usage: ~1 Linux minute per job per run; weekly plus PRs.
+#
+# GitHub disables scheduled workflows in a public repository after 60 days
+# with no repository activity. If that happens, re-enable this workflow from
+# the Actions tab; Dependabot alerts keep working regardless.
+
+name: Dependency audit
+
+on:
+  pull_request:
+  schedule:
+    # Thursdays 16:17 UTC, ahead of Dependabot's Thursday 17:00 ET run and off
+    # the top of the hour to avoid scheduler congestion.
+    - cron: "17 16 * * 4"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    name: Dependency audit (weekly)
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884  # v10.3.0
+      # Same scope as ci.yml's audit job.
+      - run: uv export --locked --no-dev --no-hashes --format requirements-txt -o "$RUNNER_TEMP/req.txt"
+      - run: uvx --no-build pip-audit==2.10.1 -r "$RUNNER_TEMP/req.txt"
+
+  vulnerable-actions:
+    name: Known-vulnerable actions (zizmor)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884  # v10.3.0
+      - name: Check actions against GitHub security advisories
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # Without a token zizmor silently skips its online audits (including
+          # known-vulnerable-actions) and would pass; fail closed instead.
+          if [ -z "${GH_TOKEN:-}" ]; then
+            echo "::error::GH_TOKEN is empty; zizmor would skip its online audits"
+            exit 1
+          fi
+          set +e
+          uvx --no-build --python 3.12 zizmor==1.31.0 --format=json . > "$RUNNER_TEMP/zizmor.json"
+          rc=$?
+          set -e
+          # 0 = no findings, 10-14 = findings by severity; anything else
+          # (e.g. 1) means the audit itself failed, which must not pass.
+          if [ "$rc" -ne 0 ] && { [ "$rc" -lt 10 ] || [ "$rc" -gt 14 ]; }; then
+            echo "::error::zizmor failed (exit $rc)"
+            exit 1
+          fi
+          python3 - <<'PY'
+          import json
+          import os
+          import sys
+
+          def wf_escape(value):
+              # A workflow command ends at the first newline and treats % as an
+              # escape, so raw advisory text could inject runner commands.
+              return str(value).replace("%", "%25").replace("\r", "%0D").replace("\n", "%0A")
+
+          def prop_escape(value):
+              # Property values such as file= and line= are split on , and : on
+              # top of the message escaping above.
+              return wf_escape(value).replace(":", "%3A").replace(",", "%2C")
+
+          findings = [
+              f for f in json.load(open(os.path.join(os.environ["RUNNER_TEMP"], "zizmor.json")))
+              if f["ident"] == "known-vulnerable-actions" and not f.get("ignored")
+          ]
+          for f in findings:
+              loc = (f.get("locations") or [{}])[0]
+              key = loc.get("symbolic", {}).get("key", {})
+              path = key.get("Local", {}).get("verbatim_path", "?") if isinstance(key, dict) else "?"
+              line = loc.get("concrete", {}).get("location", {}).get("start_point", {}).get("row", 0) + 1
+              note = loc.get("symbolic", {}).get("annotation", "")
+              print(
+                  "::error file="
+                  + prop_escape(path)
+                  + ",line="
+                  + prop_escape(line)
+                  + "::"
+                  + wf_escape(f["desc"])
+                  + ": "
+                  + wf_escape(note)
+              )
+          print(f"{len(findings)} known-vulnerable action reference(s)")
+          sys.exit(1 if findings else 0)
+          PY
