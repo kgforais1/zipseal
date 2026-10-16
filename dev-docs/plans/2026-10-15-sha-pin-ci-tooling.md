@@ -1,4 +1,4 @@
-# Plan: SHA-pin the pre-commit hook revs, pin uv, and guard both
+# Plan: SHA-pin the pre-commit hook revs, pin uv, and guard all three
 
 Date: 2026-10-15
 Status: draft
@@ -238,13 +238,6 @@ which is separate from the `uv` CLI, so it does not forbid a 0.13 CLI. The repo
 is mid-migration (open PR #4 widens `uv_build` to `<0.14.0`), so pin to the
 backend generation in use and revisit when PR #4 lands.
 
-The `version` input is **more permissive than its description suggests**. The
-action.yml description mentions only `0.5.0`, `latest` and `latest-known`, but
-the same README documents a `resolution-strategy` input as *"Resolution strategy
-when resolving **version ranges**: `highest` or `lowest`"*, which only makes
-sense if `version` accepts ranges. It also accepts PEP 440 specifiers and
-partial wildcards such as `>=0.4.0` and `0.4.x`.
-
 The `version` input accepts more than its description suggests. The action.yml
 description mentions only exact versions, `latest` and `latest-known`, but the
 README documents a `resolution-strategy` for resolving version ranges, and the
@@ -288,7 +281,7 @@ nothing checks a `setup-uv` step still carries an exact `version:`. The guard
 must cover both, or one `autoupdate` run reverts the hardening with CI green.
 
 Add `hooks/scripts/check_pins.py`, following the existing local-hook pattern
-alongside `check_file_size.py`, `check_personal_data.py` and the rest. Two
+alongside `check_file_size.py`, `check_personal_data.py` and the rest. Three
 rules:
 
 1. **Hook revs.** In `.pre-commit-config.yaml`, every `repo:` entry must have a
@@ -296,7 +289,12 @@ rules:
    reserved values `local` and `meta`, which take no `rev`. Each pinned `rev`
    must also carry its release tag as a trailing comment; that comment is the
    only human-readable record of which release a SHA is, and the SHA-versus-tag
-   verifier in Verification compares the two mechanically.
+   verifier in Verification compares the two mechanically. Because
+   `yaml.safe_load` discards comments, the comment check is a separate scoped
+   raw-line pass over lines matching `rev:\s*[0-9a-f]{40}`: such a line must
+   carry a `# tag` comment. Alias `rev` lines carry no literal hex, so the
+   comment rule does not apply to them; and the raw-text pass must handle `\r`
+   explicitly, since CRLF now exercises that path rather than the parser.
 2. **uv versions.** In every workflow, each `astral-sh/setup-uv` step must set
    `with.version` to a full literal release version, checked with
    `re.fullmatch(r"\d+\.\d+\.\d+", value)`.
@@ -354,7 +352,7 @@ their `${{ }}` expressions and the zizmor block scalar, and finds all five
 works; `language: system` no longer implies stdlib, so the import is declared,
 not assumed.
 
-Neither rule confirms a 40-hex string is a *commit* rather than a tag object.
+None of the rules confirms a 40-hex string is a *commit* rather than a tag object.
 That fails loudly anyway, since `pre-commit` cannot check out a tag object. A
 CI-side `git ls-remote` check, if wanted, belongs in the audit workflow.
 
@@ -541,7 +539,7 @@ The advisory check itself has to be confirmed by a real CI run.
 
 Not fixed by any task here. Recorded so they are not mistaken for covered.
 
-- The six `uvx` invocations PR #6 pinned have no guard. A dropped `--no-build`
+- The four `uvx` invocations PR #6 pinned have no guard. A dropped `--no-build`
   or a floated version there is silent: Task 3 sees structured `with.version`
   inputs, not `run:` text. Extending rule 2 to the `uvx` forms would need
   shell-aware parsing and is out of scope.
@@ -583,7 +581,7 @@ Not fixed by any task here. Recorded so they are not mistaken for covered.
   bump. The gap is a red gate in CI, not silent exposure. Widen the weekly
   export to include dev if a failing job is wanted on top of the alert.
 - Composite actions, if any were added under `.github/actions/`, would escape
-  both the hook's `files:` regex and rule 2, which only sees workflows. None
+  both the hook's `files:` regex and rules 2 and 3, which only see workflows. None
   exist today, so there is nothing to guard yet; widen both if one appears.
 
 ## Not in this plan
