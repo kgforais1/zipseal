@@ -278,7 +278,8 @@ case; it silently checks less.
 
 Tasks 1 and 2 rest on convention: `validate-config` accepts `rev: v8.30.0`, and
 nothing checks a `setup-uv` step still carries an exact `version:`. The guard
-must cover both, or one `autoupdate` run reverts the hardening with CI green.
+must cover all three rules, or one `autoupdate` run reverts the hardening with
+CI green.
 
 Add `hooks/scripts/check_pins.py`, following the existing local-hook pattern
 alongside `check_file_size.py`, `check_personal_data.py` and the rest. Three
@@ -513,7 +514,7 @@ than the single tag-`rev` case. Each case states the expected outcome:
 | pinned `rev` with no trailing tag comment | fail, rule 1 |
 | YAML alias resolving to a valid hex `rev` | pass: pre-commit resolves it to the same hex |
 | YAML alias resolving to a tag, or an undefined alias | fail: tag is not a SHA; undefined is an error |
-| CRLF line endings | pass: the YAML parser handles them, and the check sees the same values |
+| CRLF line endings | pass: the parser handles structural values; the raw-line comment pass handles `\r` explicitly |
 | repo entry with `rev` but no `hooks` | pass here: pre-commit itself rejects it loudly, so the guard needs no opinion |
 | `setup-uv` step, `version:` missing, empty, `latest` or `latest-known` | fail, rule 2 |
 | `setup-uv` step, range or wildcard (`>=0.12.10`, `~=0.12.10`, `0.12.x`, `0.12`) | fail, rule 2 |
