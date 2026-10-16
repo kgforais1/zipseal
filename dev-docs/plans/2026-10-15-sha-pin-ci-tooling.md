@@ -51,7 +51,7 @@ Latest tags came from
 `pre-commit-hooks` and `markdownlint-cli2` are already newest, so only their
 `rev` format changes.
 
-The resulting diff to `.pre-commit-config.yaml` is four lines:
+The four `rev:` lines end up as:
 
 ```yaml
   - repo: https://github.com/gitleaks/gitleaks
@@ -248,9 +248,18 @@ What it does indicate is that the repo is mid-migration: open PR #4 widens
 backend generation actually in use and keeps `--no-build` semantics on a line
 stable since 0.12.0. Revisit when PR #4 lands.
 
-Accepted values are an exact version, `latest`, or `latest-known`. Inequality
-operators such as `">=0.12.10"` are not supported by this input, so a "floor"
-cannot be expressed that way.
+The `version` input is **more permissive than its description suggests**. The
+action.yml description mentions only `0.5.0`, `latest` and `latest-known`, but
+the same README documents a `resolution-strategy` input as *"Resolution strategy
+when resolving **version ranges**: `highest` or `lowest`"*, which only makes
+sense if `version` accepts ranges. It also accepts PEP 440 specifiers and
+partial wildcards such as `>=0.4.0` and `0.4.x`.
+
+An earlier draft of this plan claimed inequalities were unsupported, on the
+strength of the action.yml description alone. That was wrong, and it mattered:
+a floor *can* be written, and every non-literal form of it floats at run time.
+So "exact" in this plan means a full literal release version, matching
+`^\d+\.\d+\.\d+$`, and nothing else.
 
 An exact pin has a second benefit: setup-uv verifies its own download checksum
 for a pinned version, which the `latest` path cannot.
@@ -291,14 +300,19 @@ rules:
    `rev` that is a full 40-character lowercase hex SHA, **except** the two
    reserved values `local` and `meta`, which take no `rev`.
 2. **uv versions.** In every workflow, each `astral-sh/setup-uv` step must set
-   `with.version` to an exact version. Reject empty, `latest`, and
-   `latest-known`, since all three resolve at run time.
+   `with.version` to a full literal release version matching `^\d+\.\d+\.\d+$`.
+   Reject everything else the input accepts, because all of it floats at run
+   time: empty, `latest`, `latest-known`, semver and PEP 440 ranges such as
+   `>=0.12.10`, partial wildcards such as `0.12.x`, bare minors such as `0.12`,
+   and any `${{ }}` expression, which would defer the value to something this
+   check cannot see.
 
 Rule 1 is stated as "everything except `local` and `meta`" rather than "every URL" on purpose: pre-commit also accepts SCP-style remotes such as
 `git@github.com:owner/repo.git`, # personal-data:allow: SCP-style git remote cited as an example, not an email address
 which a scheme check would miss, leaving a tag pin in place that no rule objects to.
 
-Register it in the `repo: local` block, widening `files:` to both surfaces:
+Register it in the `repo: local` block, widening `files:` to both surfaces. The
+`entry:` is refined in the next section:
 
 ```yaml
       - id: check-pins
@@ -308,29 +322,43 @@ Register it in the `repo: local` block, widening `files:` to both surfaces:
         files: '^(\.pre-commit-config\.yaml|\.github/workflows/[^/]+\.ya?ml)$'
 ```
 
-### Implementation constraint: stdlib only, fail closed
+The `files:` regex was checked against the real tree: it matches the config plus
+direct `.yml` and `.yaml` files under `.github/workflows/`, and rejects
+subdirectories, backup files such as `foo.yml.bak`, and unrelated paths. Those
+are the extensions and locations GitHub recognises.
 
-`language: system` runs the interpreter found on the runner, so an undeclared
-import is a portability bug. **Every existing policy hook is stdlib-only** —
-none of them imports PyYAML — and this one must be too, even though PyYAML
-happens to be importable in some local environments. That rules out a YAML
-library and puts the burden on a line-oriented parser.
+### Implementation constraint: use PyYAML, not a bespoke parser
 
-The parser must therefore **fail closed**: if it meets a shape it does not
-recognise, such as a YAML anchor or alias, a CRLF line ending, a nested or
-quoted `rev`, or anything malformed, it reports a failure rather than skipping
-the entry. A guard that quietly passes what it cannot read is worse than no
-guard, because it reads as protection that is not there.
+An earlier draft of this plan required a stdlib-only, fail-closed parser on the
+grounds that every existing policy hook is stdlib-only. That was the wrong
+call, and house style was mistaken for a constraint on the future. A
+hand-rolled parser cannot honestly promise to reject "anything malformed"
+without implementing YAML, and GitHub workflows contain nested mappings, lists,
+`${{ }}` expressions and block scalars. A guard that claims to catch what it
+cannot read is worse than no guard, because it reads as protection that is not
+there.
 
-Rule 2 is the harder of the two, because a GitHub workflow nests mappings and
-lists inside a step and may contain `${{ }}` expressions and block scalars.
-The check should be narrow and structural: locate each `uses:` line whose action
-is `astral-sh/setup-uv`, walk forward within that step's block, and require a
-`version:` key holding an exact version. If the block boundary is ambiguous,
-fail closed. If this proves unreliable in practice, the fallback is to declare
-PyYAML in the `dev` dependency group and change the entry to `uv run python`,
-which matches the existing `uv run basedpyright` hook — but that adds a
-dependency, so try the stdlib route first.
+So: declare PyYAML in the `dev` dependency group and run the check through the
+project environment, which is what the existing `uv run basedpyright` hook
+already does:
+
+```yaml
+      - id: check-pins
+        name: "policy: immutable version pins"
+        entry: uv run python hooks/scripts/check_pins.py
+        language: system
+        files: '^(\.pre-commit-config\.yaml|\.github/workflows/[^/]+\.ya?ml)$'
+```
+
+Use `yaml.safe_load`, never `yaml.load`. `safe_load` was confirmed to parse
+both existing workflows, including their `${{ }}` expressions and the zizmor
+step's block scalar, and to find all five `setup-uv` steps structurally rather
+than textually.
+
+The trade is a new dev dependency against a guard that actually works. For a
+security-policy hook, take the dependency. The only residual loss is that
+`language: system` no longer implies stdlib, so the new import must be declared
+rather than assumed, which is the point of recording it here.
 
 Neither rule can confirm offline that a 40-hex string is a *commit* rather than
 a tag object, which is the gitleaks v8.30.0 trap. That fails loudly anyway,
@@ -406,12 +434,12 @@ uv export --locked --no-dev --no-hashes --format requirements-txt -o "$RUNNER_TE
 uvx --no-build pip-audit==2.10.1 -r "$RUNNER_TEMP/req.txt"
 uvx --no-build --python 3.12 zizmor==1.31.0 --format=json . # gate exits 0
 uv run pytest -q
-actionlint .github/workflows/*.yml                          # workflow shape
+actionlint .github/workflows/*.y*ml                          # workflow shape
 ```
 
 `actionlint` earns its place: hand-editing a workflow to add a `with:` block is
-exactly the change most likely to break indentation or step structure, and
-PyYAML would happily parse a structurally wrong file.
+the change most likely to break structure, and PyYAML parses a structurally
+wrong file happily.
 
 ### Structural assertions
 
@@ -422,21 +450,63 @@ These catch the specific mistakes the happy path would miss:
   equals the count of `setup-uv` steps. Assert with a count, not an eyeball.
 - Each pinned SHA matches the tag in its own trailing comment. A reachable old
   SHA with a freshly bumped comment installs and passes every hook, while
-  silently violating the tag-comment convention in this plan. Compare them
-  mechanically:
+  silently violating the tag-comment convention. An earlier draft of this plan
+  carried a shell one-liner for this that never worked: it matched the SHA with
+  `^[0-9a-f]{40}`, which cannot match an indented `rev:` line, and ended in
+  `|| echo`, so it printed mismatches and still exited 0. A verification step
+  that cannot fail is worse than none. Use this instead, which parses the pairs,
+  refuses anything unparsed, and accumulates a non-zero status:
 
-  ```sh
-  for repo in gitleaks/gitleaks pre-commit/pre-commit-hooks \
-              astral-sh/ruff-pre-commit DavidAnson/markdownlint-cli2; do
-    tag=$(grep -A1 "repo: https://github.com/$repo" .pre-commit-config.yaml \
-          | rg -o '#\s*v\S+' | tr -d '# ')
-    sha=$(grep -A1 "repo: https://github.com/$repo" .pre-commit-config.yaml \
-          | rg -o '^[0-9a-f]{40}')
-    actual=$(git ls-remote "https://github.com/$repo" \
-              "refs/tags/$tag" "refs/tags/$tag^{}" | tail -1 | cut -f1)
-    [ "$actual" = "$sha" ] || echo "MISMATCH $repo: $tag is $actual, pinned $sha"
-  done
+  ```python
+  import re, subprocess, sys, pathlib
+
+  cfg = pathlib.Path(".pre-commit-config.yaml").read_text()
+  entries = re.findall(r"^\s*-\s*repo:\s*(\S+)\s*$\n\s*rev:\s*(\S+)\s*(?:#\s*(\S+))?\s*$", cfg, re.M)
+  if not entries:
+      print("no remote repo entries parsed -- is the format right?", file=sys.stderr)
+      sys.exit(2)
+
+  bad = 0
+  for repo, rev, tag in entries:
+      if not re.fullmatch(r"[0-9a-f]{40}", rev):
+          print(f"NOT PINNED  {repo}: rev={rev!r} is not a 40-char hex SHA")
+          bad += 1
+          continue
+      if not tag:
+          print(f"NO TAG      {repo}: pinned {rev} with no tag comment")
+          bad += 1
+          continue
+      out = subprocess.run(
+          [
+              "git",
+              "ls-remote",
+              f"https://github.com/{repo}",
+              f"refs/tags/{tag}",
+              f"refs/tags/{tag}^{{}}",
+          ],
+          capture_output=True,
+          text=True,
+          check=True,
+      ).stdout
+      lines = [l for l in out.splitlines() if l]
+      if not lines:
+          print(f"NO SUCH TAG {repo}: {tag} does not exist")
+          bad += 1
+          continue
+      actual = lines[-1].split()[0]
+      if actual != rev:
+          print(f"MISMATCH    {repo}: {tag} is {actual}, pinned {rev}")
+          bad += 1
+      else:
+          print(f"ok          {repo}  {tag}  {rev}")
+
+  print(f"\n{len(entries)} remote repo(s), {bad} problem(s)")
+  sys.exit(1 if bad else 0)
   ```
+
+  Run it twice. Before the pins land it must report four `NOT PINNED` lines and
+  exit 1; that proves it actually fails. After, it must report four `ok` lines
+  and exit 0.
 
 ### Guard fixture matrix
 
@@ -459,7 +529,14 @@ than the single tag-`rev` case. Each case states the expected outcome:
 | `setup-uv` step with no `version:` | fail, rule 2 |
 | `setup-uv` step with `version: latest` | fail, rule 2 |
 | `setup-uv` step with `version: latest-known` | fail, rule 2 |
-| `setup-uv` step with exact `version:` | pass |
+| `setup-uv` step with `version: ">=0.12.10"` | fail, rule 2 |
+| `setup-uv` step with `version: "~=0.12.10"` | fail, rule 2 |
+| `setup-uv` step with `version: "0.12.x"` | fail, rule 2 |
+| `setup-uv` step with `version: "0.12"` | fail, rule 2 |
+| `setup-uv` step with `version: "${{ env.UV_VERSION }}"` | fail, rule 2 |
+| `setup-uv` step with `version: ""` | fail, rule 2 |
+| `setup-uv` step with `version: 0.12.24` unquoted | pass, but note the value must stay a quoted string |
+| `setup-uv` step with exact `version: "0.12.24"` | pass |
 | unrelated workflow file with no `setup-uv` | pass |
 
 Pre-commit already rejects an empty or missing `rev`, a `rev` on `local`/`meta`,
@@ -511,10 +588,8 @@ bundled with this one.
 
 ## Rollback
 
-Tasks 1 and 2 are single-file or single-line reverts with no state migration. If
-a pinned SHA turns out to be wrong, revert that one `rev` and re-run
-`pre-commit run --all-files`. Because Task 1 is split into pin and bump commits,
-reverting a bump does not un-pin anything.
-
-Task 3 is additive: deleting the hook registration and the script restores the
-prior state.
+Tasks 1 and 2 are single-line reverts with no state migration. If a pinned SHA
+is wrong, revert that one `rev` and re-run `pre-commit run --all-files`.
+Because Task 1 splits into pin and bump commits, reverting a bump does not
+un-pin anything. Task 3 is additive: delete the hook registration and the
+script to restore the prior state.
