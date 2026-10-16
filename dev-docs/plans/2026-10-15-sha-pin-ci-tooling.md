@@ -176,7 +176,9 @@ It stripped the `# v0.16.10` comment and replaced the SHA with the tag.
 newer v8.30.1 for gitleaks, and it wrote the annotated tag-object SHA
 `2ca41cc…` for v8.30.0 rather than the commit.
 
-The header must be rewritten in the same change:
+The header must be rewritten in the **first** commit of this task, the one
+that introduces the SHAs, so the file is never in a state where the pins exist
+and the instruction to replace them with tags still stands:
 
 ```
 # Bump pinned revisions:   see "Bumping hook revs" below
@@ -274,36 +276,103 @@ case; it silently checks less.
 
 ## Task 3: a policy hook so the pinning cannot silently regress
 
-Tasks 1 and 2 both rest on a convention that nothing enforces.
-`pre-commit validate-config` only checks schema, so it accepts `rev: v8.30.0`
-happily. One `autoupdate` run, or one careless hand-edit, reverts the hardening
+Tasks 1 and 2 both rest on a convention that nothing enforces, so the guard has
+to cover both. `pre-commit validate-config` only checks schema, so it accepts
+`rev: v8.30.0` happily; and nothing at all checks that a `setup-uv` step still
+carries an exact `version:`. One `autoupdate` run, one dropped `version:` line,
 and CI stays green. That is precisely the failure mode this plan exists to
 close, so the plan should close it for itself.
 
-Add `hooks/scripts/check_sha_pins.py`, following the existing local-hook
-pattern in `.pre-commit-config.yaml` alongside `check_file_size.py`,
-`check_personal_data.py` and the rest. Parse `.pre-commit-config.yaml` and, for
-every entry whose `repo:` is a URL, require `rev` to match a full 40-character
-lowercase hex SHA. `local` repos have no `rev` and are skipped.
+Add `hooks/scripts/check_pins.py`, following the existing local-hook pattern
+alongside `check_file_size.py`, `check_personal_data.py` and the rest. Two
+rules:
 
-Register it in the `repo: local` block:
+1. **Hook revs.** In `.pre-commit-config.yaml`, every `repo:` entry must have a
+   `rev` that is a full 40-character lowercase hex SHA, **except** the two
+   reserved values `local` and `meta`, which take no `rev`.
+2. **uv versions.** In every workflow, each `astral-sh/setup-uv` step must set
+   `with.version` to an exact version. Reject empty, `latest`, and
+   `latest-known`, since all three resolve at run time.
+
+Rule 1 is stated as "everything except `local` and `meta`" rather than "every URL" on purpose: pre-commit also accepts SCP-style remotes such as
+`git@github.com:owner/repo.git`, # personal-data:allow: SCP-style git remote cited as an example, not an email address
+which a scheme check would miss, leaving a tag pin in place that no rule objects to.
+
+Register it in the `repo: local` block, widening `files:` to both surfaces:
 
 ```yaml
-      - id: check-sha-pins
-        name: "policy: SHA pins"
-        entry: python3 hooks/scripts/check_sha_pins.py
+      - id: check-pins
+        name: "policy: immutable version pins"
+        entry: python3 hooks/scripts/check_pins.py
         language: system
-        files: '^\.pre-commit-config\.yaml$'
+        files: '^(\.pre-commit-config\.yaml|\.github/workflows/[^/]+\.ya?ml)$'
 ```
 
-This catches both regressions described above: a SHA rewritten to a tag by
-`autoupdate`, and the silent gitleaks downgrade, since `v8.30.0` is not a SHA.
+### Implementation constraint: stdlib only, fail closed
 
-What it cannot do offline is confirm a 40-hex string is a *commit* rather than a
-tag object, which is the gitleaks v8.30.0 trap. A tag object also fails loudly,
-because `pre-commit` cannot check one out, so the mode of failure is safe. If a
-CI-side `git ls-remote` reachability check is wanted later, it belongs in the
-audit workflow, not in this hook.
+`language: system` runs the interpreter found on the runner, so an undeclared
+import is a portability bug. **Every existing policy hook is stdlib-only** —
+none of them imports PyYAML — and this one must be too, even though PyYAML
+happens to be importable in some local environments. That rules out a YAML
+library and puts the burden on a line-oriented parser.
+
+The parser must therefore **fail closed**: if it meets a shape it does not
+recognise, such as a YAML anchor or alias, a CRLF line ending, a nested or
+quoted `rev`, or anything malformed, it reports a failure rather than skipping
+the entry. A guard that quietly passes what it cannot read is worse than no
+guard, because it reads as protection that is not there.
+
+Rule 2 is the harder of the two, because a GitHub workflow nests mappings and
+lists inside a step and may contain `${{ }}` expressions and block scalars.
+The check should be narrow and structural: locate each `uses:` line whose action
+is `astral-sh/setup-uv`, walk forward within that step's block, and require a
+`version:` key holding an exact version. If the block boundary is ambiguous,
+fail closed. If this proves unreliable in practice, the fallback is to declare
+PyYAML in the `dev` dependency group and change the entry to `uv run python`,
+which matches the existing `uv run basedpyright` hook — but that adds a
+dependency, so try the stdlib route first.
+
+Neither rule can confirm offline that a 40-hex string is a *commit* rather than
+a tag object, which is the gitleaks v8.30.0 trap. That fails loudly anyway,
+because `pre-commit` cannot check out a tag object, so the mode of failure is
+safe. A CI-side `git ls-remote` reachability check, if wanted later, belongs in
+the audit workflow rather than in this hook.
+
+## Checklist
+
+Tick a box only when the task is done and verified by a command or an explicit
+acceptance, per the lifecycle in `dev-docs/README.md`.
+
+### Commit 1: pin, and close the loopholes
+
+- [ ] Re-point the four `rev:` values at the commit SHAs of the tags already in
+      the file, versions unchanged (gitleaks v8.30.0 becomes `6eaad03…`).
+- [ ] Rewrite the `.pre-commit-config.yaml` header bump instruction in this same
+      commit, since the trap it describes is created here.
+- [ ] Add `hooks/scripts/check_pins.py` and register it, covering both rule 1
+      and rule 2.
+- [ ] Verify the guard against the fixture matrix in Verification, including
+      that it fails closed.
+- [ ] Confirm the four pinned hooks install and pass from their SHAs.
+
+### Commit 2: bump
+
+- [ ] Bump gitleaks to v8.30.1 (`83d9cd6…`) and ruff-pre-commit to v0.17.1
+      (`38bfb07c…`).
+- [ ] Confirm each new SHA matches its new tag comment.
+- [ ] Re-run the full pre-commit gate and confirm ruff 0.17 did not change any
+      finding.
+
+### Task 2: pin uv
+
+- [ ] Land open PR #3 first, then re-verify the new action SHA has a tag.
+- [ ] Add `with: version: "0.12.24"` to all five `setup-uv` steps.
+- [ ] Re-run the whole Verification block **under uv 0.12.24**, not the local uv.
+
+### Close out
+
+- [ ] Log in `CHANGELOG.dev.md` and delete the `TODO.md` item.
+- [ ] Set `Status:` and move to `plans/archive/`.
 
 ## Verification
 
@@ -330,17 +399,79 @@ uvx --no-build pre-commit==4.7.0 run --config <sha-rev config> --all-files
 After applying the tasks, under uv 0.12.24:
 
 ```sh
+uv --version                                              # expect 0.12.24
 pre-commit validate-config .pre-commit-config.yaml
 uvx --no-build pre-commit==4.7.0 run --all-files          # all hooks pass
 uv export --locked --no-dev --no-hashes --format requirements-txt -o "$RUNNER_TEMP/req.txt"
 uvx --no-build pip-audit==2.10.1 -r "$RUNNER_TEMP/req.txt"
 uvx --no-build --python 3.12 zizmor==1.31.0 --format=json . # gate exits 0
 uv run pytest -q
+actionlint .github/workflows/*.yml                          # workflow shape
 ```
 
-The Task 3 guard is verified by making it fail: put a tag `rev` in a scratch
-copy of the config and confirm `check-sha-pins` exits non-zero; then confirm a
-valid 40-hex `rev` passes. The hook checks format, not reachability.
+`actionlint` earns its place: hand-editing a workflow to add a `with:` block is
+exactly the change most likely to break indentation or step structure, and
+PyYAML would happily parse a structurally wrong file.
+
+### Structural assertions
+
+These catch the specific mistakes the happy path would miss:
+
+- Every one of the five `astral-sh/setup-uv` steps carries
+  `version: "0.12.24"`, and the count of `version:` keys under those steps
+  equals the count of `setup-uv` steps. Assert with a count, not an eyeball.
+- Each pinned SHA matches the tag in its own trailing comment. A reachable old
+  SHA with a freshly bumped comment installs and passes every hook, while
+  silently violating the tag-comment convention in this plan. Compare them
+  mechanically:
+
+  ```sh
+  for repo in gitleaks/gitleaks pre-commit/pre-commit-hooks \
+              astral-sh/ruff-pre-commit DavidAnson/markdownlint-cli2; do
+    tag=$(grep -A1 "repo: https://github.com/$repo" .pre-commit-config.yaml \
+          | rg -o '#\s*v\S+' | tr -d '# ')
+    sha=$(grep -A1 "repo: https://github.com/$repo" .pre-commit-config.yaml \
+          | rg -o '^[0-9a-f]{40}')
+    actual=$(git ls-remote "https://github.com/$repo" \
+              "refs/tags/$tag" "refs/tags/$tag^{}" | tail -1 | cut -f1)
+    [ "$actual" = "$sha" ] || echo "MISMATCH $repo: $tag is $actual, pinned $sha"
+  done
+  ```
+
+### Guard fixture matrix
+
+`check_pins.py` is verified by making it fail, across a fixture matrix rather
+than the single tag-`rev` case. Each case states the expected outcome:
+
+| Fixture | Expected |
+| --- | --- |
+| valid 40-hex lowercase `rev` | pass |
+| tag `rev` (`v8.30.0`) | fail, rule 1 |
+| SCP remote with a tag `rev` | fail, rule 1 |
+| uppercase hex `rev` | fail, rule 1 |
+| short or over-long hex | fail, rule 1 |
+| non-string `rev` (unquoted number, nested map) | fail, rule 1 |
+| `local` or `meta` repo, no `rev` | pass |
+| YAML anchor/alias in place of a `rev` | fail closed |
+| CRLF line endings | fail closed |
+| malformed YAML | fail closed |
+| repo entry with `rev` but no `hooks` | fail closed |
+| `setup-uv` step with no `version:` | fail, rule 2 |
+| `setup-uv` step with `version: latest` | fail, rule 2 |
+| `setup-uv` step with `version: latest-known` | fail, rule 2 |
+| `setup-uv` step with exact `version:` | pass |
+| unrelated workflow file with no `setup-uv` | pass |
+
+Pre-commit already rejects an empty or missing `rev`, a `rev` on `local`/`meta`,
+and an entry with no `hooks`, so those cases are belt-and-braces; the point of
+the matrix is that our guard never passes something it could not read.
+
+### What local verification cannot confirm
+
+The zizmor gate's `known-vulnerable-actions` audit is online-only and needs
+`GH_TOKEN`. Without it, zizmor silently skips the audit that matters most and
+still exits 0, so a local green run proves only that the gate's plumbing works.
+The advisory check itself has to be confirmed by a real CI run.
 
 ## Known remaining holes
 
@@ -361,6 +492,12 @@ Not fixed by any task here. Recorded so they are not mistaken for covered.
   by pinning `rev`.
 - `apt-get install 7zip` and `brew install sevenzip` in `ci.yml` are unpinned.
   Test jobs only, so low risk.
+- Python selectors float to the newest patch of their minor. `ci.yml` uses
+  `python-version: ${{ matrix.python }}` with `3.11` and `3.13`, and
+  `dependency-audit.yml:76` passes `--python 3.12` to `uvx`, so each resolves to
+  whatever patch is current that day. Pinning patch-exact would fix it at the
+  cost of never getting interpreter security patches automatically. Ordinary
+  practice, recorded so it is not mistaken for a pin.
 - `runs-on: ubuntu-latest` and `macos-latest` float, so the base image changes
   under the CI run. A dated image label would fix it at the cost of routine
   security patching.
