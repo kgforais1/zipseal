@@ -37,9 +37,9 @@ edits and refactors. User-visible changes go in [`CHANGELOG.md`](CHANGELOG.md).
 
 ### Fixed
 
-- `dependency-audit.yml` escaped the advisory text it prints as `::error`
-  annotations. A newline in a GitHub advisory description terminated the
-  annotation and the rest of the text was parsed as runner commands.
+- `dependency-audit.yml` no longer prints advisory text unescaped. A newline in
+  a GitHub advisory description used to end the `::error` annotation, and the
+  rest of the text was parsed as runner commands.
 
 ## [0.1.0] - 2026-10-08
 
