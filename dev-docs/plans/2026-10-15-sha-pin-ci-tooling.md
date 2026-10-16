@@ -4,8 +4,9 @@ Date: 2026-10-15
 Status: draft
 Linked: `TODO.md` "SHA-pin the CI tooling and guard it"
 
-Reviewed by Gemini 3.8 Flash High, then by Claude Sonnet 5.5 High. Findings from
-both rounds are folded in; the corrections they forced are called out inline.
+Reviewed by Gemini 3.8 Flash High, Claude Sonnet 5.5 High and Kiro GPT-5.6 Sol.
+Findings from all three rounds are folded in; the corrections they forced are
+called out inline.
 
 ## Goal
 
@@ -30,7 +31,7 @@ What is still mutable:
 2. `setup-uv` installs whatever uv the `version` input resolves to, which
    defaults to the pyproject version or `latest`.
 
-`uv.lock` is fine for the project's own dependencies: 210 `sha256` hashes.
+`uv.lock` is fine: 210 `sha256` hashes.
 
 ## Task 1: SHA-pin the four pre-commit hook revs
 
@@ -79,28 +80,20 @@ The four `rev:` lines end up as:
 
 Keep this in one PR but split it across two commits:
 
-1. **Pin only, versions unchanged.** Re-point the four `rev:` values at the
-   commit SHAs of the tags already in the file. This diff is mechanically
-   checkable: same version, now immutable. gitleaks v8.30.0 becomes
-   `6eaad039…`, not `2ca41cc…`.
+1. **Pin only, versions unchanged.** Same version, now immutable. gitleaks
+   v8.30.0 becomes `6eaad039…`, not `2ca41cc…`.
 2. **Then bump.** gitleaks to v8.30.1, ruff-pre-commit to v0.17.1.
 
-Reverting the bump should not revert the pin. A single squashed commit means
-`git revert` of the ruff bump also un-hardens gitleaks, and a reviewer cannot
-confirm "same version, now immutable" when the version changes in the same diff.
+A single squashed commit means reverting the bump also un-hardens gitleaks, and
+a reviewer cannot confirm "same version, now immutable" when the version changes
+in the same diff. The bumps are small and verified:
 
-Re-pinning a stale SHA without bumping is a false economy either way: it locks
-in old code behind fresh process. The bumps are small and verified:
-
-- `gitleaks` v8.30.0 to v8.30.1: four commits, eight files, +79/-11. Go 1.24
-  build switch, goreleaser and report-template tidy-up, plus small
-  `detect/codec` encoding changes. It touches the secret-scanning gate, so it
-  deserves its own commit.
+- `gitleaks` v8.30.0 to v8.30.1: four commits, eight files, +79/-11. It touches
+  the secret-scanning gate, so it deserves its own commit.
 - `ruff-pre-commit` v0.16.10 to v0.17.1 is a **minor** release and carries the
-  real risk, since a new ruff can add or change rules and turn the lint gate
-  red. Tested against this repo: `ruff-check` and `ruff-format` both pass
-  unchanged on all files. If a future bump trips the gate, fix or configure the
-  new findings rather than reverting the pin.
+  real risk, since a new ruff can change rules and turn the lint gate red.
+  Tested: `ruff-check` and `ruff-format` both pass unchanged. If a future bump
+  trips the gate, fix the findings rather than reverting the pin.
 
 ### gitleaks v8.30.1 is not on master, and that matters
 
@@ -134,9 +127,9 @@ consequences:
 ```
 
 `2ca41cc…` is the *tag object*, not the commit. The `^{}` line is the commit, and
-that is what belongs in `rev`. The other three are lightweight tags, where the two
-lines collapse to one and the tag ref is already the commit. All four *new* tags
-happen to be lightweight, so the trap is easy to forget next time.
+that is what belongs in `rev`. The other tags here are lightweight, where the
+tag ref already is the commit. All four *new* tags happen to be lightweight, so
+the trap is easy to forget next time.
 
 Use the peeled form, and guard it, because a mistyped tag yields an empty string
 and still exits 0:
@@ -193,10 +186,9 @@ apart.
 ### Risk
 
 - `pre-commit autoupdate` stops being the bump command. That is the point, but
-  it is a real workflow change for whoever maintains this repo.
-- No automated bump path. Dependabot has no ecosystem for pre-commit revs and
-  pre-commit.ci is not configured, so hook bumps stay manual. Acceptable for
-  four repos that move a few times a year; revisit if that stops being true.
+  it is a real workflow change.
+- No automated bump path: hook bumps stay manual. Fine for four repos that move
+  a few times a year; revisit if that stops being true.
 - A wrong SHA fails loudly at `pre-commit run` time, not silently. Good.
 
 ## Task 2: pin the uv version in setup-uv
@@ -236,17 +228,14 @@ was newest that day. And because the action reads pyproject.toml first, adding
 ### Why 0.12.24 and not 0.12.10
 
 Current tags are `0.12.24` (newest 0.12.x) and `0.13.1` (newest overall). Pin
-the newest patch of the 0.12 line rather than whatever version happened to be on
-the machine when PR #6 was written, for the same reason the hook pins move:
-hardening shipped on stale code is still stale code.
+the newest patch of the 0.12 line rather than the version that happened to be
+installed when PR #6 was written.
 
 `0.12.24` rather than `0.13.1` is a judgement call, not a hard constraint. The
 `<0.13.0` cap in `pyproject.toml:28` applies to `uv_build`, the build backend,
-which is a separate package from the `uv` CLI, so it does not forbid a 0.13 CLI.
-What it does indicate is that the repo is mid-migration: open PR #4 widens
-`uv_build` to `<0.14.0`. Pinning the CLI to 0.12.x keeps it consistent with the
-backend generation actually in use and keeps `--no-build` semantics on a line
-stable since 0.12.0. Revisit when PR #4 lands.
+which is separate from the `uv` CLI, so it does not forbid a 0.13 CLI. The repo
+is mid-migration (open PR #4 widens `uv_build` to `<0.14.0`), so pin to the
+backend generation in use and revisit when PR #4 lands.
 
 The `version` input is **more permissive than its description suggests**. The
 action.yml description mentions only `0.5.0`, `latest` and `latest-known`, but
@@ -258,8 +247,13 @@ partial wildcards such as `>=0.4.0` and `0.4.x`.
 An earlier draft of this plan claimed inequalities were unsupported, on the
 strength of the action.yml description alone. That was wrong, and it mattered:
 a floor *can* be written, and every non-literal form of it floats at run time.
-So "exact" in this plan means a full literal release version, matching
-`^\d+\.\d+\.\d+$`, and nothing else.
+So "exact" in this plan means a full literal release version, checked with
+`re.fullmatch(r"\d+\.\d+\.\d+", value)`, and nothing else. State the function,
+not just the pattern: under `re.match`, the anchors are not enough, because `$`
+matches before a trailing newline, so a YAML double-quoted scalar such as
+`version: "0.12.24\n"` would pass a `re.match(r"^\d+\.\d+\.\d+$", …)` check.
+`fullmatch` has no such leak. A leading `v` is rejected by the same gate, which
+is a harmless false positive against setup-uv's semver handling.
 
 An exact pin has a second benefit: setup-uv verifies its own download checksum
 for a pinned version, which the `latest` path cannot.
@@ -300,7 +294,8 @@ rules:
    `rev` that is a full 40-character lowercase hex SHA, **except** the two
    reserved values `local` and `meta`, which take no `rev`.
 2. **uv versions.** In every workflow, each `astral-sh/setup-uv` step must set
-   `with.version` to a full literal release version matching `^\d+\.\d+\.\d+$`.
+   `with.version` to a full literal release version, checked with
+   `re.fullmatch(r"\d+\.\d+\.\d+", value)`.
    Reject everything else the input accepts, because all of it floats at run
    time: empty, `latest`, `latest-known`, semver and PEP 440 ranges such as
    `>=0.12.10`, partial wildcards such as `0.12.x`, bare minors such as `0.12`,
@@ -379,6 +374,9 @@ acceptance, per the lifecycle in `dev-docs/README.md`.
       commit, since the trap it describes is created here.
 - [ ] Add `hooks/scripts/check_pins.py` and register it, covering both rule 1
       and rule 2.
+- [ ] Declare PyYAML in the `dev` dependency group and run `uv lock`, so the
+      `uv run python` hook entry has its import. Without the relock,
+      `uv sync --locked` fails in CI and the hook dies on `ModuleNotFoundError`.
 - [ ] Verify the guard against the fixture matrix in Verification, including
       that it fails closed.
 - [ ] Confirm the four pinned hooks install and pass from their SHAs.
@@ -400,6 +398,8 @@ acceptance, per the lifecycle in `dev-docs/README.md`.
 ### Close out
 
 - [ ] Log in `CHANGELOG.dev.md` and delete the `TODO.md` item.
+- [ ] Document the new hook where the repo tracks its own hooks: the hooks
+      table in `dev-docs/README.md` and `AGENTS.md`, in the same commit.
 - [ ] Set `Status:` and move to `plans/archive/`.
 
 ## Verification
@@ -468,43 +468,40 @@ These catch the specific mistakes the happy path would miss:
 
   bad = 0
   for repo, rev, tag in entries:
+      problems = []
       if not re.fullmatch(r"[0-9a-f]{40}", rev):
-          print(f"NOT PINNED  {repo}: rev={rev!r} is not a 40-char hex SHA")
-          bad += 1
-          continue
-      if not tag:
-          print(f"NO TAG      {repo}: pinned {rev} with no tag comment")
-          bad += 1
-          continue
-      out = subprocess.run(
-          [
-              "git",
-              "ls-remote",
-              f"https://github.com/{repo}",
-              f"refs/tags/{tag}",
-              f"refs/tags/{tag}^{{}}",
-          ],
-          capture_output=True,
-          text=True,
-          check=True,
-      ).stdout
-      lines = [l for l in out.splitlines() if l]
-      if not lines:
-          print(f"NO SUCH TAG {repo}: {tag} does not exist")
-          bad += 1
-          continue
-      actual = lines[-1].split()[0]
-      if actual != rev:
-          print(f"MISMATCH    {repo}: {tag} is {actual}, pinned {rev}")
+          problems.append(f"rev={rev!r} is not a 40-char hex SHA")
+      elif not tag:
+          problems.append(f"pinned {rev} with no tag comment")
+      else:
+          out = subprocess.run(
+              [
+                  "git",
+                  "ls-remote",
+                  f"https://github.com/{repo}",
+                  f"refs/tags/{tag}",
+                  f"refs/tags/{tag}^{{}}",
+              ],
+              capture_output=True,
+              text=True,
+              check=True,
+          ).stdout
+          lines = [line for line in out.splitlines() if line]
+          if not lines:
+              problems.append(f"tag {tag} does not exist")
+          elif lines[-1].split()[0] != rev:
+              problems.append(f"{tag} is {lines[-1].split()[0]}, pinned {rev}")
+      if problems:
+          print(f"FAIL {repo}: " + "; ".join(problems))
           bad += 1
       else:
-          print(f"ok          {repo}  {tag}  {rev}")
+          print(f"ok   {repo}  {tag}  {rev}")
 
   print(f"\n{len(entries)} remote repo(s), {bad} problem(s)")
   sys.exit(1 if bad else 0)
   ```
 
-  Run it twice. Before the pins land it must report four `NOT PINNED` lines and
+  Run it twice. Before the pins land it must report four `FAIL` lines and
   exit 1; that proves it actually fails. After, it must report four `ok` lines
   and exit 0.
 
@@ -522,10 +519,10 @@ than the single tag-`rev` case. Each case states the expected outcome:
 | short or over-long hex | fail, rule 1 |
 | non-string `rev` (unquoted number, nested map) | fail, rule 1 |
 | `local` or `meta` repo, no `rev` | pass |
-| YAML anchor/alias in place of a `rev` | fail closed |
-| CRLF line endings | fail closed |
-| malformed YAML | fail closed |
-| repo entry with `rev` but no `hooks` | fail closed |
+| YAML alias resolving to a valid hex `rev` | pass: pre-commit resolves it to the same hex |
+| YAML alias resolving to a tag, or an undefined alias | fail: tag is not a SHA; undefined is an error |
+| CRLF line endings | pass: the YAML parser handles them, and the check sees the same values |
+| repo entry with `rev` but no `hooks` | pass here: pre-commit itself rejects it loudly, so the guard needs no opinion |
 | `setup-uv` step with no `version:` | fail, rule 2 |
 | `setup-uv` step with `version: latest` | fail, rule 2 |
 | `setup-uv` step with `version: latest-known` | fail, rule 2 |
@@ -535,8 +532,6 @@ than the single tag-`rev` case. Each case states the expected outcome:
 | `setup-uv` step with `version: "0.12"` | fail, rule 2 |
 | `setup-uv` step with `version: "${{ env.UV_VERSION }}"` | fail, rule 2 |
 | `setup-uv` step with `version: ""` | fail, rule 2 |
-| `setup-uv` step with `version: 0.12.24` unquoted | pass, but note the value must stay a quoted string |
-| `setup-uv` step with exact `version: "0.12.24"` | pass |
 | unrelated workflow file with no `setup-uv` | pass |
 
 Pre-commit already rejects an empty or missing `rev`, a `rev` on `local`/`meta`,
@@ -553,6 +548,15 @@ The advisory check itself has to be confirmed by a real CI run.
 ## Known remaining holes
 
 Not fixed by any task here. Recorded so they are not mistaken for covered.
+
+- The six `uvx` invocations PR #6 pinned have no guard. A dropped `--no-build`
+  or a floated version there is silent: Task 3 sees structured `with.version`
+  inputs, not `run:` text. Extending rule 2 to the `uvx` forms would need
+  shell-aware parsing and is out of scope.
+- The action-SHA audit does not run on push to `main`. `zizmor` fires on pull
+  requests and the weekly schedule, while `ci.yml` fires on push, so a direct
+  push carrying a bad `uses:` reference sits unaudited until the next scheduled
+  run. Normal flow goes through PRs, where it is caught.
 
 - `pyproject.toml:28` requires `uv_build>=0.12.10,<0.13.0`, and `uv_build` is
   **not in `uv.lock`** (confirmed by grep). Every `uv sync --locked` builds the
