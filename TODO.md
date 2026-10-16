@@ -17,6 +17,13 @@ An item that needs more than a few lines of thought gets a plan in
 
 ## Later
 
+- Move the CI-only tools (`pip-audit`, `pre-commit`, `zizmor`) out of inline
+  workflow pins and into a `[dependency-groups]` entry in `pyproject.toml`,
+  locked in `uv.lock` and run with `uv run --group ci --locked`. That buys
+  hash verification and Dependabot-driven bumps, which the inline `==` pins in
+  `.github/workflows/` do not get (Dependabot's `github-actions` ecosystem
+  updates `uses:` references, not versions inside `run:` steps). Costs a
+  `uv.lock` diff and puts CI tooling in the app's dependency closure.
 - Add drag-and-drop to the GUI via `tkinterdnd2` ([GUI plan](dev-docs/plans/2026-10-10-gui.md)).
 - Package the GUI as a signed, double-clickable macOS `.app` with PyInstaller or Briefcase ([GUI plan](dev-docs/plans/2026-10-10-gui.md)).
 - Consider `--format 7z`, `--oversize=volumes` and `--tight` (`SPEC.md` §6.2, §6.4, §6.7).
