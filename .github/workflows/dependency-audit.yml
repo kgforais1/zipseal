@@ -49,6 +49,8 @@ jobs:
         with:
           persist-credentials: false
       - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884  # v10.3.0
+        with:
+          version: "0.12.24"
       # Same scope as ci.yml's audit job.
       - run: uv export --locked --no-dev --no-hashes --format requirements-txt -o "$RUNNER_TEMP/req.txt"
       - run: uvx --no-build pip-audit==2.10.1 -r "$RUNNER_TEMP/req.txt"
@@ -62,6 +64,8 @@ jobs:
         with:
           persist-credentials: false
       - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884  # v10.3.0
+        with:
+          version: "0.12.24"
       - name: Check actions against GitHub security advisories
         env:
           GH_TOKEN: ${{ github.token }}
