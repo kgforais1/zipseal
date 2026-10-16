@@ -290,15 +290,18 @@ rules:
    reserved values `local` and `meta`, which take no `rev`. Each pinned `rev`
    must also carry its release tag as a trailing comment; that comment is the
    only human-readable record of which release a SHA is, and the SHA-versus-tag
-   verifier in Verification compares the two mechanically. Because
-   `yaml.safe_load` discards comments, the comment check is a separate scoped
-   raw-line pass over lines matching `rev:\s*[0-9a-f]{40}`: such a line must
-   carry a `# tag` comment. Alias `rev` lines carry no literal hex, so the
-   comment rule does not apply to them; and the raw-text pass must handle `\r`
-   explicitly, since CRLF now exercises that path rather than the parser.
+   verifier in Verification compares the two mechanically. Because parsing
+   discards comments, the check locates each `rev` scalar through
+   `yaml.compose` marks and requires a `# tag` comment after the scalar's end
+   position on its own source line, which covers quoted keys, quoted values
+   and multi-line scalars uniformly. Alias use is detected at the key
+   position (`rev: *name`) and exempted, since pre-commit resolves it
+   identically; and the raw-text pass handles `\r` explicitly, since CRLF
+   exercises that path rather than the parser.
 2. **uv versions.** In every workflow, each `astral-sh/setup-uv` step must set
    `with.version` to a full literal release version, checked with
-   `re.fullmatch(r"\d+\.\d+\.\d+", value)`.
+   `re.fullmatch(r"[0-9]+\.[0-9]+\.[0-9]+", value)` (ASCII-only: `\d` also
+   matches non-ASCII digits).
    Reject everything else the input accepts, because all of it floats at run
    time: empty, `latest`, `latest-known`, semver and PEP 440 ranges such as
    `>=0.12.10`, partial wildcards such as `0.12.x`, bare minors such as `0.12`,
@@ -587,7 +590,7 @@ Not fixed by any task here. Recorded so they are not mistaken for covered.
 ## Not in this plan
 
 Moving `pip-audit`, `pre-commit` and `zizmor` into `[dependency-groups]` for
-`uv.lock` hash verification. Already in `TODO.md`; bigger change, not bundled.
+`uv.lock` hash verification. Already in `TODO.md`; not bundled.
 
 ## Rollback
 

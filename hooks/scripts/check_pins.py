@@ -8,8 +8,10 @@ Three rules (see dev-docs/plans/2026-10-15-sha-pin-ci-tooling.md, Task 3):
 
 1. Hook revs: in `.pre-commit-config.yaml`, every `repo:` except `local` and
    `meta` must pin a full 40-character lowercase hex SHA, and each pinned
-   `rev` must carry its release tag as a trailing comment. The comment check
-   is a raw-line pass because `yaml.safe_load` discards comments.
+   `rev` must carry its release tag as a trailing comment. Comment positions
+   come from `yaml.compose` marks, since parsing discards comments; alias use
+   is detected at the key position and exempted because pre-commit resolves
+   it identically.
 2. uv versions: in every workflow, each `astral-sh/setup-uv` step must set
    `with.version` to a full literal release version.
 3. Action refs: in every workflow, each `uses:` naming a remote action must
@@ -26,10 +28,10 @@ import sys
 from pathlib import Path
 
 import yaml
+from yaml.nodes import MappingNode, ScalarNode, SequenceNode
 
 FULL_SHA = re.compile(r"\A[0-9a-f]{40}\Z")
 EXACT_VERSION = re.compile(r"[0-9]+\.[0-9]+\.[0-9]+")
-REV_LINE = re.compile(r"""^\s*rev:\s*['"]?([0-9a-f]{40})\b""")
 COMMENT = re.compile(r"#[ \t]*\S")
 USES_SHA = re.compile(r"\A[^@\s]+@[0-9a-f]{40}\Z")
 
@@ -55,29 +57,50 @@ def check_hook_revs(path: Path) -> list[str]:
     text, errors = _read_text(path)
     if errors or text is None:
         return errors
-    data, errors = _parse(path, text)
-    if errors:
-        return errors
-    repos = data.get("repos") if isinstance(data, dict) else None
-    if not isinstance(repos, list):
+    try:
+        root = yaml.compose(text)
+    except yaml.YAMLError as exc:
+        return [f"{path}: malformed YAML: {exc}"]
+    lines = text.splitlines()
+    # splitlines() handles \n, \r\n and lone \r alike, so mark columns,
+    # which count from the start of the visual line, stay aligned.
+    repos: object = None
+    if isinstance(root, MappingNode):
+        for key, value in root.value:
+            if isinstance(key, ScalarNode) and key.value == "repos":
+                repos = value
+    if not isinstance(repos, SequenceNode):
         return [f"{path}: no `repos:` list found"]
-    for entry in repos:
-        if not isinstance(entry, dict):
+    for entry in repos.value:
+        if not isinstance(entry, MappingNode):
             return [f"{path}: malformed repo entry: {entry!r}"]
-        repo = entry.get("repo")
+        fields: dict[str, tuple[object, object]] = {}
+        for key, value in entry.value:
+            if isinstance(key, ScalarNode):
+                fields[key.value] = (key, value)
+        repo_node = fields.get("repo", (None, None))[1]
+        repo = repo_node.value if isinstance(repo_node, ScalarNode) else None
         if repo in SKIP_REPOS:
             continue
-        rev = entry.get("rev")
-        if not isinstance(rev, str) or not FULL_SHA.match(rev):
+        rev_key, rev_val = fields.get("rev", (None, None))
+        if not isinstance(rev_val, ScalarNode) or not FULL_SHA.match(rev_val.value):
             findings.append(f"{path}: repo {repo!r} rev must be a 40-char hex SHA")
-    # Comment check is a raw-line pass: safe_load discards comments, and
-    # alias rev lines carry no literal hex so the pattern skips them.
-    # splitlines() handles \n, \r\n and lone \r alike.
-    for number, line in enumerate(text.splitlines(), 1):
-        if line.lstrip().startswith("#"):
             continue
-        if REV_LINE.search(line) and not COMMENT.search(line.split("rev:", 1)[1]):
-            findings.append(f"{path}:{number}: pinned rev carries no tag comment")
+        # Comment check on the rev scalar's own source position: safe_load
+        # and compose both discard comments, so the raw line where the scalar
+        # ends must carry the tag. Key position (not value) reveals alias use,
+        # because compose resolves `rev: *anchor` to the anchored node.
+        if isinstance(rev_key, ScalarNode):
+            after = lines[rev_key.start_mark.line][rev_key.end_mark.column :]
+            after = after.lstrip()
+            if after.startswith(":"):
+                after = after[1:].lstrip()
+                if after.startswith("*"):
+                    continue  # alias use: pre-commit resolves it identically
+        end = rev_val.end_mark
+        tail = lines[end.line][end.column :]
+        if not COMMENT.search(tail):
+            findings.append(f"{path}:{end.line + 1}: pinned rev carries no tag comment")
     return findings
 
 
