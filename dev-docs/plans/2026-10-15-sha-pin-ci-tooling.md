@@ -4,10 +4,6 @@ Date: 2026-10-15
 Status: draft
 Linked: `TODO.md` "SHA-pin the CI tooling and guard it"
 
-Reviewed by Gemini 3.8 Flash High, Claude Sonnet 5.5 High, Kiro GPT-5.6 Sol,
-opencode Step 5 preview and opencode GLM 5.3. Findings from all five rounds are
-folded in; the corrections they forced are called out inline.
-
 ## Goal
 
 Several surfaces in CI still resolve a version at run time instead of pinning an
@@ -23,7 +19,7 @@ zizmor's `known-vulnerable-actions` audit needs:
 | Action | SHA | Tags at that SHA |
 | --- | --- | --- |
 | `actions/checkout` | `3d3c42e5aac5ba805825da76410c181273ba90b1` | `v7.0.1`, `v7` |
-| `astral-sh/setup-uv` | `c18668ad3cf93ea998bef934396af7bb5c839dc7` | `v10.2.0` |
+| `astral-sh/setup-uv` | `1c37ad07a6a961277cf70c0d37d6f313000f5884` | `v10.3.0` |
 
 What is still mutable:
 
@@ -143,11 +139,8 @@ case "$sha" in
 esac
 ```
 
-Do not filter on `rg '\^\{\}$'`: that matches nothing for a lightweight tag,
-which is three of the four here. `tail -1` handles both.
-
-For reference, both action pins in the workflows are lightweight tags, so
-`3d3c42e…` and `c18668a…` are already commit SHAs.
+Do not filter on `rg '\^\{\}$'`: that matches nothing for a lightweight tag.
+`tail -1` handles both.
 
 ### This task has a documentation trap
 
@@ -165,9 +158,9 @@ against a throwaway copy of the config carrying the plan's exact pin:
 ```
 
 It stripped the `# v0.16.10` comment and replaced the SHA with the tag.
-`autoupdate --freeze` is **not** a safe substitute: it chose v8.30.0 over the
-newer v8.30.1 for gitleaks, and it wrote the annotated tag-object SHA
-`2ca41cc…` for v8.30.0 rather than the commit.
+`autoupdate --freeze` is **not** a safe substitute: it picked v8.30.0 over the
+newer v8.30.1, and wrote the annotated tag-object SHA `2ca41cc…` instead of the
+commit.
 
 The header must be rewritten in the **first** commit of this task, the one
 that introduces the SHAs, so the file is never in a state where the pins exist
@@ -203,16 +196,23 @@ Five steps carry `astral-sh/setup-uv`, and all five need the change:
 | `.github/workflows/dependency-audit.yml` | 51 | `audit` |
 | `.github/workflows/dependency-audit.yml` | 64 | `vulnerable-actions` |
 
-Add to each:
+Add a `version:` key to each. Do not touch the `uses:` line, which Dependabot
+now maintains at `1c37ad07…  # v10.3.0`:
 
 ```yaml
-      - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7  # v10.2.0
         with:
           version: "0.12.24"
 ```
 
+At `ci.yml:47` the step already has a `with:` block holding `python-version:`.
+Merge the key into that block; do not paste a second `with:`, which is a
+duplicate mapping key. PyYAML silently keeps only the last block, so a botched
+merge would drop `python-version:` while the guard and the count assertion both
+still pass. `actionlint` catches the duplicate and is the backstop, which is
+why it is in Verification rather than optional.
+
 `version` is unset today, so uv has been whatever the input resolved to by
-default. From the pinned action's own `action.yml` at v10.2.0:
+default. From the pinned action's own `action.yml` at v10.3.0 (identical text at v10.2.0):
 
 ```yaml
   version:
@@ -220,10 +220,12 @@ default. From the pinned action's own `action.yml` at v10.2.0:
     default: ""
 ```
 
-Two things follow. This repo has no `[tool.uv]` section in `pyproject.toml`, so
-the documented default resolves to `latest`: every CI run has used whatever uv
-was newest that day. And because the action reads pyproject.toml first, adding
-`[tool.uv] required-version` later would silently start governing this too.
+Two things follow. This repo has neither `uv.toml` nor a `[tool.uv]` section in
+`pyproject.toml`, so the documented default (uv.toml, then pyproject, then
+`latest`) resolves to `latest`: every CI run has used whatever uv was newest
+that day. And because the action would read either file first if one appeared,
+adding a `required-version` to either later would silently start governing
+this too.
 
 ### Why 0.12.24 and not 0.12.10
 
@@ -244,29 +246,32 @@ when resolving **version ranges**: `highest` or `lowest`"*, which only makes
 sense if `version` accepts ranges. It also accepts PEP 440 specifiers and
 partial wildcards such as `>=0.4.0` and `0.4.x`.
 
-An earlier draft of this plan claimed inequalities were unsupported, on the
-strength of the action.yml description alone. That was wrong, and it mattered:
-a floor *can* be written, and every non-literal form of it floats at run time.
-So "exact" in this plan means a full literal release version, checked with
-`re.fullmatch(r"\d+\.\d+\.\d+", value)`, and nothing else. State the function,
-not just the pattern: under `re.match`, the anchors are not enough, because `$`
-matches before a trailing newline, so a YAML double-quoted scalar such as
-`version: "0.12.24\n"` would pass a `re.match(r"^\d+\.\d+\.\d+$", …)` check.
-`fullmatch` has no such leak. A leading `v` is rejected by the same gate, which
-is a harmless false positive against setup-uv's semver handling.
+The `version` input accepts more than its description suggests. The action.yml
+description mentions only exact versions, `latest` and `latest-known`, but the
+README documents a `resolution-strategy` for resolving version ranges, and the
+input also takes PEP 440 specifiers and partial wildcards. Every non-literal
+form floats at run time. So "exact" means a full literal release version,
+checked with `re.fullmatch(r"\d+\.\d+\.\d+", value)` — state the function, not
+just the pattern, because under `re.match` the `$` anchor matches before a
+trailing newline and `"0.12.24\n"` would pass. A leading `v` is rejected as a
+harmless false positive.
 
-An exact pin has a second benefit: setup-uv verifies its own download checksum
-for a pinned version, which the `latest` path cannot.
+An exact pin's second benefit is determinism, not exclusive checksums:
+setup-uv verifies downloads on every path including `latest`. The pin fixes
+which uv runs, not whether the download is checked.
 
 Because this pin changes which binary runs every `uv`, `uvx` and `uv sync`
 command in CI, the whole Verification block must be re-run **under 0.12.24**.
 PR #6 validated 0.12.10 only.
 
-### Sequencing: open PR #3 collides
+### Sequencing: PR #3 has landed
 
-PR #3 (`Bump astral-sh/setup-uv from 10.2.0 to 10.3.0`) edits the same `uses:`
-lines. Land PR #3 first, then apply this task on top. After PR #3 lands,
-re-check that the new SHA resolves to a release tag:
+PR #3 (`Bump astral-sh/setup-uv from 10.2.0 to 10.3.0`) is merged and rewrote
+all five `uses:` lines to `1c37ad07…  # v10.3.0`. That tag is lightweight, so
+the SHA is already the commit and zizmor can resolve it. Nothing in that diff
+collides with Task 2, which now only adds `with: version:` lines and never
+touches `uses:`. This section stays as a record of the ordering, not an open
+dependency. For the next bump, the tag check is:
 
 ```sh
 git ls-remote https://github.com/astral-sh/setup-uv 'refs/tags/<new-tag>' \
@@ -331,13 +336,10 @@ are the extensions and locations GitHub recognises.
 
 ### Implementation constraint: use PyYAML, not a bespoke parser
 
-An earlier draft required a stdlib-only parser because every existing hook is
-stdlib-only. That mistook house style for a constraint. A hand-rolled parser
-cannot promise to reject anything malformed without implementing YAML, and
-workflows contain nested mappings, `${{ }}` expressions and block scalars.
-
-So: declare PyYAML in `dev` and run through the project environment, as the
-existing `uv run basedpyright` hook already does:
+Use PyYAML, not a bespoke parser: rejecting malformed input without
+implementing YAML is a false promise, and workflows contain nested mappings,
+`${{ }}` expressions and block scalars. Declare PyYAML in `dev` and run through
+the project environment, as the existing `uv run basedpyright` hook does:
 
 ```yaml
       - id: check-pins
@@ -359,8 +361,7 @@ CI-side `git ls-remote` check, if wanted, belongs in the audit workflow.
 
 ## Checklist
 
-Tick a box only when the task is done and verified by a command or an explicit
-acceptance, per the lifecycle in `dev-docs/README.md`.
+Tick a box only when done and verified, per the lifecycle in `dev-docs/README.md`.
 
 ### Commit 1: pin, and close the loopholes
 
@@ -387,8 +388,8 @@ acceptance, per the lifecycle in `dev-docs/README.md`.
 
 ### Task 2: pin uv
 
-- [ ] Land open PR #3 first, then re-verify the new action SHA has a tag.
-- [ ] Add `with: version: "0.12.24"` to all five `setup-uv` steps.
+- [ ] Add `with: version: "0.12.24"` to all five `setup-uv` steps, merging into
+      the existing `with:` block at `ci.yml:47` rather than duplicating it.
 - [ ] Re-run the whole Verification block **under uv 0.12.24**, not the local uv.
 
 ### Close out
@@ -400,9 +401,8 @@ acceptance, per the lifecycle in `dev-docs/README.md`.
 
 ## Verification
 
-Already run against this tree while drafting this plan, using throwaway configs
-outside the repo, each hook installed from its raw SHA rev and run over all
-files:
+Already run while drafting, using throwaway configs outside the repo, each
+hook installed from its raw SHA rev and run over all files:
 
 ```sh
 # SHA revs work as `rev:` values at all
@@ -428,7 +428,7 @@ pre-commit validate-config .pre-commit-config.yaml
 uvx --no-build pre-commit==4.7.0 run --all-files          # all hooks pass
 uv export --locked --no-dev --no-hashes --format requirements-txt -o "$RUNNER_TEMP/req.txt"
 uvx --no-build pip-audit==2.10.1 -r "$RUNNER_TEMP/req.txt"
-uvx --no-build --python 3.12 zizmor==1.31.0 --format=json . # gate exits 0
+uvx --no-build --python 3.12 zizmor==1.31.0 --format=json . # raw rc is 10-14, gate asserts zero known-vulnerable-actions
 uv run pytest -q
 actionlint .github/workflows/*.y*ml                          # workflow shape
 ```
@@ -446,12 +446,9 @@ These catch the specific mistakes the happy path would miss:
   equals the count of `setup-uv` steps. Assert with a count, not an eyeball.
 - Each pinned SHA matches the tag in its own trailing comment. A reachable old
   SHA with a freshly bumped comment installs and passes every hook, while
-  silently violating the tag-comment convention. An earlier draft of this plan
-  carried a shell one-liner for this that never worked: it matched the SHA with
-  `^[0-9a-f]{40}`, which cannot match an indented `rev:` line, and ended in
-  `|| echo`, so it printed mismatches and still exited 0. A verification step
-  that cannot fail is worse than none. Use this instead, which parses the pairs,
-  refuses anything unparsed, and accumulates a non-zero status:
+  silently violating the tag-comment convention. Use a verifier that parses the
+  pairs, refuses anything unparsed, and exits non-zero on any problem — a check
+  that cannot fail verifies nothing:
 
   ```python
   import re, subprocess, sys, pathlib
@@ -578,10 +575,14 @@ Not fixed by any task here. Recorded so they are not mistaken for covered.
 - `runs-on: ubuntu-latest` and `macos-latest` float, so the base image changes
   under the CI run. A dated image label would fix it at the cost of routine
   security patching.
-- PyYAML, once added as a dev dependency for Task 3, is invisible to both
-  dependency audits. Each audit job exports with `--no-dev`, so a PyYAML CVE
-  never turns CI red. `uv.lock` hashes still cover install integrity; the gap
-  is CVE monitoring, not supply. Auditing the dev group would close it.
+- PyYAML, once added for Task 3, misses the weekly audit gate but not
+  Dependabot. Each audit job exports with `--no-dev`, so a PyYAML CVE does not
+  fail that job; but dev-group packages from `uv.lock` are already in this
+  repo's dependency graph — verified via the SBOM export, which lists
+  `hypothesis`, `pytest` and `basedpyright` — so Dependabot alerts would still
+  fire for a PyYAML CVE, and the weekly `uv` version updates would propose the
+  bump. The gap is a red gate in CI, not silent exposure. Widen the weekly
+  export to include dev if a failing job is wanted on top of the alert.
 - Composite actions, if any were added under `.github/actions/`, would escape
   both the hook's `files:` regex and rule 2, which only sees workflows. None
   exist today, so there is nothing to guard yet; widen both if one appears.
@@ -594,6 +595,6 @@ Moving `pip-audit`, `pre-commit` and `zizmor` into `[dependency-groups]` for
 ## Rollback
 
 Tasks 1 and 2 are single-line reverts. If a pinned SHA is wrong, revert that
-`rev` and re-run `pre-commit run --all-files`. Because Task 1 splits into pin
-and bump commits, reverting a bump does not un-pin anything. Task 3 is
-additive: delete the hook registration and the script.
+`rev` and re-run `pre-commit run --all-files`. Task 1's pin/bump split means
+reverting a bump does not un-pin anything. Task 3 is additive: delete the hook
+registration and the script.
