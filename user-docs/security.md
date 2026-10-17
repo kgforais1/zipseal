@@ -36,16 +36,26 @@ then leaves you to deliver it, which is the safest option available.
 
 Some archives need a password you choose: one your team already uses, one a
 partner will receive, or one you must be able to retype. In that case aim for
-**at least 16 characters drawn at random**, or **five or more unrelated
-words**. Both sit far beyond offline guessing at 1,000 iterations. Four words
-from a large word list is also workable; a single word is not.
+**at least 16 characters drawn at random**, or **five words taken at random
+from a diceware word list** such as the EFF long list. Both sit far beyond
+offline guessing at 1,000 iterations.
+
+Words must be *drawn*, not chosen. The strength of a passphrase comes from
+every word being an even, independent pick, so use a generator that picks them
+for you, or roll dice against a published list. Picking five words yourself
+does not get you the same result: words picked by a person tend to be related
+to each other, drawn from a smaller vocabulary than the list suggests, and
+biased toward what feels memorable or safe to choose. A hand-picked set can
+land far below the figure below, and it is exactly the kind of guess a cracking
+tool tries first. If you have no way to draw words at random, use random
+characters instead.
 
 To put those numbers in perspective, `--generate-password` produces 24
-characters from a 62-symbol alphabet, about 143 bits, while 16 random
-characters is about 95 bits and five words from a 7,776-word list is about 65.
-Length does most of the work. Avoid passwords built from one word plus
-punctuation, names, dates, or anything a person who knows you could guess,
-since those fall in the range a cracking tool tries first.
+characters from a 62-symbol alphabet, about 143 bits; 16 random characters is
+about 95 bits; and five words drawn at random from a 7,776-word list is about
+65. Those counts assume uniform, independent choices. Length does most of the
+work. Avoid passwords built from one word plus punctuation, names, dates, or
+anything a person who knows you could guess.
 
 zipseal warns when a password is shorter than 12 characters or contains
 non-ASCII characters, but it accepts them: a warning is advice, not a block.
