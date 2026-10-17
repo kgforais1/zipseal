@@ -127,4 +127,5 @@ personal files.
 | `check-forbidden-paths` | `hooks/scripts/check_forbidden_paths.py` | No tracked file may match `.forbidden-paths` (archives, images, documents, `sample-data/`, secrets), even if force-added |
 | `check-gitignore-protected` | `hooks/scripts/check_gitignore_protected.py` | Every rule in `.gitignore-protected` must stay in `.gitignore` |
 | `check-personal-data` | `hooks/scripts/check_personal_data.py` | No home-folder paths or real email addresses in text files. Opt a line out with `personal-data:allow: <reason>` |
+| `check-pins` | `hooks/scripts/check_pins.py` | Hook `rev:` values must be full SHAs (except `local`/`meta`) with tag comments; `setup-uv` steps must pin an exact `version:`; remote `uses:` refs must pin full SHAs |
 | `gitleaks` | upstream hook | No secrets |

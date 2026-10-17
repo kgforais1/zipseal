@@ -1,6 +1,16 @@
 # Install once per clone:  pre-commit install
 # Run on everything:       pre-commit run --all-files
-# Bump pinned revisions:   pre-commit autoupdate
+# Bump pinned revisions:   see "Bumping hook revs" below.
+#   Do NOT run pre-commit autoupdate: it rewrites SHAs back to tags.
+#
+# Bumping hook revs: `rev` must stay a commit SHA, never a tag. For each repo,
+# find the newest tag, resolve it to the commit (peeled: for an annotated tag,
+# ls-remote lists the tag object first), then update rev and its tag comment
+# together:
+#   tag=$(git ls-remote --tags --refs https://github.com/<repo> \
+#     | sed 's#.*refs/tags/##' | sort -V | tail -1)
+#   sha=$(git ls-remote https://github.com/<repo> "refs/tags/$tag" \
+#     "refs/tags/$tag^{}" | tail -1 | cut -f1)
 
 repos:
   - repo: local
@@ -41,6 +51,12 @@ repos:
         name: "data: home paths and email addresses"
         entry: python3 hooks/scripts/check_personal_data.py
         language: system
+
+      - id: check-pins
+        name: "policy: immutable version pins"
+        entry: uv run python hooks/scripts/check_pins.py
+        language: system
+        files: '^(\.pre-commit-config\.yaml|\.github/workflows/[^/]+\.ya?ml)$'
         types: [text]
 
       - id: basedpyright
@@ -51,12 +67,12 @@ repos:
         pass_filenames: false
 
   - repo: https://github.com/gitleaks/gitleaks
-    rev: v8.30.0
+    rev: 83d9cd684c87d95d656c1458ef04895a7f1cbd8e  # v8.30.1
     hooks:
       - id: gitleaks
 
   - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v6.0.0
+    rev: 3e8a8703264a2f4a69428a0aa4dcb512790b2c8c  # v6.0.0
     hooks:
       - id: check-added-large-files
         args: [--maxkb=1024]
@@ -71,13 +87,13 @@ repos:
         args: [--fix=lf]
 
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.16.10
+    rev: 38bfb07c0c64c304f47eb52090f8288150c77730  # v0.17.1
     hooks:
       - id: ruff-check
         args: [--fix, --exit-non-zero-on-fix]
       - id: ruff-format
 
   - repo: https://github.com/DavidAnson/markdownlint-cli2
-    rev: v0.23.3
+    rev: 916ad0aaa108c64d294101002066f530ea170b10  # v0.23.3
     hooks:
       - id: markdownlint-cli2

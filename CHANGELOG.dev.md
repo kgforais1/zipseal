@@ -34,6 +34,20 @@ edits and refactors. User-visible changes go in [`CHANGELOG.md`](CHANGELOG.md).
   until GitHub killed it.
 - `pipeline.py`, `write.py` and the test helpers take `Options` instead of an
   `argparse.Namespace` (plan: `dev-docs/plans/2026-10-10-gui.md`).
+- All four `.pre-commit-config.yaml` hook revs are pinned to commit SHAs (with
+  the release tag kept as a comment), and two that had drifted are bumped
+  (gitleaks v8.30.0 to v8.30.1, ruff-pre-commit v0.16.10 to v0.17.1). A tag can
+  be moved; a SHA cannot (plan:
+  `dev-docs/plans/archive/2026-10-15-sha-pin-ci-tooling.md`).
+- All five `setup-uv` steps pin `version: "0.12.24"`. The input was unset, so
+  every run resolved to `latest`.
+- New `check-pins` policy hook: hook revs must be full SHAs (except
+  `local`/`meta`) with tag comments, `setup-uv` steps must pin an exact
+  `x.y.z` version, and remote `uses:` refs must pin full SHAs. It runs via
+  `uv run python`, so PyYAML joins the `dev` group.
+- `tests/test_check_pins.py`: 46 pytest cases covering the guard's fixture
+  matrix (all three rules) plus quoted and multi-line `rev` layouts and
+  case-varied `setup-uv` refs, so later edits cannot silently break it.
 
 ### Fixed
 
