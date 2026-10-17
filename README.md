@@ -69,11 +69,15 @@ for you, while Keka and 7-Zip extract it as a second zip to open. See
 
 ## Security in brief
 
-AES-256 protects the contents. The weak point is the password: the zip
-format derives its key with PBKDF2-SHA1 at only 1,000 iterations, so short
-passwords can be guessed offline. Use `--generate-password` for anything
-sensitive. Without `--hide-names`, anyone can list file names, sizes and
-dates. See the [security notes](user-docs/security.md).
+AES-256 protects the contents, with the key derivation every AES zip uses, so
+a zipseal archive is no weaker than one from 7-Zip or WinZip. The weak point
+is the password: the zip format derives its key with PBKDF2-SHA1 at only
+1,000 iterations, so short passwords can be guessed offline. Use
+`--generate-password` for anything sensitive; if you must choose your own, use
+16+ characters drawn from the 62 letters and digits, or five unrelated words,
+letting a tool pick them rather than choosing them yourself. Without
+`--hide-names`, anyone can list file names, sizes and dates. See the
+[security notes](user-docs/security.md).
 
 ## Documentation
 
