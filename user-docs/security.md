@@ -11,8 +11,13 @@ Last reviewed: 2026-10-08
 - **The password is the weak point.** AE-2 derives its key with
   PBKDF2-HMAC-SHA1 at only 1,000 iterations. The format fixes that number, so
   it cannot be raised without producing archives other tools cannot open.
-  What this means in practice: a password with enough entropy in it stays safe
-  even at 1,000 iterations, while a short or guessable one does not. See
+  That cost is the same one every AES zip pays: 7-Zip, WinZip, Keka and
+  macOS Archive Utility all write these archives with the same parameters, so
+  a zipseal archive is no weaker than one from any of them. zipseal never
+  falls back to the legacy ZipCrypto scheme, which is far weaker and has no
+  meaningful key derivation at all. What the low iteration count means in
+  practice: a password with enough entropy in it stays safe even at 1,000
+  iterations, while a short or guessable one does not. See
   [Choosing a password](#choosing-a-password) below.
 - **Send the password separately.** Use a different channel from the one
   carrying the zip.
@@ -36,25 +41,29 @@ then leaves you to deliver it, which is the safest option available.
 
 Some archives need a password you choose: one your team already uses, one a
 partner will receive, or one you must be able to retype. In that case aim for
-**at least 16 characters drawn at random**, or **five words taken at random
-from a diceware word list** such as the EFF long list. Both sit far beyond
-offline guessing at 1,000 iterations.
+**at least 16 characters drawn at random from the 62 letters and digits**, or
+**five unrelated words**. Both sit far beyond offline guessing at 1,000
+iterations.
 
-Words must be *drawn*, not chosen. The strength of a passphrase comes from
-every word being an even, independent pick, so use a generator that picks them
-for you, or roll dice against a published list. Picking five words yourself
-does not get you the same result: words picked by a person tend to be related
-to each other, drawn from a smaller vocabulary than the list suggests, and
-biased toward what feels memorable or safe to choose. A hand-picked set can
-land far below the figure below, and it is exactly the kind of guess a cracking
-tool tries first. If you have no way to draw words at random, use random
-characters instead.
+The character set matters as much as the count. Sixteen characters drawn from
+the full 62 letters and digits is about 95 bits, but the same 16 characters
+drawn from lowercase letters alone is about 75, and from digits alone about
+53. Mix in upper case, lower case and digits, and let a tool pick them rather
+than choosing them yourself.
+
+The reliable way to keep five words unrelated is to let a tool draw them:
+generate the passphrase with a diceware generator, or roll dice against a
+published list. Related words, even ones that feel random, tend to have lower
+entropy than the count suggests, because they come from a smaller vocabulary
+and cluster around a theme or around what feels memorable. That is also the
+first thing a cracking tool tries. If you have no way to draw words at
+random, use random characters instead.
 
 To put those numbers in perspective, `--generate-password` produces 24
-characters from a 62-symbol alphabet, about 143 bits; 16 random characters is
-about 95 bits; and five words drawn at random from a 7,776-word list is about
-65. Those counts assume uniform, independent choices. Length does most of the
-work. Avoid passwords built from one word plus punctuation, names, dates, or
+characters from that same 62-symbol set, about 143 bits; 16 of them is about
+95 bits; and five words drawn at random from a 7,776-word list is about 65.
+Those counts assume even, independent choices. Length does most of the work.
+Avoid passwords built from one word plus punctuation, names, dates, or
 anything a person who knows you could guess.
 
 zipseal warns when a password is shorter than 12 characters or contains
