@@ -13,7 +13,8 @@ Three rules (see dev-docs/plans/2026-10-15-sha-pin-ci-tooling.md, Task 3):
    is detected at the key position and exempted because pre-commit resolves
    it identically.
 2. uv versions: in every workflow, each `astral-sh/setup-uv` step must set
-   `with.version` to a full literal release version.
+   `with.version` to a full literal release version. The action name is matched
+   case-insensitively, since GitHub resolves owner/repo that way.
 3. Action refs: in every workflow, each `uses:` naming a remote action must
    pin a full 40-character lowercase hex SHA. Local (`./…`) and `docker://…`
    refs are skipped.
@@ -36,6 +37,9 @@ COMMENT = re.compile(r"#[ \t]*\S")
 USES_SHA = re.compile(r"\A[^@\s]+@[0-9a-f]{40}\Z")
 
 SKIP_REPOS = {"local", "meta"}
+# GitHub resolves owner/repo case-insensitively, so a re-cased reference
+# still runs setup-uv and must still pin an exact version.
+SETUP_UV = "astral-sh/setup-uv"
 
 
 def _read_text(path: Path) -> tuple[str | None, list[str]]:
@@ -142,7 +146,7 @@ def check_workflow(path: Path) -> list[str]:
             continue
         if not USES_SHA.match(uses):
             findings.append(f"{path}: {where} uses must pin a 40-char hex SHA")
-        if "astral-sh/setup-uv" not in uses:
+        if uses.rsplit("@", 1)[0].lower() != SETUP_UV:
             continue
         with_block = node.get("with")
         version = with_block.get("version") if isinstance(with_block, dict) else None

@@ -45,9 +45,9 @@ edits and refactors. User-visible changes go in [`CHANGELOG.md`](CHANGELOG.md).
   `local`/`meta`) with tag comments, `setup-uv` steps must pin an exact
   `x.y.z` version, and remote `uses:` refs must pin full SHAs. It runs via
   `uv run python`, so PyYAML joins the `dev` group.
-- `tests/test_check_pins.py`: 43 pytest cases covering the guard's fixture
-  matrix (all three rules) plus quoted and multi-line `rev` layouts, so later
-  edits cannot silently break it.
+- `tests/test_check_pins.py`: 46 pytest cases covering the guard's fixture
+  matrix (all three rules) plus quoted and multi-line `rev` layouts and
+  case-varied `setup-uv` refs, so later edits cannot silently break it.
 
 ### Fixed
 

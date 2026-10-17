@@ -126,6 +126,21 @@ WORKFLOW_CASES = [
         True,
     ),
     ("pinned uses", _uses_step(f"actions/checkout@{VALID_SHA}"), False),
+    (
+        "mixed-case setup-uv needs a version",
+        _setup_uv("").replace("astral-sh/setup-uv", "Astral-Sh/Setup-Uv"),
+        True,
+    ),
+    (
+        "upper-case setup-uv with a version passes",
+        _setup_uv(EXACT).replace("astral-sh/setup-uv", "ASTRAL-SH/SETUP-UV"),
+        False,
+    ),
+    (
+        "unrelated action containing the name",
+        _uses_step(f"someone/astral-sh/setup-uv-fork@{VALID_SHA}"),
+        False,
+    ),
     ("tag uses", _uses_step("actions/checkout@v7"), True),
     ("local uses", _uses_step("./local-action"), False),
     ("docker uses", _uses_step("docker://img:tag"), False),
