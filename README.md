@@ -72,8 +72,9 @@ for you, while Keka and 7-Zip extract it as a second zip to open. See
 AES-256 protects the contents. The weak point is the password: the zip
 format derives its key with PBKDF2-SHA1 at only 1,000 iterations, so short
 passwords can be guessed offline. Use `--generate-password` for anything
-sensitive. Without `--hide-names`, anyone can list file names, sizes and
-dates. See the [security notes](user-docs/security.md).
+sensitive; if you must choose your own, use 16+ random characters or five or
+more unrelated words. Without `--hide-names`, anyone can list file names,
+sizes and dates. See the [security notes](user-docs/security.md).
 
 ## Documentation
 

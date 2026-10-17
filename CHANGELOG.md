@@ -8,6 +8,11 @@ All notable user-facing changes are documented here. The format follows
 
 ### Added
 
+- Password guidance in `user-docs/security.md`: concrete minimums (16+ random
+  characters, or five or more unrelated words) for people who must choose
+  their own password instead of using `--generate-password`, with the
+  reasoning behind them and how they compare to a generated password.
+
 - `zipseal-gui`, a Tkinter window over the same core. It adds files and
   folders, sets the part size, level, excludes and name hiding, runs a dry
   run, and shows progress and warnings in a log area (`user-docs/gui.md`).
