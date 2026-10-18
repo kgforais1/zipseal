@@ -33,6 +33,9 @@ case "${1:-}" in
     *) echo "usage: $0 [--release | --uninstall]" >&2; exit 2 ;;
 esac
 
+# Give the double-clickable launcher its icon (macOS only; never fails).
+"$repo/scripts/set-icon.sh" "$repo/zipseal-gui.command"
+
 bin=$(uv tool dir --bin)
 case ":$PATH:" in
     *":$bin:"*) ;;

@@ -1,8 +1,14 @@
 # zipseal
 
-Last reviewed: 2026-10-10
+![zipseal icon](assets/icon.svg)
 
 [![CI](https://github.com/kgforais1/zipseal/actions/workflows/ci.yml/badge.svg)](https://github.com/kgforais1/zipseal/actions/workflows/ci.yml)
+[![Dependency audit](https://github.com/kgforais1/zipseal/actions/workflows/dependency-audit.yml/badge.svg)](https://github.com/kgforais1/zipseal/actions/workflows/dependency-audit.yml)
+![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-3776AB?logo=python&logoColor=white)
+![AES-256](https://img.shields.io/badge/encryption-AES--256-2E7D32)
+[![MIT license](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
+
+Last reviewed: 2026-10-18
 
 `zipseal` writes files and folders into AES-256 encrypted zips. It can split
 the output into parts that each stay under a size cap, such as an email
@@ -39,6 +45,16 @@ zipseal needs Python 3.11 or later and [`uv`](https://docs.astral.sh/uv/).
 uv tool install git+https://github.com/kgforais1/zipseal.git
 ```
 
+That puts two commands on your `PATH`: `zipseal` and `zipseal-gui`. From a
+clone, `scripts/install.sh` does the same as an editable install.
+
+### Open the window without a terminal (macOS)
+
+In a clone, double-click `zipseal-gui.command` in Finder. It opens Terminal
+and then the zipseal window, with no install step. The first run gives the file
+its zipseal icon. See [the zipseal window](user-docs/gui.md) for what to do if
+macOS blocks a downloaded copy.
+
 ## Use
 
 ```sh
@@ -54,6 +70,9 @@ zipseal reports/ -o bundle.zip --max-size 20MB --hide-names --generate-password
 # See what would happen, without writing anything
 zipseal reports/ -o bundle.zip --max-size 20MB --dry-run
 ```
+
+Prefer a window? Run `zipseal-gui` for the same options with a file picker,
+progress bar and a one-time view of the generated password.
 
 Several parts are named `bundle-part01-of-03.zip`, `bundle-part02-of-03.zip`
 and so on. Send the password through a different channel than the zip.

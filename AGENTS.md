@@ -1,6 +1,6 @@
 # AGENTS.md
 
-Last reviewed: 2026-10-10
+Last reviewed: 2026-10-18
 
 Single source of truth for AI coding agents in this repository. `CLAUDE.md` is a
 thin pointer back here.
@@ -41,6 +41,7 @@ uv run pytest -m gui           # tests that need a real Tk display
 pre-commit run --all-files     # lint, format, secret scan, file-size policy
 uv run python scripts/make_samples.py  # rebuild sample archives in sample-data/
 scripts/install.sh             # put zipseal and zipseal-gui on PATH (editable)
+open zipseal-gui.command       # what a Finder double-click does (macOS)
 ```
 
 Run `pre-commit install` once per clone to enable the git hook.
@@ -61,6 +62,9 @@ dev-docs/investigations/  dated research and spike write-ups
 hooks/scripts/        repo policy checks run by pre-commit
 .context/             scratch and handoffs (gitignored)
 sample-data/          local inputs and sample archives (gitignored)
+assets/icon.svg       project icon; SVG because raster images are blocked
+zipseal-gui.command   double-clickable macOS launcher (runs uv run zipseal-gui)
+scripts/set-icon.sh   gives a file the icon in Finder; used by install.sh and the launcher
 scripts/make_samples.py  rebuilds sample-data/ with synthetic inputs
 ```
 

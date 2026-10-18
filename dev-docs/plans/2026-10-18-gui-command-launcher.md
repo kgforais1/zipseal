@@ -1,7 +1,7 @@
 # Plan: Double-clickable GUI launcher
 
 Date: 2026-10-18
-Status: draft
+Status: in-progress
 Linked: branch `feat/gui-command-launcher`
 
 ## Goal
@@ -46,38 +46,75 @@ Security → Open Anyway ([Apple guide](https://support.apple.com/en-ie/102445))
 and mention `xattr -d com.apple.quarantine zipseal-gui.command` for terminal
 users.
 
+## Icon and README
+
+`assets/icon.svg` is the project icon. It is hand-written SVG, because
+`.forbidden-paths` blocks PNG and other raster images. Its root carries
+`width="128" height="128"`, so the README shows it at that size without
+inline HTML, which markdownlint forbids (MD033).
+
+`scripts/set-icon.sh FILE` gives FILE the icon on macOS. It loads the SVG with
+`NSImage` and calls `NSWorkspace.setIcon(_:forFile:)` through
+`osascript -l JavaScript`. Verified on macOS 26 on 2026-10-18. The icon lives
+in extended attributes, so git sees no change. On other systems, or when it
+fails, the script prints nothing and exits 0. An icon is never worth blocking
+a launch.
+
+Two callers use it:
+
+- `scripts/install.sh` sets the icon on `zipseal-gui.command` after install.
+- The launcher sets its own icon on first run, when the file has no
+  `com.apple.ResourceFork` attribute yet. A fresh clone has none.
+
+The README gets the icon at the top, then badges for CI, dependency audit,
+Python 3.11+, AES-256 and the MIT license. It also gains a short GUI pointer
+and a macOS launcher section under Install.
+
 ## Tasks
 
-- [ ] Write `zipseal-gui.command` and commit it with mode `100755`
+- [x] Write `zipseal-gui.command` and commit it with mode `100755`
       (`git update-index --chmod=+x` if needed).
-- [ ] Add `tests/test_launcher.py`:
-  - [ ] The file is tracked as executable and starts with `#!/bin/sh`.
-  - [ ] `sh -n` accepts it.
-  - [ ] Every subprocess test passes a `timeout` and uses
+- [x] Add `tests/test_launcher.py`:
+  - [x] The file is tracked as executable and starts with `#!/bin/sh`.
+  - [x] `sh -n` accepts it.
+  - [x] Every subprocess test passes a `timeout` and uses
         `stdin=DEVNULL` unless it feeds input, so a broken prompt cannot hang
         CI.
-  - [ ] With a stub `uv` first on `PATH`, the script calls
+  - [x] With a stub `uv` first on `PATH`, the script calls
         `uv run --project <repo> zipseal-gui` with no other arguments.
-  - [ ] With `uv` only in `$HOME/.local/bin` (a `tmp_path` HOME) and not on
+  - [x] With `uv` only in `$HOME/.local/bin` (a `tmp_path` HOME) and not on
         `PATH`, the script still runs that stub. This catches a bare
         `exec uv`.
-  - [ ] Copy the launcher into a `tmp_path` folder whose name has a space,
+  - [x] Copy the launcher into a `tmp_path` folder whose name has a space,
         run it from an unrelated working directory, and assert the exact
         `--project` path.
-  - [ ] With no `uv` anywhere (`PATH` and `HOME` pointed at empty
+  - [x] With no `uv` anywhere (`PATH` and `HOME` pointed at empty
         `tmp_path` folders), it exits non-zero and names the install URL.
         Run it once with a newline and once with EOF on stdin. Keep
         `/usr/bin:/bin` on `PATH` for `dirname`. Skip the test when `uv`
         exists in `/opt/homebrew/bin` or `/usr/local/bin`, because the
         script checks those absolute folders and the test cannot hide them.
+- [x] Generate candidate icons with Gemini 3.8 Flash (High) via Antigravity
+      into `.context/icons/`. The user picks one, and it goes to
+      `assets/icon.svg`.
+- [x] Write `scripts/set-icon.sh` and call it from `scripts/install.sh` and
+      the launcher's first run.
+- [x] Test `set-icon.sh`: it exits 0 on Linux without touching the file.
+      On macOS (skipped elsewhere), a `tmp_path` copy gains
+      `com.apple.ResourceFork` and its bytes are unchanged.
+- [x] Polish `README.md`: icon, badges, GUI and launcher sections.
 - [ ] Double-click it in Finder on macOS and confirm the window opens. This
-      is the manual check that tests cannot cover. Repeat with a copy from a
-      browser-downloaded ZIP to confirm the Gatekeeper steps in the docs.
-- [ ] Update `user-docs/gui.md` "Start it", and bump `Last reviewed`.
-- [ ] Mention the launcher in `README.md` and the `AGENTS.md` commands and
-      layout. Bump both `Last reviewed` dates after re-reading.
-- [ ] Log it in `CHANGELOG.md`.
-- [ ] Run `uv run pytest` and `pre-commit run --all-files`.
+      is the manual check that tests cannot cover. `open zipseal-gui.command`,
+      which takes the same Terminal path, started the GUI on 2026-10-18, and
+      `scripts/install.sh` gave the file its icon with git status unchanged.
+      A real double-click by the user is still open.
+- [ ] Repeat with a copy from a browser-downloaded ZIP to confirm the
+      Gatekeeper steps in the docs.
+- [x] Update `user-docs/gui.md` "Start it", and bump `Last reviewed`.
+- [x] Mention the launcher, `assets/` and `set-icon.sh` in the `AGENTS.md`
+      commands and layout. Bump both `Last reviewed` dates after re-reading.
+- [x] Log it in `CHANGELOG.md`.
+- [x] Run `uv run pytest` and `pre-commit run --all-files`.
 - [ ] Run the completion steps in `dev-docs/README.md`.
 
 ## Decisions
