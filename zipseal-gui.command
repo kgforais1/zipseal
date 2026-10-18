@@ -2,7 +2,7 @@
 # Double-click in Finder to open the zipseal window (macOS).
 #
 # Finder runs this in Terminal. It starts the GUI from this clone with uv, so
-# nothing needs installing first. Closing the Terminal window quits the GUI.
+# nothing needs installing first. uv downloads its own Python if needed. Closing the Terminal window quits the GUI.
 set -eu
 
 repo=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
@@ -17,7 +17,7 @@ fi
 # Finder's shell may not have uv's usual folders on PATH.
 uv=$(command -v uv 2>/dev/null || true)
 if [ -z "$uv" ]; then
-    for dir in "${HOME:-}/.local/bin" /opt/homebrew/bin /usr/local/bin; do
+    for dir in "${HOME:-}/.local/bin" "${HOME:-}/.cargo/bin" /opt/homebrew/bin /usr/local/bin; do
         if [ -x "$dir/uv" ]; then
             uv=$dir/uv
             break
@@ -32,4 +32,5 @@ if [ -z "$uv" ]; then
     exit 1
 fi
 
-exec "$uv" run --project "$repo" zipseal-gui
+# uv-managed Pythons always include Tk; Homebrew's and some others do not.
+exec "$uv" run --managed-python --project "$repo" zipseal-gui

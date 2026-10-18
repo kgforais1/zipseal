@@ -11,7 +11,9 @@ window does not show keep their usual defaults.
 On macOS, double-click `zipseal-gui.command` in a clone of the project. Finder
 opens Terminal, and Terminal opens the zipseal window. Leave the Terminal
 window open: it shows any error, and closing it closes zipseal. The first run
-gives the file the zipseal icon.
+gives the file the zipseal icon. It runs zipseal on a Python that uv
+manages, because those always include Tk, so the first run may pause while uv
+downloads one.
 
 If the copy came from a downloaded ZIP rather than `git clone`, macOS may
 refuse to open it. Open System Settings → Privacy & Security, and press

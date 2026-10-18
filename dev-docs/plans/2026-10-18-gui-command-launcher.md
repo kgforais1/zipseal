@@ -21,10 +21,12 @@ The script:
 2. Finds the repo from its own path, so it works from any clone location.
 3. Finds `uv`. Finder starts a non-login shell, so `~/.local/bin`,
    `/opt/homebrew/bin` and `/usr/local/bin` may be missing from `PATH`. Try
-   `command -v uv` first, then those three folders. Store the result in
+   `command -v uv` first, then those folders and `~/.cargo/bin`. Store the result in
    `$uv`. Use `$HOME`, never a literal home path, so `check-personal-data`
    passes.
-4. Runs `exec "$uv" run --project "$repo" zipseal-gui`. It runs the resolved
+4. Runs `exec "$uv" run --managed-python --project "$repo" zipseal-gui`.
+   uv-managed Pythons always include Tk. Homebrew's Python lacks it unless
+   `python-tk` is installed. It runs the resolved
    path, because a fallback folder is not on `PATH`. This always uses the
    clone's current source and needs no prior `scripts/install.sh`.
 5. If `uv` is missing, prints where to get it and waits for Return, so the
@@ -129,3 +131,9 @@ Codex (GPT-6.1-Sol, low) reviewed the draft on 2026-10-18. Its three findings
 are folded in above: run the resolved `$uv` path, document Open Anyway for
 quarantined copies, and test a spaced clone path, a foreign working
 directory, EOF on stdin and subprocess timeouts.
+
+Sourcery and Greptile reviewed PR #9. Their fixes: run uv-managed Python so
+Tk is present, also look in `~/.cargo/bin`, build the test `PATH` from links
+to the launcher's tools so a system `uv` cannot leak in, assert the full argv
+in every launcher test, and skip the icon test only when an independent
+AppKit probe shows the session cannot set icons.
