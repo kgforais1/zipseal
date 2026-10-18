@@ -34,7 +34,7 @@ case "${1:-}" in
 esac
 
 # Give the double-clickable launcher its icon (macOS only; never fails).
-"$repo/scripts/set-icon.sh" "$repo/zipseal-gui.command"
+sh "$repo/scripts/set-icon.sh" "$repo/zipseal-gui.command" || true
 
 bin=$(uv tool dir --bin)
 case ":$PATH:" in

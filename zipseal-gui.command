@@ -9,9 +9,9 @@ repo=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 self=$repo/$(basename -- "$0")
 
 # First run: give this file the zipseal icon. A fresh clone has none.
-if [ -x "$repo/scripts/set-icon.sh" ] &&
+if [ -f "$repo/scripts/set-icon.sh" ] &&
     ! xattr -p com.apple.ResourceFork "$self" >/dev/null 2>&1; then
-    "$repo/scripts/set-icon.sh" "$self" || true
+    sh "$repo/scripts/set-icon.sh" "$self" || true
 fi
 
 # Finder's shell may not have uv's usual folders on PATH.

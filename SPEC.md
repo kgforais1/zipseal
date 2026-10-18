@@ -105,7 +105,9 @@ verify.py     re-reads each part with stream-unzip and checks names + CRCs
 
 Packaging: a `pyproject.toml` with `zipseal` and `zipseal-gui` console scripts.
 Run them with `uv run zipseal …` and `uv run zipseal-gui`, or install both
-with `uv tool install .`.
+with `uv tool install .`. On macOS, `zipseal-gui.command` at the repo root
+runs `uv run zipseal-gui` from the clone when double-clicked in Finder, and
+`scripts/set-icon.sh` gives it the `assets/icon.svg` icon.
 
 ### 5.1 The GUI
 

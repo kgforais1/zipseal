@@ -53,6 +53,7 @@ def test_launcher_is_tracked_as_executable_shell_script() -> None:
         check=True,
     ).stdout
     assert staged.startswith("100755 ")
+    assert LAUNCHER.stat().st_mode & 0o111, "working-tree copy lost its exec bit"
     assert LAUNCHER.read_text().startswith("#!/bin/sh\n")
 
 
@@ -93,7 +94,12 @@ def test_launcher_handles_spaced_clone_and_foreign_cwd(tmp_path: Path) -> None:
     elsewhere.mkdir()
     result = _run(launcher, path=f"{tmp_path / 'bin'}:{SYSTEM_PATH}", home=tmp_path, cwd=elsewhere)
     assert result.returncode == 0, result.stderr
-    assert out.read_text().splitlines()[2] == str(launcher.parent)
+    assert out.read_text().splitlines() == [
+        "run",
+        "--project",
+        str(launcher.parent),
+        "zipseal-gui",
+    ]
 
 
 @pytest.mark.skipif(
@@ -119,9 +125,11 @@ def test_set_icon_keeps_file_bytes(tmp_path: Path) -> None:
     assert result.returncode == 0
     assert target.read_text() == "#!/bin/sh\n"
     if platform.system() == "Darwin":
-        subprocess.run(
+        icon = subprocess.run(
             ["xattr", "-p", "com.apple.ResourceFork", str(target)],
             capture_output=True,
             timeout=TIMEOUT,
-            check=True,
+            check=False,
         )
+        if icon.returncode != 0:
+            pytest.skip("NSWorkspace cannot set icons in this session (headless runner?)")

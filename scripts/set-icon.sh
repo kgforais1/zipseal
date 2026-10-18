@@ -8,16 +8,12 @@
 # icon is never worth blocking an install or a launch.
 set -u
 
-if [ "$#" -ne 1 ]; then
-    echo "usage: $0 FILE" >&2
-    exit 2
-fi
-
 [ "$(uname -s)" = Darwin ] || exit 0
 command -v osascript >/dev/null 2>&1 || exit 0
+[ "$#" -eq 1 ] || exit 0
 
-icon=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)/assets/icon.svg
-target=$(CDPATH= cd -- "$(dirname -- "$1")" && pwd)/$(basename -- "$1") || exit 0
+icon=$(CDPATH= cd -- "$(dirname -- "$0")/.." 2>/dev/null && pwd)/assets/icon.svg || exit 0
+target=$(CDPATH= cd -- "$(dirname -- "$1")" 2>/dev/null && pwd)/$(basename -- "$1") || exit 0
 
 # NSImage reads SVG directly, so no raster copy of the icon is needed.
 osascript -l JavaScript - "$icon" "$target" >/dev/null 2>&1 <<'EOF' || true
