@@ -16,6 +16,7 @@ from tkinter.scrolledtext import ScrolledText
 from zipseal.errors import UsageError, ZipsealError
 from zipseal.gui import (
     CUSTOM_SIZE,
+    ICON,
     SIZE_PRESETS,
     Controller,
     Done,
@@ -33,7 +34,6 @@ from zipseal.passwords import Password
 
 APP_ID = "zipseal.gui"
 CLIPBOARD_MS = 60_000
-ICON = Path(__file__).with_name("icon.svg")
 POLL_MS = 50
 
 

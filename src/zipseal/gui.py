@@ -146,6 +146,7 @@ class _QueueProgress:
         self._events.put(ProgressUpdate("verified", number, size))
 
 
+ICON = Path(__file__).with_name("icon.svg")
 CUSTOM_SIZE = "Custom…"
 SIZE_PRESETS = (
     "no limit",
@@ -358,6 +359,7 @@ def main() -> int:
 
 __all__ = [
     "CUSTOM_SIZE",
+    "ICON",
     "SIZE_PRESETS",
     "Controller",
     "Done",
