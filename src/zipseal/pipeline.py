@@ -128,7 +128,7 @@ def write_archive(
     password = get_password(options)
     print(
         f"zipseal: temporary .partial files will appear in {out.dir} while this runs. "
-        "Do not rename, move or open them. zipseal renames them when every part verifies.",
+        "Do not rename, move or open them. zipseal renames them when the run succeeds.",
         file=log,
     )
     try:

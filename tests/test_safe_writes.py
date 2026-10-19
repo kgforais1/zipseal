@@ -80,6 +80,23 @@ def test_force_overwrites_only_own_targets(src: Path, tmp_path: Path) -> None:
     assert leftovers(out) == []
 
 
+@pytest.mark.parametrize("force", [False, True])
+def test_old_part_names_are_listed_but_never_replaced(
+    src: Path, tmp_path: Path, force: bool
+) -> None:
+    out = tmp_path / "out"
+    (out / "b-part01-of-02.zip").write_text("from an older zipseal")
+    options = args_for([src], out / "b.zip", *(["--force"] if force else []))
+    err = io.StringIO()
+    with collect_for(options) as c:
+        pipeline.write_archive(options, c, lambda _: Password(PASSWORD), err=err)
+    assert extract(out / "b.zip")
+    assert (out / "b-part01-of-02.zip").read_text() == "from an older zipseal"
+    assert f"older part files remain and were not touched:\n  {out / 'b-part01-of-02.zip'}" in (
+        err.getvalue()
+    )
+
+
 def test_force_failure_restores_originals(
     src: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

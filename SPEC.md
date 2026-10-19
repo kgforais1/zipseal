@@ -421,6 +421,8 @@ breaks the result for the recipient unless they also run a restore step.
   `-o` name exists, or any file named `NAME-volume` + digits + `-of-` +
   digits + `.zip`. `--force` lifts this, and replaces only the names this run
   produces (§6.5). Other old parts are listed in a warning, never deleted.
+  Parts named `NAME-partNN-of-MM.zip` by older versions never block a run and
+  are never replaced. They are listed in the same warning.
 - **Output inside an input.** The walker skips the output name, any
   existing part name for it, and `.partial` files.
 - **Dry run.** `--dry-run` needs no password. It plans from worst-case
