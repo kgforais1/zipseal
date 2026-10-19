@@ -65,8 +65,8 @@ would leave it in your shell history and visible to other users.
 
 ## Safety guarantees
 
-- Each part is written under a temporary `.partial` name, verified, and only
-  then given its final name. A failure removes every `.partial` file. zipseal
+- Each part is written under a temporary `.partial` name, verified (unless
+  `--no-verify`), and only then given its final name. A failure removes every `.partial` file. zipseal
   prints a notice when they appear. Do not rename, move or open them while it runs.
 - zipseal never overwrites a file it did not expect, even one created while
   it was running.
