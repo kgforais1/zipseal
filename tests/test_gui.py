@@ -464,5 +464,6 @@ def test_save_as_opens_in_the_folder_with_only_the_name(tmp_path: Path) -> None:
     assert save_as_start(f"  {tmp_path}/bundle.zip ") == (str(tmp_path), "bundle.zip")
     assert save_as_start("bundle.zip") == ("", "bundle.zip")
     assert save_as_start("") == ("", "")
+    assert save_as_start("~no-such-user-zipseal.zip") == ("", "~no-such-user-zipseal.zip")
     # A folder that does not exist yet is left to the dialog's default.
     assert save_as_start(f"{tmp_path}/missing/bundle.zip") == ("", "bundle.zip")

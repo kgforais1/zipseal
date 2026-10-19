@@ -119,7 +119,7 @@ and the CLI holds none either: both build an `Options` and call `run_job`.
 for the maximum part size (presets from 10 MB to 20 GB, plus a custom value in MB), compression level,
 `Hide names`, excludes (one glob per line), `Follow symlinks` and
 `Overwrite existing files`; two masked password fields, or a `Generate a
-password` checkbox; `Dry run` and `Create archive`; an indeterminate progress
+password` checkbox; `Dry run`, `Create archive` and `Cancel`; an indeterminate progress
 bar with a status line; and a log area.
 
 The window maps to the CLI's flags: the size box to `--max-size`, the level
@@ -131,7 +131,7 @@ window does not offer stay as they are for the CLI: `default_excludes` on,
 which builds the `Options` from the window's plain values, checks that the two
 password fields match, generates a password on the calling thread, and runs
 one job in a daemon thread. It reports through a `queue.Queue` of small events
-(`Log`, `ProgressUpdate`, `Error`, `Done`), and imports no Tk, so it is
+(`Log`, `ProgressUpdate`, `Error`, `Stopped`, `Done`), and imports no Tk, so it is
 testable without a display. `gui_view.py` is the Tk window and the only module
 that imports Tk; `gui.main` imports it, so importing `zipseal.gui` needs no
 display. The view reads the window into a `JobSpec`, calls the controller, and

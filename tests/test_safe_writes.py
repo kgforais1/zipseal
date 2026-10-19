@@ -64,6 +64,24 @@ def test_no_verify_still_checks_cap_and_writes(src: Path, tmp_path: Path) -> Non
         extract(r.path)
 
 
+def test_a_partial_that_cannot_be_deleted_is_a_warning_not_the_error(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    err = io.StringIO()
+    out = output_mod.Output(tmp_path / "b.zip", force=False, warn=err)
+    path, fd = out.new_partial(1)
+    os.close(fd)
+
+    def refuse(_path: object) -> None:
+        raise PermissionError(1, "Operation not permitted")
+
+    monkeypatch.setattr(output_mod.os, "unlink", refuse)
+    out.cleanup()
+    assert f"could not delete partial files. Delete them before the next run:\n  {path}" in (
+        err.getvalue()
+    )
+
+
 def test_force_overwrites_only_own_targets(src: Path, tmp_path: Path) -> None:
     out = tmp_path / "out"
     (out / "b.zip").write_text("old single")

@@ -266,7 +266,11 @@ def save_as_start(current: str) -> tuple[str, str]:
     text = current.strip()
     if not text:
         return "", ""
-    path = Path(text).expanduser()
+    path = Path(text)
+    try:
+        path = path.expanduser()
+    except RuntimeError:  # "~name" with no such user is a literal name
+        pass
     folder = path.parent
     return (str(folder) if folder != Path() and folder.is_dir() else ""), path.name
 
