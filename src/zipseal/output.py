@@ -25,6 +25,11 @@ class Output:
         self._part_re = re.compile(
             re.escape(self.stem) + r"-volume\d+-of-\d+" + re.escape(self.suffix)
         )
+        # Names from before the -volume rename. They never block a run and are
+        # never replaced, but publication warns that they are still there.
+        self._legacy_re = re.compile(
+            re.escape(self.stem) + r"-part\d+-of-\d+" + re.escape(self.suffix)
+        )
         self._partial_re = re.compile(
             re.escape(self.stem) + r"-(?:volume|part)\d+" + re.escape(self.suffix) + r"\.partial"
         )
@@ -154,14 +159,23 @@ class Output:
                 f"zipseal: warning: could not delete old outputs kept as backups:\n{listing}",
                 file=self.warn,
             )
-        if self.force:
-            stale = [p for p in self.existing() if p not in finals]
-            if stale:
-                listing = "\n".join(f"  {p}" for p in stale)
-                print(
-                    f"zipseal: warning: older part files remain and were not touched:\n{listing}",
-                    file=self.warn,
-                )
+        # Past the commit point, so a folder that cannot be listed only skips the warning.
+        try:
+            names = sorted(os.listdir(self.dir))
+        except OSError:
+            names = []
+        stale = [
+            self.dir / n
+            for n in names
+            if (self.force and self._part_re.fullmatch(n) and self.dir / n not in finals)
+            or self._legacy_re.fullmatch(n)
+        ]
+        if stale:
+            listing = "\n".join(f"  {p}" for p in stale)
+            print(
+                f"zipseal: warning: older part files remain and were not touched:\n{listing}",
+                file=self.warn,
+            )
 
     def _rollback(self, published: list[Path], backups: list[tuple[Path, Path]]) -> None:
         for final in published:
