@@ -116,7 +116,7 @@ and the CLI holds none either: both build an `Options` and call `run_job`.
 
 **The window** (top to bottom) is the input list with `Add files…`,
 `Add folder…` and `Remove`; the output name with a `Save as…` picker; options
-for the maximum part size (presets plus a custom value), compression level,
+for the maximum part size (presets from 10 MB to 20 GB, plus a custom value in MB), compression level,
 `Hide names`, excludes (one glob per line), `Follow symlinks` and
 `Overwrite existing files`; two masked password fields, or a `Generate a
 password` checkbox; `Dry run` and `Create archive`; an indeterminate progress

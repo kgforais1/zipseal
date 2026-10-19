@@ -13,6 +13,9 @@ All notable user-facing changes are documented here. The format follows
   has it off `PATH`, and gives itself the zipseal icon on first run.
   `scripts/install.sh` sets the icon too (`user-docs/gui.md`,
   [plan](dev-docs/plans/archive/2026-10-18-gui-command-launcher.md)).
+- The window's `Max part size` now offers presets from 10 MB to 20 GB, plus
+  `Custom…` with a clearly labeled `Custom size (MB)` box. The list no longer
+  accepts free text.
 - The zipseal window shows the project icon in the macOS Dock, the Windows
   taskbar and the title bar, when Python's Tk is version 9 or later
   (uv-managed Pythons are). An older Tk keeps its default icon.

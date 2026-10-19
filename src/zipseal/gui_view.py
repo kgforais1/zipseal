@@ -15,6 +15,8 @@ from tkinter.scrolledtext import ScrolledText
 
 from zipseal.errors import UsageError, ZipsealError
 from zipseal.gui import (
+    CUSTOM_SIZE,
+    SIZE_PRESETS,
     Controller,
     Done,
     Error,
@@ -33,7 +35,6 @@ APP_ID = "zipseal.gui"
 CLIPBOARD_MS = 60_000
 ICON = Path(__file__).with_name("icon.svg")
 POLL_MS = 50
-SIZE_PRESETS = ("no limit", "10 MB", "20 MB", "25 MB", "45 MB", "100 MB")
 
 
 class View:
@@ -99,33 +100,47 @@ class View:
         box.grid(row=row, column=0, sticky="ew", pady=4)
         box.columnconfigure(1, weight=1)
         ttk.Label(box, text="Max part size").grid(row=0, column=0, sticky="w")
-        self.max_size = ttk.Combobox(box, values=list(SIZE_PRESETS), width=16)
+        self.max_size = ttk.Combobox(box, values=list(SIZE_PRESETS), width=16, state="readonly")
         self.max_size.set(SIZE_PRESETS[0])
         self.max_size.grid(row=0, column=1, sticky="w")
-        ttk.Label(box, text="Compression level").grid(row=1, column=0, sticky="w")
+        self.max_size.bind("<<ComboboxSelected>>", self._on_size_choice)
+        ttk.Label(box, text="Custom size (MB)").grid(row=1, column=0, sticky="w")
+        self.custom_mb = ttk.Spinbox(box, from_=1, to=1_000_000, increment=1, width=10)
+        self.custom_mb.set("25")
+        self.custom_mb.grid(row=1, column=1, sticky="w")
+        self.custom_mb.state(["disabled"])
+        ttk.Label(box, text="Compression level").grid(row=2, column=0, sticky="w")
         self.level = ttk.Spinbox(box, from_=0, to=9, width=4)
         self.level.set("6")
-        self.level.grid(row=1, column=1, sticky="w")
+        self.level.grid(row=2, column=1, sticky="w")
         self.hide_names = tk.BooleanVar()
         ttk.Checkbutton(box, text="Hide names", variable=self.hide_names).grid(
-            row=2, column=0, columnspan=2, sticky="w"
+            row=3, column=0, columnspan=2, sticky="w"
         )
         self.follow = tk.BooleanVar()
         ttk.Checkbutton(box, text="Follow symlinks", variable=self.follow).grid(
-            row=3, column=0, columnspan=2, sticky="w"
+            row=4, column=0, columnspan=2, sticky="w"
         )
         self.force = tk.BooleanVar()
         ttk.Checkbutton(box, text="Overwrite existing files", variable=self.force).grid(
-            row=4, column=0, columnspan=2, sticky="w"
-        )
-        ttk.Label(box, text="Excludes, one glob per line").grid(
             row=5, column=0, columnspan=2, sticky="w"
         )
-        self.excludes = tk.Text(box, height=3, width=32)
-        self.excludes.grid(row=6, column=0, columnspan=2, sticky="ew")
-        ttk.Label(box, text=f"always skipped: {', '.join(DEFAULT_EXCLUDES)}").grid(
-            row=7, column=0, columnspan=2, sticky="w"
+        ttk.Label(box, text="Excludes, one glob per line").grid(
+            row=6, column=0, columnspan=2, sticky="w"
         )
+        self.excludes = tk.Text(box, height=3, width=32)
+        self.excludes.grid(row=7, column=0, columnspan=2, sticky="ew")
+        ttk.Label(box, text=f"always skipped: {', '.join(DEFAULT_EXCLUDES)}").grid(
+            row=8, column=0, columnspan=2, sticky="w"
+        )
+
+    def _on_size_choice(self, _event: object = None) -> None:
+        """Switch the MB box on only while `Custom…` is chosen."""
+        if self.max_size.get() == CUSTOM_SIZE:
+            self.custom_mb.state(["!disabled"])
+            self.custom_mb.focus_set()
+        else:
+            self.custom_mb.state(["disabled"])
 
     def _build_password(self, parent: tk.Misc, row: int) -> None:
         box = ttk.LabelFrame(parent, text=" Password ", padding=6)
@@ -181,7 +196,7 @@ class View:
         return JobSpec(
             paths=[Path(self.paths.get(i)) for i in range(self.paths.size())],
             output=Path(output),
-            max_size=parse_max_size(self.max_size.get()),
+            max_size=parse_max_size(self.max_size.get(), self.custom_mb.get()),
             level=parse_level(self.level.get()),
             excludes=self.excludes.get("1.0", "end"),
             follow_symlinks=self.follow.get(),
