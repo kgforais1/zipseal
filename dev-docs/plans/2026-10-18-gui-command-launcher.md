@@ -21,13 +21,13 @@ The script:
 2. Finds the repo from its own path, so it works from any clone location.
 3. Finds `uv`. Finder starts a non-login shell, so `~/.local/bin`,
    `/opt/homebrew/bin` and `/usr/local/bin` may be missing from `PATH`. Try
-   `command -v uv` first, then those folders and `~/.cargo/bin`. Store the result in
-   `$uv`. Use `$HOME`, never a literal home path, so `check-personal-data`
+   `command -v uv` first, then those folders and `~/.cargo/bin`. Store the
+   result in `$uv`. Use `$HOME`, never a literal home path, so `check-personal-data`
    passes.
 4. Runs `exec "$uv" run --managed-python --project "$repo" zipseal-gui`.
    uv-managed Pythons always include Tk. Homebrew's Python lacks it unless
-   `python-tk` is installed. It runs the resolved
-   path, because a fallback folder is not on `PATH`. This always uses the
+   `python-tk` is installed. It runs the resolved path, because a fallback
+   folder is not on `PATH`. This always uses the
    clone's current source and needs no prior `scripts/install.sh`.
 5. If `uv` is missing, prints where to get it and waits for Return, so the
    Terminal window does not vanish before the user reads the message. The
@@ -83,7 +83,8 @@ and a macOS launcher section under Install.
         `stdin=DEVNULL` unless it feeds input, so a broken prompt cannot hang
         CI.
   - [x] With a stub `uv` first on `PATH`, the script calls
-        `uv run --project <repo> zipseal-gui` with no other arguments.
+        `uv run --managed-python --project <repo> zipseal-gui` with no other
+        arguments.
   - [x] With `uv` only in `$HOME/.local/bin` (a `tmp_path` HOME) and not on
         `PATH`, the script still runs that stub. This catches a bare
         `exec uv`.
@@ -92,8 +93,9 @@ and a macOS launcher section under Install.
         `--project` path.
   - [x] With no `uv` anywhere (`PATH` and `HOME` pointed at empty
         `tmp_path` folders), it exits non-zero and names the install URL.
-        Run it once with a newline and once with EOF on stdin. Keep
-        `/usr/bin:/bin` on `PATH` for `dirname`. Skip the test when `uv`
+        Run it once with a newline and once with EOF on stdin. `PATH` holds
+        only links to the launcher's tools (`dirname`, `basename`, `xattr`),
+        so a system `uv` cannot leak in. Skip the test when `uv`
         exists in `/opt/homebrew/bin` or `/usr/local/bin`, because the
         script checks those absolute folders and the test cannot hide them.
 - [x] Generate candidate icons with Gemini 3.8 Flash (High) via Antigravity
