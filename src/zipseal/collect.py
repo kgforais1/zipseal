@@ -89,7 +89,9 @@ class _OutputFilter:
         out = Path(os.path.abspath(output))
         self.name = out.name
         stem, suffix = out.stem, out.suffix
-        self.part_re = re.compile(re.escape(stem) + r"-volume\d+-of-\d+" + re.escape(suffix))
+        self.part_re = re.compile(
+            re.escape(stem) + r"-(?:volume|part)\d+-of-\d+" + re.escape(suffix)
+        )
         self.partial_prefix = stem
         try:
             self.dir_ident: Identity | None = _ident(os.stat(out.parent))

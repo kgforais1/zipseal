@@ -286,6 +286,8 @@ delegates that file to `7zz -v`.
   every part has been written and verified. Then all parts are renamed, in
   order. A failure therefore never leaves a final-named part behind.
 - On any failure, all `.partial` files from the run are deleted.
+- Before the first `.partial` is created, the warning sink gets one line
+  telling the user not to rename, move or open those files during the run.
 - `.partial` files are opened with `O_CREAT | O_EXCL | O_NOFOLLOW`, so a
   planted file or symlink is never written through.
 - A source that changes between collection and reading stops the run.

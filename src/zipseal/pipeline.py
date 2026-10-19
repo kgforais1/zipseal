@@ -126,6 +126,11 @@ def write_archive(
         extras = [Extra(manifest.entry, data)]
 
     password = get_password(options)
+    print(
+        f"zipseal: temporary .partial files will appear in {out.dir} while this runs. "
+        "Do not rename, move or open them. zipseal renames them when every part verifies.",
+        file=log,
+    )
     try:
         results: list[PartResult] = []
 

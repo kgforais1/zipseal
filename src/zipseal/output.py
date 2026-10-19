@@ -26,7 +26,7 @@ class Output:
             re.escape(self.stem) + r"-volume\d+-of-\d+" + re.escape(self.suffix)
         )
         self._partial_re = re.compile(
-            re.escape(self.stem) + r"-volume\d+" + re.escape(self.suffix) + r"\.partial"
+            re.escape(self.stem) + r"-(?:volume|part)\d+" + re.escape(self.suffix) + r"\.partial"
         )
 
     # ── before writing ────────────────────────────────────────────────────────

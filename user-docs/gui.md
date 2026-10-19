@@ -115,8 +115,9 @@ keeps a generated password from being lost before it is shown.
 A dialog says what happened, in the same words the command would use. Nothing
 is written: parts are made under a temporary `.partial` name and only renamed
 after they are verified, and every `.partial` file is removed when a run
-fails. If an earlier run was killed and left `.partial` files in the way, the
-next run stops and lists them. Delete those, then try again.
+fails. The log area says when they appear. Do not rename, move or open them
+while the run works. If an earlier run was killed and left `.partial` files in
+the way, the next run stops and lists them. Delete those, then try again.
 
 The window has no stop button. Closing it during a run ends the job, which
 can leave a `.partial` file in the output folder. Delete it before the next
