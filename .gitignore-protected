@@ -4,6 +4,7 @@ sample-data/
 *.zip
 *.ZIP
 *.7z
+*.temp
 *.partial
 .env
 .envrc

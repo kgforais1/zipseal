@@ -113,13 +113,13 @@ keeps a generated password from being lost before it is shown.
 ### If something goes wrong
 
 A dialog says what happened, in the same words the command would use. Nothing
-is written: parts are made under a temporary `.partial` name and only renamed
-after they are verified, and every `.partial` file is removed when a run
+is written: parts are made under a temporary name ending in `.temp`, and only
+renamed after they are verified. Every `.temp` file is removed when a run
 fails. The log area says when they appear. Do not rename, move or open them
-while the run works. If an earlier run was killed and left `.partial` files in
+while the run works. If an earlier run was killed and left `.temp` files in
 the way, the next run stops and lists them. Delete those, then try again.
 
-Press Cancel to stop a run. zipseal removes its `.partial` files, writes no
+Press Cancel to stop a run. zipseal removes its `.temp` files, writes no
 archive, and says so in the log area. The window cannot close while a run
 works, so cancel it first. A dry run cannot be cancelled, so wait for it to
 finish.

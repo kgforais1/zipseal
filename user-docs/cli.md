@@ -65,11 +65,13 @@ would leave it in your shell history and visible to other users.
 
 ## Safety guarantees
 
-- Each part is written under a temporary `.partial` name, verified (unless
-  `--no-verify`), and only then given its final name. A failure removes every `.partial` file. zipseal
-  prints a notice when they appear. Do not rename, move or open them while it runs.
+- Each part is written under a temporary name ending in `.temp`, verified
+  (unless `--no-verify`), and only then given its final name. A failure
+  removes every `.temp` file. zipseal prints a notice when they appear. Do not
+  rename, move or open them while it runs.
 - zipseal never overwrites a file it did not expect, even one created while
   it was running.
-- If an earlier run was killed and left `.partial` files, the next run stops
-  before writing and lists them. Check them, then delete them.
+- If an earlier run was killed and left `.temp` files, the next run stops
+  before writing and lists them. Check them, then delete them. Older versions
+  named these files `.partial`, and those stop a run too.
 - If a source file changes or is swapped while zipseal runs, the run stops.

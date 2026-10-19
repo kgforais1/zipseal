@@ -61,4 +61,6 @@ def extract(path: Path, password: str = PASSWORD) -> dict[str, bytes]:
 
 
 def leftovers(folder: Path) -> list[str]:
-    return sorted(n for n in os.listdir(folder) if n.endswith(".partial") or "zipseal-" in n)
+    return sorted(
+        n for n in os.listdir(folder) if n.endswith((".temp", ".partial")) or "zipseal-" in n
+    )

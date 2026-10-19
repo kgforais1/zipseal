@@ -127,7 +127,7 @@ def write_archive(
 
     password = get_password(options)
     print(
-        f"zipseal: temporary .partial files will appear in {out.dir} while this runs. "
+        f"zipseal: temporary .temp files will appear in {out.dir} while this runs. "
         "Do not rename, move or open them. zipseal renames them when the run succeeds.",
         file=log,
     )
@@ -138,7 +138,7 @@ def write_archive(
             if progress is not None:
                 progress.part_started(len(results) + 1)
             budget = PartBudget(layout)
-            path, fd = out.new_partial(len(results) + 1)
+            path, fd = out.new_temp(len(results) + 1)
             results.append(
                 write_part(
                     collection, queue, budget, password, options.level, path, extras, progress, fd

@@ -92,7 +92,10 @@ class _OutputFilter:
         self.part_re = re.compile(
             re.escape(stem) + r"-(?:volume|part)\d+-of-\d+" + re.escape(suffix)
         )
-        self.partial_prefix = stem
+        # `.partial` is what older versions called their temporary files.
+        self.temp_re = re.compile(
+            re.escape(stem) + r"-(?:volume|part)\d+" + re.escape(suffix) + r"\.(?:temp|partial)"
+        )
         try:
             self.dir_ident: Identity | None = _ident(os.stat(out.parent))
         except OSError:
@@ -104,7 +107,7 @@ class _OutputFilter:
         return (
             name == self.name
             or self.part_re.fullmatch(name) is not None
-            or (name.startswith(self.partial_prefix) and name.endswith(".partial"))
+            or self.temp_re.fullmatch(name) is not None
         )
 
 

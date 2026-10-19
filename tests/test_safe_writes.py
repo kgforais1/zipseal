@@ -25,7 +25,7 @@ def src(tmp_path: Path) -> Path:
 def test_failure_mid_part_leaves_nothing(
     src: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """A read error in the fourth file (second part) removes every partial."""
+    """A read error in the fourth file (second part) removes every `.temp` file."""
     import zipseal.sources as sources
 
     real_read = os.read
@@ -64,12 +64,12 @@ def test_no_verify_still_checks_cap_and_writes(src: Path, tmp_path: Path) -> Non
         extract(r.path)
 
 
-def test_a_partial_that_cannot_be_deleted_is_a_warning_not_the_error(
+def test_a_temp_file_that_cannot_be_deleted_is_a_warning_not_the_error(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     err = io.StringIO()
     out = output_mod.Output(tmp_path / "b.zip", force=False, warn=err)
-    path, fd = out.new_partial(1)
+    path, fd = out.new_temp(1)
     os.close(fd)
 
     def refuse(_path: object) -> None:
@@ -77,7 +77,7 @@ def test_a_partial_that_cannot_be_deleted_is_a_warning_not_the_error(
 
     monkeypatch.setattr(output_mod.os, "unlink", refuse)
     out.cleanup()
-    assert f"could not delete partial files. Delete them before the next run:\n  {path}" in (
+    assert f"could not delete temporary files. Delete them before the next run:\n  {path}" in (
         err.getvalue()
     )
 
