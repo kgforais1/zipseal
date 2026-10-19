@@ -202,6 +202,14 @@ def test_disk_full_is_a_write_error(
     assert os.listdir(tmp_path / "out") == []
 
 
+def test_temp_files_are_named_dot_temp(tmp_path: Path) -> None:
+    out = output_mod.Output(tmp_path / "b.zip", force=False)
+    path, fd = out.new_temp(1)
+    os.close(fd)
+    assert path.name == "b-volume01.zip.temp"
+    out.cleanup()
+
+
 def test_part_names_sort_with_many_parts(tmp_path: Path) -> None:
     out = output_mod.Output(tmp_path / "b.zip", force=False)
     for count, first, last in [

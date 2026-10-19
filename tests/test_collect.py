@@ -180,12 +180,14 @@ def test_output_inside_input_is_skipped(tmp_path: Path) -> None:
             "d/bundle-part02-of-02.zip": "old naming",
             "d/bundle-party.zip": "keep",
             "d/bundle-notes.temp": "keep, not a zipseal name",
+            "d/bundle-notes.partial": "keep, not a zipseal name either",
             "d/sub/bundle.zip": "keep, different folder",
         },
     )
     with run([tmp_path / "d"], tmp_path, output=tmp_path / "d/bundle.zip")[0] as c:
         assert names(c) == [
             "d/a.txt",
+            "d/bundle-notes.partial",
             "d/bundle-notes.temp",
             "d/bundle-party.zip",
             "d/sub/bundle.zip",

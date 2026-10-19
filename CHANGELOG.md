@@ -48,11 +48,12 @@ All notable user-facing changes are documented here. The format follows
 - Split outputs are now named `NAME-volumeNN-of-MM.zip` instead of
   `NAME-partNN-of-MM.zip`. The existing-output check and `--force` match the
   new names only, so old `-part` files are left alone. Old `-part` archives
-  and `.partial` files are still skipped as inputs, old `.partial` files still
-  block a run, and a run lists old `-part` archives in a warning.
+  are still skipped as inputs, and a run lists old `-part` archives in a warning.
 - Temporary files are now named `NAME-volumeNN.zip.temp` instead of
-  `.partial`. Old `.partial` files still stop a run and are still skipped as
-  inputs.
+  `.partial`. Leftover temporary files from older versions
+  (`NAME-volumeNN.zip.partial` and `NAME-partNN.zip.partial`) still stop a run
+  and are still skipped as inputs. Other files ending in `.partial` or `.temp`
+  are archived like any other file.
 - The window has a Cancel button while a run works. It stops the run and
   removes its `.temp` files, with no error dialog.
 - In a terminal, a run says that Ctrl-C cancels it. Ctrl-C already removed the
