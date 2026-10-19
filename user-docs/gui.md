@@ -70,7 +70,7 @@ anything.
 | `Overwrite existing files` | Replace outputs from an earlier run. Old outputs are restored if this run fails. |
 | `Excludes` | One glob per line, such as `*.tmp`. `.DS_Store`, files starting with `._` and `Thumbs.db` are always skipped. |
 
-With several parts, they are named `bundle-part01-of-03.zip` and so on. Every
+With several parts, they are named `bundle-volume01-of-03.zip` and so on. Every
 part opens on its own, with the same password.
 
 ## Password

@@ -32,7 +32,7 @@ passwords:
   prompts twice. Send the password through a different channel than the zip.
 
 output:
-  One part keeps the -o name. Several are named NAME-partNN-of-MM.zip, and
+  One part keeps the -o name. Several are named NAME-volumeNN-of-MM.zip, and
   each one opens on its own. Existing files are never overwritten without
   --force. Every part is verified before it gets its final name.
 

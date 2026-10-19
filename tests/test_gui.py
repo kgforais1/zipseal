@@ -419,12 +419,12 @@ def test_existing_outputs_finds_the_names_a_run_would_replace(tmp_path: Path) ->
     (out / "b.zip").write_text("old single")
     assert existing_outputs(options) == [out / "b.zip"]
 
-    (out / "b-part01-of-02.zip").write_text("old part")
-    assert existing_outputs(options) == [out / "b-part01-of-02.zip", out / "b.zip"]
+    (out / "b-volume01-of-02.zip").write_text("old part")
+    assert existing_outputs(options) == [out / "b-volume01-of-02.zip", out / "b.zip"]
 
     (out / "unrelated.zip").write_text("keep me")
     (out / "b.zip.partial").write_text("keep me too")
-    assert existing_outputs(options) == [out / "b-part01-of-02.zip", out / "b.zip"]
+    assert existing_outputs(options) == [out / "b-volume01-of-02.zip", out / "b.zip"]
 
 
 def test_existing_outputs_of_a_missing_folder_is_empty(tmp_path: Path) -> None:

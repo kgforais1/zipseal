@@ -27,7 +27,7 @@ Sizes accept plain bytes, decimal units (`KB`, `MB`, `GB`, `TB`, or `K`, `M`,
 sensitive. `25MB` is 25,000,000 bytes, and `25MiB` is 26,214,400 bytes.
 
 With one part, the output keeps the `-o` name exactly. With several, they are
-named `NAME-partNN-of-MM.zip`.
+named `NAME-volumeNN-of-MM.zip`.
 
 ## Password
 

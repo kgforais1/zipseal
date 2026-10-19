@@ -174,8 +174,8 @@ def test_output_inside_input_is_skipped(tmp_path: Path) -> None:
         {
             "d/a.txt": "x",
             "d/bundle.zip": "old",
-            "d/bundle-part01-of-02.zip": "old",
-            "d/bundle-part01.zip.partial": "tmp",
+            "d/bundle-volume01-of-02.zip": "old",
+            "d/bundle-volume01.zip.partial": "tmp",
             "d/bundle-party.zip": "keep",
             "d/sub/bundle.zip": "keep, different folder",
         },

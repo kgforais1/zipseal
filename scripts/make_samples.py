@@ -64,7 +64,7 @@ def run(out: str, *flags: str) -> None:
     name = out.split("-", 1)[1]
     folder.mkdir(exist_ok=True)
     # Only remove archives this script wrote; refuse if anything else is in the folder.
-    ours = re.compile(re.escape(name) + r"(-part\d+-of-\d+)?\.zip")
+    ours = re.compile(re.escape(name) + r"(-volume\d+-of-\d+)?\.zip")
     foreign = [
         p.name for p in folder.iterdir() if not ours.fullmatch(p.name) and p.name != ".DS_Store"
     ]

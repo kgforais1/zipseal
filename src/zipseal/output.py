@@ -23,10 +23,10 @@ class Output:
         self.token = secrets.token_hex(4)
         self.partials: list[Path] = []
         self._part_re = re.compile(
-            re.escape(self.stem) + r"-part\d+-of-\d+" + re.escape(self.suffix)
+            re.escape(self.stem) + r"-volume\d+-of-\d+" + re.escape(self.suffix)
         )
         self._partial_re = re.compile(
-            re.escape(self.stem) + r"-part\d+" + re.escape(self.suffix) + r"\.partial"
+            re.escape(self.stem) + r"-volume\d+" + re.escape(self.suffix) + r"\.partial"
         )
 
     # ── before writing ────────────────────────────────────────────────────────
@@ -93,7 +93,7 @@ class Output:
         The path is registered for cleanup only after this run has created it, so a
         failed create never deletes a file another run owns.
         """
-        path = self.dir / f"{self.stem}-part{number:02d}{self.suffix}.partial"
+        path = self.dir / f"{self.stem}-volume{number:02d}{self.suffix}.partial"
         fd = create_exclusive(path)
         self.partials.append(path)
         return path, fd
@@ -103,7 +103,7 @@ class Output:
             return [self.output]
         width = max(2, len(str(count)))  # same width for every part, so names sort
         return [
-            self.dir / f"{self.stem}-part{i:0{width}d}-of-{count:0{width}d}{self.suffix}"
+            self.dir / f"{self.stem}-volume{i:0{width}d}-of-{count:0{width}d}{self.suffix}"
             for i in range(1, count + 1)
         ]
 

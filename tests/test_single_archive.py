@@ -114,7 +114,7 @@ def test_existing_output_refused(tree: Path, tmp_path: Path) -> None:
     with pytest.raises(WriteError, match="already exist"):
         archive([tree], out)
     assert out.read_text() == "precious"
-    (tmp_path / "out/bundle-part01-of-02.zip").write_text("old part")
+    (tmp_path / "out/bundle-volume01-of-02.zip").write_text("old part")
     out.unlink()
     with pytest.raises(WriteError, match="already exist"):
         archive([tree], out)
@@ -201,7 +201,7 @@ def test_planted_partial_symlink_not_followed(tree: Path, tmp_path: Path) -> Non
     out = tmp_path / "out/bundle.zip"
     victim = tmp_path / "victim.txt"
     victim.write_text("do not touch")
-    (tmp_path / "out/bundle-part01.zip.partial").symlink_to(victim)
+    (tmp_path / "out/bundle-volume01.zip.partial").symlink_to(victim)
     with pytest.raises(WriteError, match="earlier, interrupted run|refusing to write through"):
         archive([tree], out)
     assert victim.read_text() == "do not touch"
@@ -294,10 +294,10 @@ def test_partial_planted_after_preflight_not_followed(
 
 
 def test_leftover_partial_fails_preflight(tree: Path, tmp_path: Path) -> None:
-    (tmp_path / "out/bundle-part03.zip.partial").write_text("crashed run")
+    (tmp_path / "out/bundle-volume03.zip.partial").write_text("crashed run")
     with pytest.raises(WriteError, match="earlier, interrupted run"):
         archive([tree], tmp_path / "out/bundle.zip")
-    assert (tmp_path / "out/bundle-part03.zip.partial").read_text() == "crashed run"
+    assert (tmp_path / "out/bundle-volume03.zip.partial").read_text() == "crashed run"
 
 
 def test_symlinked_ancestor_is_followed_by_default(tmp_path: Path) -> None:
