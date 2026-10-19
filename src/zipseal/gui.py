@@ -31,7 +31,7 @@ from pathlib import Path
 from typing import NamedTuple, TextIO
 
 from zipseal import passwords
-from zipseal.errors import UsageError, ZipsealError
+from zipseal.errors import Cancelled, UsageError, ZipsealError
 from zipseal.job import run_job
 from zipseal.options import Options
 from zipseal.output import Output
@@ -61,11 +61,17 @@ class Error(NamedTuple):
     message: str
 
 
+class Stopped(NamedTuple):
+    """The user cancelled the run, and nothing was written."""
+
+    message: str
+
+
 class Done(NamedTuple):
     """The worker finished: the run either succeeded or already reported why not."""
 
 
-Event = Log | ProgressUpdate | Error | Done
+Event = Log | ProgressUpdate | Error | Stopped | Done
 
 UNEXPECTED = "zipseal stopped: an unexpected error, and no archive was written"
 
@@ -123,26 +129,39 @@ class _QueueProgress:
 
     Byte counts are running totals, so each one replaces the last. At most one is
     queued per `BYTES_INTERVAL`, which bounds the queue however fast the disk is.
+
+    It is also where a cancel lands. The core calls it once per chunk written, so
+    raising `Cancelled` here stops the job within one chunk, and the core's usual
+    cleanup removes the `.partial` files.
     """
 
-    def __init__(self, events: queue.Queue[Event]) -> None:
+    def __init__(self, events: queue.Queue[Event], cancel: threading.Event) -> None:
         self._events = events
+        self._cancel = cancel
         self._last_bytes = float("-inf")
 
+    def _check(self) -> None:
+        if self._cancel.is_set():
+            raise Cancelled("cancelled: no archive was written")
+
     def part_started(self, number: int) -> None:
+        self._check()
         self._events.put(ProgressUpdate("started", number, 0))
         self._last_bytes = float("-inf")
 
     def bytes_written(self, written: int) -> None:
+        self._check()
         now = time.monotonic()
         if now - self._last_bytes >= BYTES_INTERVAL:
             self._last_bytes = now
             self._events.put(ProgressUpdate("bytes", 0, written))
 
     def verifying(self, parts: int) -> None:
+        self._check()
         self._events.put(ProgressUpdate("verifying", 0, parts))
 
     def part_verified(self, number: int, size: int) -> None:
+        self._check()
         self._events.put(ProgressUpdate("verified", number, size))
 
 
@@ -261,6 +280,7 @@ class Controller:
     def __init__(self) -> None:
         self.events: queue.Queue[Event] = queue.Queue()
         self._generated: Password | None = None
+        self._cancel = threading.Event()
 
     # ── main thread ───────────────────────────────────────────────────────────
 
@@ -291,13 +311,23 @@ class Controller:
         # to hand over.
         holder = secret if secret is not None else Password("")
 
-        progress = _QueueProgress(self.events)
+        self._cancel = threading.Event()  # a fresh one, so an old cancel cannot leak in
+        progress = _QueueProgress(self.events, self._cancel)
         log = _LogSink(self.events)
         threading.Thread(
             target=self._work,
             args=(options, holder, progress, log),
             daemon=True,
         ).start()
+
+    def cancel(self) -> None:
+        """Ask the running job to stop. It stops at its next progress event.
+
+        Collecting the inputs reports no progress, so a cancel there waits for the
+        first part to start. Publication reports none either, so a run that is
+        already renaming its parts finishes.
+        """
+        self._cancel.set()
 
     def poll(self) -> list[Event]:
         """Everything queued since the last call, oldest first."""
@@ -334,6 +364,8 @@ class Controller:
             # No `password_out`: the generated password is shown in a modal, never
             # in the log area.
             run_job(options, lambda _: password, progress=progress, warn=log, out=log)
+        except Cancelled as exc:
+            self.events.put(Stopped(str(exc)))
         except ZipsealError as exc:
             self.events.put(Error(str(exc)))
         except Exception:
@@ -368,6 +400,7 @@ __all__ = [
     "JobSpec",
     "Log",
     "ProgressUpdate",
+    "Stopped",
     "build_options",
     "existing_outputs",
     "main",

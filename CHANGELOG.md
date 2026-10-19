@@ -43,6 +43,10 @@ All notable user-facing changes are documented here. The format follows
   `NAME-partNN-of-MM.zip`. The existing-output check and `--force` match the
   new names only, so old `-part` files are left alone. Old `-part` archives
   and `.partial` files are still skipped as inputs and still block a run.
+- The window has a Cancel button while a run works. It stops the run and
+  removes its `.partial` files, with no error dialog.
+- In a terminal, a run says that Ctrl-C cancels it. Ctrl-C already removed the
+  run's `.partial` files.
 - A run now prints a notice before its temporary `.partial` files appear,
   asking you not to rename, move or open them until it finishes.
 

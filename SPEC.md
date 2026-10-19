@@ -164,9 +164,11 @@ reaches the log area.
 - Error dialogs show `ZipsealError` messages only. An unexpected exception
   shows one generic line, not a traceback with locals.
 
-The GUI has no cancel button and no drag-and-drop. A run in progress cannot
-be stopped from the window, so closing it mid-run can leave `.partial` files
-that the next run reports (§6.5).
+The GUI has a Cancel button while a run works. It stops the job at the next
+progress event, and the usual cleanup removes the run's `.partial` files. A
+cancel is not an error, so it gets a log line and no dialog. A run that is
+already publishing its parts finishes. The window has no drag-and-drop, and it
+cannot close while a run works.
 
 ## 6. Key design decisions
 
