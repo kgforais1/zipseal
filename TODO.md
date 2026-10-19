@@ -24,6 +24,9 @@ An item that needs more than a few lines of thought gets a plan in
   `.github/workflows/` do not get (Dependabot's `github-actions` ecosystem
   updates `uses:` references, not versions inside `run:` steps). Costs a
   `uv.lock` diff and puts CI tooling in the app's dependency closure.
+- Let a GUI cancel land while a part is being verified. Today `verify_part`
+  reports no progress until the whole part is decrypted, so a cancel waits for
+  it. It needs a progress or cancel hook inside verification.
 - Add drag-and-drop to the GUI via `tkinterdnd2` ([GUI plan](dev-docs/plans/2026-10-10-gui.md)).
 - Package the GUI as a signed, double-clickable macOS `.app` with PyInstaller or Briefcase ([GUI plan](dev-docs/plans/2026-10-10-gui.md)).
 - Consider `--format 7z`, `--oversize=volumes` and `--tight` (`SPEC.md` §6.2, §6.4, §6.7).

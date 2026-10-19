@@ -167,7 +167,9 @@ reaches the log area.
 The GUI has a Cancel button while a run works. It stops the job at the next
 progress event, and the usual cleanup removes the run's `.partial` files. A
 cancel is not an error, so it gets a log line and no dialog. A run that is
-already publishing its parts finishes. The window has no drag-and-drop, and it
+already publishing its parts finishes. Verifying a part reports no progress
+until the part is done, so a cancel there waits for it. A dry run reports no
+progress at all, so Cancel stays disabled for one. The window has no drag-and-drop, and it
 cannot close while a run works.
 
 ## 6. Key design decisions

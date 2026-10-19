@@ -278,7 +278,8 @@ class View:
         except UsageError as exc:
             self._report(str(exc))
             return
-        self._set_busy(True)
+        # A dry run reports no progress, so there is nothing for Cancel to stop.
+        self._set_busy(True, cancellable=not spec.dry_run)
 
     def _cancel(self) -> None:
         """Ask the worker to stop. A `Stopped` event follows once it has cleaned up."""
@@ -317,6 +318,8 @@ class View:
     def _finished(self) -> None:
         """A run succeeded: clear the fields, then show a generated password."""
         self._set_busy(False)
+        # A Cancel pressed too late to stop publication left "cancelling …" here.
+        self.status.set("done")
         self._clear_fields()
         password = self.controller.take_generated_password()
         if password is not None:
@@ -325,6 +328,7 @@ class View:
     def _failed(self, message: str) -> None:
         """A run failed: clear the fields and show the message the core gave."""
         self._set_busy(False)
+        self.status.set("failed")
         self._clear_fields()
         self.controller.clear_password()
         self._report(message)
@@ -350,11 +354,11 @@ class View:
         self.password.delete(0, "end")
         self.confirm.delete(0, "end")
 
-    def _set_busy(self, busy: bool) -> None:
+    def _set_busy(self, busy: bool, *, cancellable: bool = False) -> None:
         self._busy = busy
         for widget in (self.dry_button, self.run_button):
             widget.configure(state="disabled" if busy else "normal")
-        self.cancel_button.configure(state="normal" if busy else "disabled")
+        self.cancel_button.configure(state="normal" if busy and cancellable else "disabled")
         if busy:
             self.bar.start(10)
         else:

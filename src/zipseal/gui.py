@@ -374,26 +374,28 @@ class Controller:
         progress: Progress,
         log: TextIO,
     ) -> None:
+        ending: Event
         try:
             # No `password_out`: the generated password is shown in a modal, never
             # in the log area.
             run_job(options, lambda _: password, progress=progress, warn=log, out=log)
         except Cancelled as exc:
-            self.events.put(Stopped(str(exc)))
+            ending = Stopped(str(exc))
         except ZipsealError as exc:
-            self.events.put(Error(str(exc)))
+            ending = Error(str(exc))
         except Exception:
             # A bug. The plan shows no traceback, so the view only gets the generic
             # line; the traceback goes to the console for a bug report.
             traceback.print_exc()
-            self.events.put(Error(UNEXPECTED))
+            ending = Error(UNEXPECTED)
         else:
-            self.events.put(Done())
             # A successful run keeps it: the view takes it for the modal.
+            self.events.put(Done())
             return
-        # A failed run never shows a password, and nothing can be taking it while
-        # this happens, because a take only ever follows a `Done`.
+        # A failed run never shows a password. Clear it before the last event, so
+        # the view cannot start a new run, with a new password, until this is done.
         self.clear_password()
+        self.events.put(ending)
 
 
 def main() -> int:

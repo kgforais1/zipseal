@@ -225,7 +225,11 @@ def run(command: Command) -> int:
     log = sys.stderr
     progress = _TtyProgress(log) if log.isatty() else None
     if progress is not None and not command.options.dry_run:
-        print("zipseal: press Ctrl-C to cancel. Nothing is left behind.", file=log, flush=True)
+        print(
+            "zipseal: press Ctrl-C to cancel. Before publishing, that leaves nothing behind.",
+            file=log,
+            flush=True,
+        )
     return run_job(
         command.options,
         command.get_password,

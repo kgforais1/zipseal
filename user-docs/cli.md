@@ -61,7 +61,7 @@ would leave it in your shell history and visible to other users.
 | 1 | Usage error, such as a bad option or mismatched passwords. |
 | 2 | Input error, such as a missing path, a name collision, a file too large for `--max-size`, or nothing left to archive after skips and excludes. |
 | 3 | Write or verify failure. Nothing is left behind. |
-| 130 | Cancelled with Ctrl-C. Nothing is left behind. |
+| 130 | Cancelled with Ctrl-C. A cancel before the parts are published leaves nothing behind. |
 
 ## Safety guarantees
 
