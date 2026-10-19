@@ -26,6 +26,7 @@ import threading
 import time
 import traceback
 from dataclasses import dataclass
+from decimal import Decimal, InvalidOperation
 from pathlib import Path
 from typing import NamedTuple, TextIO
 
@@ -145,12 +146,54 @@ class _QueueProgress:
         self._events.put(ProgressUpdate("verified", number, size))
 
 
-def parse_max_size(text: str) -> int | None:
-    """Turn the size box into a cap in bytes, or None for no limit."""
+ICON = Path(__file__).with_name("icon.svg")
+CUSTOM_SIZE = "Custom…"
+SIZE_PRESETS = (
+    "no limit",
+    "10 MB",
+    "20 MB",
+    "100 MB",
+    "500 MB",
+    "1 GB",
+    "5 GB",
+    "10 GB",
+    "20 GB",
+    CUSTOM_SIZE,
+)
+
+
+def parse_max_size(text: str, custom_mb: str = "") -> int | None:
+    """Turn the size choice into a cap in bytes, or None for no limit.
+
+    `CUSTOM_SIZE` takes its value from `custom_mb`, a plain number of
+    megabytes (1 MB = 1,000,000 bytes, as in the CLI).
+    """
     stripped = text.strip()
     if stripped.lower() in ("", "no limit"):
         return None
+    if stripped == CUSTOM_SIZE:
+        return _parse_custom_mb(custom_mb)
     return parse_size(stripped)
+
+
+def _parse_custom_mb(text: str) -> int:
+    stripped = text.strip()
+    if not stripped:
+        raise UsageError("enter the custom part size in MB")
+    try:
+        megabytes = Decimal(stripped)
+    except InvalidOperation:
+        raise UsageError(
+            f"the custom part size must be a number of MB, such as 25, not {stripped!r}"
+        ) from None
+    if not megabytes.is_finite():
+        raise UsageError(f"the custom part size must be a number of MB, not {stripped!r}")
+    if megabytes <= 0:
+        raise UsageError(f"the custom part size must be greater than zero, not {stripped!r}")
+    size = megabytes * 1_000_000
+    if size != size.to_integral_value():
+        raise UsageError(f"the custom part size {stripped!r} MB is not a whole number of bytes")
+    return int(size)
 
 
 def parse_level(text: str) -> int:
@@ -315,6 +358,9 @@ def main() -> int:
 
 
 __all__ = [
+    "CUSTOM_SIZE",
+    "ICON",
+    "SIZE_PRESETS",
     "Controller",
     "Done",
     "Error",

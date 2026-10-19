@@ -62,7 +62,7 @@ dev-docs/investigations/  dated research and spike write-ups
 hooks/scripts/        repo policy checks run by pre-commit
 .context/             scratch and handoffs (gitignored)
 sample-data/          local inputs and sample archives (gitignored)
-assets/icon.svg       project icon; SVG because raster images are blocked
+src/zipseal/icon.svg  project icon (SVG; raster images are blocked); Tk 9 loads it
 zipseal-gui.command   double-clickable macOS launcher (runs uv run zipseal-gui)
 scripts/set-icon.sh   gives a file the icon in Finder; used by install.sh and the launcher
 scripts/make_samples.py  rebuilds sample-data/ with synthetic inputs

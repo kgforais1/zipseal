@@ -1,6 +1,6 @@
 # zipseal
 
-![zipseal icon](assets/icon.svg)
+![zipseal icon](src/zipseal/icon.svg)
 
 [![CI](https://github.com/kgforais1/zipseal/actions/workflows/ci.yml/badge.svg)](https://github.com/kgforais1/zipseal/actions/workflows/ci.yml)
 [![Dependency audit](https://github.com/kgforais1/zipseal/actions/workflows/dependency-audit.yml/badge.svg)](https://github.com/kgforais1/zipseal/actions/workflows/dependency-audit.yml)

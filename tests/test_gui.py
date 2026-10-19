@@ -20,6 +20,8 @@ from helpers import leftovers, make_tree
 from zipseal import passwords, pipeline
 from zipseal.errors import UsageError, WriteError
 from zipseal.gui import (
+    CUSTOM_SIZE,
+    SIZE_PRESETS,
     Controller,
     Done,
     Error,
@@ -193,6 +195,50 @@ def test_parse_max_size(text: str, expected: int | None) -> None:
 def test_parse_max_size_rejects_nonsense() -> None:
     with pytest.raises(UsageError, match="invalid size"):
         parse_max_size("twenty megabytes")
+
+
+def test_size_presets_parse_to_decimal_caps() -> None:
+    caps = [parse_max_size(choice) for choice in SIZE_PRESETS if choice != CUSTOM_SIZE]
+    assert caps == [
+        None,
+        10_000_000,
+        20_000_000,
+        100_000_000,
+        500_000_000,
+        1_000_000_000,
+        5_000_000_000,
+        10_000_000_000,
+        20_000_000_000,
+    ]
+
+
+@pytest.mark.parametrize(
+    ("custom", "expected"),
+    [("25", 25_000_000), (" 7.5 ", 7_500_000), ("1000", 1_000_000_000)],
+)
+def test_custom_size_is_megabytes(custom: str, expected: int) -> None:
+    assert parse_max_size(CUSTOM_SIZE, custom) == expected
+
+
+@pytest.mark.parametrize(
+    ("custom", "message"),
+    [
+        ("", "enter the custom part size in MB"),
+        ("5 GB", "must be a number of MB"),
+        ("abc", "must be a number of MB"),
+        ("Infinity", "must be a number of MB"),
+        ("0", "must be greater than zero"),
+        ("-3", "must be greater than zero"),
+        ("0.0000001", "not a whole number of bytes"),
+    ],
+)
+def test_custom_size_rejects_bad_input(custom: str, message: str) -> None:
+    with pytest.raises(UsageError, match=message):
+        parse_max_size(CUSTOM_SIZE, custom)
+
+
+def test_custom_box_is_ignored_unless_custom_is_chosen() -> None:
+    assert parse_max_size("20 MB", "not a number") == 20_000_000
 
 
 def test_parse_level() -> None:

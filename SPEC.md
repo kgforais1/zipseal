@@ -107,7 +107,7 @@ Packaging: a `pyproject.toml` with `zipseal` and `zipseal-gui` console scripts.
 Run them with `uv run zipseal …` and `uv run zipseal-gui`, or install both
 with `uv tool install .`. On macOS, `zipseal-gui.command` at the repo root
 runs `uv run --managed-python zipseal-gui` from the clone when double-clicked in Finder, and
-`scripts/set-icon.sh` gives it the `assets/icon.svg` icon.
+`scripts/set-icon.sh` gives it the `src/zipseal/icon.svg` icon.
 
 ### 5.1 The GUI
 
@@ -116,7 +116,7 @@ and the CLI holds none either: both build an `Options` and call `run_job`.
 
 **The window** (top to bottom) is the input list with `Add files…`,
 `Add folder…` and `Remove`; the output name with a `Save as…` picker; options
-for the maximum part size (presets plus a custom value), compression level,
+for the maximum part size (presets from 10 MB to 20 GB, plus a custom value in MB), compression level,
 `Hide names`, excludes (one glob per line), `Follow symlinks` and
 `Overwrite existing files`; two masked password fields, or a `Generate a
 password` checkbox; `Dry run` and `Create archive`; an indeterminate progress

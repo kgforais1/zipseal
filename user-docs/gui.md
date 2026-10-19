@@ -13,7 +13,8 @@ opens Terminal, and Terminal opens the zipseal window. Leave the Terminal
 window open: it shows any error, and closing it closes zipseal. The first run
 gives the file the zipseal icon. It runs zipseal on a Python that uv
 manages, because those always include Tk, so the first run may pause while uv
-downloads one.
+downloads one. On that Python, the window shows the zipseal icon in the Dock
+or taskbar.
 
 If the copy came from a downloaded ZIP rather than `git clone`, macOS may
 refuse to open it. Open System Settings → Privacy & Security, and press
@@ -61,7 +62,8 @@ anything.
 
 | Control | What it does |
 |---|---|
-| `Max part size` | The cap for each part. `no limit` writes one zip. Preset values cover common limits, and you can type your own, such as `25MB`. |
+| `Max part size` | The cap for each part. `no limit` writes one zip. The presets run from 10 MB to 20 GB. Choose `Custom…` to type your own. |
+| `Custom size (MB)` | Used only with `Custom…`. A number of megabytes, where 1 MB is 1,000,000 bytes, as in the CLI. Decimals such as `7.5` work. |
 | `Compression level` | `0` to `9`. `6` is the default and `0` stores files without compressing them. |
 | `Hide names` | Nest each part's files inside one encrypted `payload.zip`, so names, sizes and dates are not readable without the password. |
 | `Follow symlinks` | Follow symlinks. Without it, they are skipped with a note in the log. |
