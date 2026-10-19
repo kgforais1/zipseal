@@ -257,6 +257,20 @@ def build_options(spec: JobSpec) -> Options:
     )
 
 
+def save_as_start(current: str) -> tuple[str, str]:
+    """The folder and bare file name to open the `Save as…` dialog with.
+
+    The dialog's name field must get a name, never the whole path. Given a path,
+    macOS shows it in that field, and what the user types is added to it.
+    """
+    text = current.strip()
+    if not text:
+        return "", ""
+    path = Path(text).expanduser()
+    folder = path.parent
+    return (str(folder) if folder != Path() and folder.is_dir() else ""), path.name
+
+
 def existing_outputs(options: Options) -> list[Path]:
     """The names this run would write over (SPEC.md §6.5), for the overwrite question.
 
@@ -406,4 +420,5 @@ __all__ = [
     "main",
     "parse_level",
     "parse_max_size",
+    "save_as_start",
 ]

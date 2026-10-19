@@ -33,6 +33,7 @@ from zipseal.gui import (
     existing_outputs,
     parse_level,
     parse_max_size,
+    save_as_start,
 )
 from zipseal.options import Options
 from zipseal.passwords import Password
@@ -457,3 +458,11 @@ def test_existing_outputs_finds_the_names_a_run_would_replace(tmp_path: Path) ->
 
 def test_existing_outputs_of_a_missing_folder_is_empty(tmp_path: Path) -> None:
     assert existing_outputs(options_for(tmp_path)) == []
+
+
+def test_save_as_opens_in_the_folder_with_only_the_name(tmp_path: Path) -> None:
+    assert save_as_start(f"  {tmp_path}/bundle.zip ") == (str(tmp_path), "bundle.zip")
+    assert save_as_start("bundle.zip") == ("", "bundle.zip")
+    assert save_as_start("") == ("", "")
+    # A folder that does not exist yet is left to the dialog's default.
+    assert save_as_start(f"{tmp_path}/missing/bundle.zip") == ("", "bundle.zip")

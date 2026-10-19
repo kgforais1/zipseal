@@ -29,6 +29,7 @@ from zipseal.gui import (
     existing_outputs,
     parse_level,
     parse_max_size,
+    save_as_start,
 )
 from zipseal.options import DEFAULT_EXCLUDES
 from zipseal.passwords import Password
@@ -228,8 +229,9 @@ class View:
             self.paths.delete(index)
 
     def _save_as(self) -> None:
+        folder, name = save_as_start(self.output.get())
         chosen = filedialog.asksaveasfilename(
-            title="Save as", defaultextension=".zip", initialfile=self.output.get()
+            title="Save as", defaultextension=".zip", initialdir=folder, initialfile=name
         )
         if chosen:
             self.output.delete(0, "end")

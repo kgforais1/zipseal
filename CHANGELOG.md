@@ -37,6 +37,12 @@ All notable user-facing changes are documented here. The format follows
 - The window asks before replacing outputs from an earlier run, instead of
   stopping, and nothing is saved between sessions.
 
+### Fixed
+
+- `Save as…` now opens in the output's folder with only its file name filled
+  in. Before, the name field held the whole old path, so a typed name was
+  added to it.
+
 ### Changed
 
 - Split outputs are now named `NAME-volumeNN-of-MM.zip` instead of
