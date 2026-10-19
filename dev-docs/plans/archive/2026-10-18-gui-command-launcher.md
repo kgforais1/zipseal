@@ -1,7 +1,7 @@
 # Plan: Double-clickable GUI launcher
 
 Date: 2026-10-18
-Status: in-progress
+Status: complete
 Linked: branch `feat/gui-command-launcher`
 
 ## Goal
@@ -107,19 +107,19 @@ and a macOS launcher section under Install.
       On macOS (skipped elsewhere), a `tmp_path` copy gains
       `com.apple.ResourceFork` and its bytes are unchanged.
 - [x] Polish `README.md`: icon, badges, GUI and launcher sections.
-- [ ] Double-click it in Finder on macOS and confirm the window opens. This
+- [x] Double-click it in Finder on macOS and confirm the window opens. This
       is the manual check that tests cannot cover. `open zipseal-gui.command`,
       which takes the same Terminal path, started the GUI on 2026-10-18, and
       `scripts/install.sh` gave the file its icon with git status unchanged.
-      A real double-click by the user is still open.
-- [ ] Repeat with a copy from a browser-downloaded ZIP to confirm the
-      Gatekeeper steps in the docs.
+      The user confirmed a real double-click on 2026-10-18.
+- [x] Repeat with a copy from a browser-downloaded ZIP to confirm the
+      Gatekeeper steps in the docs. The user confirmed it on 2026-10-18.
 - [x] Update `user-docs/gui.md` "Start it", and bump `Last reviewed`.
 - [x] Mention the launcher, `assets/` and `set-icon.sh` in the `AGENTS.md`
       commands and layout. Bump both `Last reviewed` dates after re-reading.
 - [x] Log it in `CHANGELOG.md`.
 - [x] Run `uv run pytest` and `pre-commit run --all-files`.
-- [ ] Run the completion steps in `dev-docs/README.md`.
+- [x] Run the completion steps in `dev-docs/README.md`.
 
 ## Decisions
 

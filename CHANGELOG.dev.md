@@ -10,7 +10,7 @@ edits and refactors. User-visible changes go in [`CHANGELOG.md`](CHANGELOG.md).
 - `tests/test_launcher.py` covers `zipseal-gui.command` (uv on and off
   `PATH`, a spaced clone path, a foreign working directory, no uv with
   Return or EOF) and `scripts/set-icon.sh`. `scripts/install.sh` now sets the
-  launcher's icon ([plan](dev-docs/plans/2026-10-18-gui-command-launcher.md)).
+  launcher's icon ([plan](dev-docs/plans/archive/2026-10-18-gui-command-launcher.md)).
 
 - `dependency-audit.yml`: re-runs ci.yml's uv.lock `pip-audit` weekly, so a
   new advisory fails a scheduled run on a quiet repo, and checks the
