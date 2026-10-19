@@ -67,17 +67,46 @@ def test_no_verify_still_checks_cap_and_writes(src: Path, tmp_path: Path) -> Non
 def test_force_overwrites_only_own_targets(src: Path, tmp_path: Path) -> None:
     out = tmp_path / "out"
     (out / "b.zip").write_text("old single")
-    (out / "b-part07-of-09.zip").write_text("stale part")
+    (out / "b-volume07-of-09.zip").write_text("stale part")
     (out / "unrelated.zip").write_text("leave me")
     options = args_for([src], out / "b.zip", "--force")
     err = io.StringIO()
     with collect_for(options) as c:
         pipeline.write_archive(options, c, lambda _: Password(PASSWORD), err=err)
     assert extract(out / "b.zip")
-    assert (out / "b-part07-of-09.zip").read_text() == "stale part"
+    assert (out / "b-volume07-of-09.zip").read_text() == "stale part"
     assert (out / "unrelated.zip").read_text() == "leave me"
     assert "older part files remain" in err.getvalue()
     assert leftovers(out) == []
+
+
+def test_force_lists_an_old_single_archive_a_split_run_leaves(src: Path, tmp_path: Path) -> None:
+    out = tmp_path / "out"
+    (out / "b.zip").write_text("old single")
+    options = args_for([src], out / "b.zip", "--max-size", "400KB", "--no-verify", "--force")
+    err = io.StringIO()
+    with collect_for(options) as c:
+        results = pipeline.write_archive(options, c, lambda _: Password(PASSWORD), err=err)
+    assert len(results) > 1
+    assert (out / "b.zip").read_text() == "old single"
+    assert f"not touched:\n  {out / 'b.zip'}" in err.getvalue()
+
+
+@pytest.mark.parametrize("force", [False, True])
+def test_old_part_names_are_listed_but_never_replaced(
+    src: Path, tmp_path: Path, force: bool
+) -> None:
+    out = tmp_path / "out"
+    (out / "b-part01-of-02.zip").write_text("from an older zipseal")
+    options = args_for([src], out / "b.zip", *(["--force"] if force else []))
+    err = io.StringIO()
+    with collect_for(options) as c:
+        pipeline.write_archive(options, c, lambda _: Password(PASSWORD), err=err)
+    assert extract(out / "b.zip")
+    assert (out / "b-part01-of-02.zip").read_text() == "from an older zipseal"
+    assert f"older part files remain and were not touched:\n  {out / 'b-part01-of-02.zip'}" in (
+        err.getvalue()
+    )
 
 
 def test_force_failure_restores_originals(
@@ -158,9 +187,9 @@ def test_disk_full_is_a_write_error(
 def test_part_names_sort_with_many_parts(tmp_path: Path) -> None:
     out = output_mod.Output(tmp_path / "b.zip", force=False)
     for count, first, last in [
-        (2, "b-part01-of-02.zip", "b-part02-of-02.zip"),
-        (100, "b-part001-of-100.zip", "b-part100-of-100.zip"),
-        (1000, "b-part0001-of-1000.zip", "b-part1000-of-1000.zip"),
+        (2, "b-volume01-of-02.zip", "b-volume02-of-02.zip"),
+        (100, "b-volume001-of-100.zip", "b-volume100-of-100.zip"),
+        (1000, "b-volume0001-of-1000.zip", "b-volume1000-of-1000.zip"),
     ]:
         names = [p.name for p in out.final_names(count)]
         assert names[0] == first and names[-1] == last

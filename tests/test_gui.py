@@ -359,9 +359,11 @@ def test_progress_events_reach_the_view(tmp_path: Path) -> None:
     assert [(e.number, e.value) for e in verified] == [
         (1, (tmp_path / "out" / "b.zip").stat().st_size)
     ]
-    # Every progress event comes before the report and the finish.
+    # The .partial notice comes first, then every progress event, then the finish.
     kinds = [type(e).__name__ for e in events]
-    assert kinds[0] == "ProgressUpdate" and kinds[-1] == "Done"
+    assert kinds[:2] == ["Log", "ProgressUpdate"] and kinds[-1] == "Done"
+    first = events[0]
+    assert isinstance(first, Log) and "Do not rename" in first.line
 
 
 def test_a_generated_password_is_cleared_after_a_failed_run(
@@ -419,12 +421,12 @@ def test_existing_outputs_finds_the_names_a_run_would_replace(tmp_path: Path) ->
     (out / "b.zip").write_text("old single")
     assert existing_outputs(options) == [out / "b.zip"]
 
-    (out / "b-part01-of-02.zip").write_text("old part")
-    assert existing_outputs(options) == [out / "b-part01-of-02.zip", out / "b.zip"]
+    (out / "b-volume01-of-02.zip").write_text("old part")
+    assert existing_outputs(options) == [out / "b-volume01-of-02.zip", out / "b.zip"]
 
     (out / "unrelated.zip").write_text("keep me")
     (out / "b.zip.partial").write_text("keep me too")
-    assert existing_outputs(options) == [out / "b-part01-of-02.zip", out / "b.zip"]
+    assert existing_outputs(options) == [out / "b-volume01-of-02.zip", out / "b.zip"]
 
 
 def test_existing_outputs_of_a_missing_folder_is_empty(tmp_path: Path) -> None:

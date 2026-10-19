@@ -27,7 +27,7 @@ Sizes accept plain bytes, decimal units (`KB`, `MB`, `GB`, `TB`, or `K`, `M`,
 sensitive. `25MB` is 25,000,000 bytes, and `25MiB` is 26,214,400 bytes.
 
 With one part, the output keeps the `-o` name exactly. With several, they are
-named `NAME-partNN-of-MM.zip`.
+named `NAME-volumeNN-of-MM.zip`.
 
 ## Password
 
@@ -65,8 +65,9 @@ would leave it in your shell history and visible to other users.
 
 ## Safety guarantees
 
-- Each part is written under a temporary `.partial` name, verified, and only
-  then given its final name. A failure removes every `.partial` file.
+- Each part is written under a temporary `.partial` name, verified (unless
+  `--no-verify`), and only then given its final name. A failure removes every `.partial` file. zipseal
+  prints a notice when they appear. Do not rename, move or open them while it runs.
 - zipseal never overwrites a file it did not expect, even one created while
   it was running.
 - If an earlier run was killed and left `.partial` files, the next run stops

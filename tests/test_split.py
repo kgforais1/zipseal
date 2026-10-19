@@ -43,7 +43,7 @@ def test_incompressible_never_exceeds_cap(tmp_path: Path, cap: int) -> None:
     results = archive([src], tmp_path / "out/b.zip", "--max-size", str(cap))
     assert len(results) > 1
     check_parts(results, cap, src)
-    assert [r.path.name for r in results][0] == f"b-part01-of-{len(results):02d}.zip"
+    assert [r.path.name for r in results][0] == f"b-volume01-of-{len(results):02d}.zip"
     assert leftovers(tmp_path / "out") == []
 
 

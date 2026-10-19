@@ -29,7 +29,7 @@ a separate message.
 zipseal reports/ -o bundle.zip --max-size 20MB --generate-password
 ```
 
-This writes `bundle-part01-of-03.zip`, `bundle-part02-of-03.zip` and so on.
+This writes `bundle-volume01-of-03.zip`, `bundle-volume02-of-03.zip` and so on.
 Every part is a complete zip that opens on its own, and no part is larger
 than 20 MB. All parts use the same password.
 

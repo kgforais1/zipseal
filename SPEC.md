@@ -64,7 +64,7 @@ zipseal [OPTIONS] PATH [PATH ...] -o OUTPUT
 
 | Option | Default | Meaning |
 |---|---|---|
-| `-o, --output PATH` | required | Output name, such as `bundle.zip`. Parts become `bundle-part01-of-03.zip`. |
+| `-o, --output PATH` | required | Output name, such as `bundle.zip`. Parts become `bundle-volume01-of-03.zip`. |
 | `--max-size SIZE` | none (one zip) | Cap per part. Accepts raw bytes, decimal suffixes `KB`/`MB`/`GB`/`TB` (and bare `K`/`M`/`G`/`T`), or binary suffixes `KiB`/`MiB`/`GiB`/`TiB`. Suffixes are case-insensitive. Anything else is a usage error. |
 | `--password-prompt` | default | Prompt twice with `getpass` and require a match. If `getpass` cannot turn off echo, it would fall back to visible input. That warning (`GetPassWarning`) is treated as an error, and the run stops before reading anything. |
 | `--password-env VAR` | — | Read the password from an environment variable. |
@@ -252,7 +252,7 @@ Under `--order path` without `--manifest`, part boundaries depend on real
 compressed sizes, so the part count is only known at the end. In the
 upfront-assignment modes of §6.3, the part count is known before writing.
 Either way the writer uses temporary names and renames the parts to
-`-partNN-of-MM.zip` only after every part verifies (§6.5).
+`-volumeNN-of-MM.zip` only after every part verifies (§6.5).
 
 ### 6.3 Ordering
 
@@ -283,9 +283,12 @@ delegates that file to `7zz -v`.
 ### 6.5 Safe writes
 
 - Each part is written under a `.partial` name. No part is renamed until
-  every part has been written and verified. Then all parts are renamed, in
+  every part has been written and verified, or only size-checked under
+  `--no-verify`. Then all parts are renamed, in
   order. A failure therefore never leaves a final-named part behind.
 - On any failure, all `.partial` files from the run are deleted.
+- Before the first `.partial` is created, the warning sink gets one line
+  telling the user not to rename, move or open those files during the run.
 - `.partial` files are opened with `O_CREAT | O_EXCL | O_NOFOLLOW`, so a
   planted file or symlink is never written through.
 - A source that changes between collection and reading stops the run.
@@ -362,7 +365,7 @@ plaintext headers. Anyone can list them without the password. `--hide-names`
 fixes this by nesting:
 
 ```
-bundle-part01-of-03.zip          outer: AES-256, deflate level 0
+bundle-volume01-of-03.zip        outer: AES-256, deflate level 0
 └── payload.zip                  one entry with a fixed, generic name
     ├── reports/q3.xlsx          inner: deflate, no encryption
     └── reports/notes.txt
@@ -413,12 +416,14 @@ breaks the result for the recipient unless they also run a restore step.
 
 - **Part names.** A run that produces one part writes exactly the `-o`
   name, even with `--max-size`. Two or more parts are named
-  `NAME-partNN-of-MM.zip`. Part numbers have as many digits as the part count
+  `NAME-volumeNN-of-MM.zip`. Part numbers have as many digits as the part count
   needs, and at least two, so the names sort in order.
 - **Existing outputs.** Before writing, the run fails with exit 3 if the
-  `-o` name exists, or any file named `NAME-part` + digits + `-of-` +
+  `-o` name exists, or any file named `NAME-volume` + digits + `-of-` +
   digits + `.zip`. `--force` lifts this, and replaces only the names this run
   produces (§6.5). Other old parts are listed in a warning, never deleted.
+  Parts named `NAME-partNN-of-MM.zip` by older versions never block a run and
+  are never replaced. They are listed in the same warning.
 - **Output inside an input.** The walker skips the output name, any
   existing part name for it, and `.partial` files.
 - **Dry run.** `--dry-run` needs no password. It plans from worst-case

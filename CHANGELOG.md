@@ -37,6 +37,16 @@ All notable user-facing changes are documented here. The format follows
 - The window asks before replacing outputs from an earlier run, instead of
   stopping, and nothing is saved between sessions.
 
+### Changed
+
+- Split outputs are now named `NAME-volumeNN-of-MM.zip` instead of
+  `NAME-partNN-of-MM.zip`. The existing-output check and `--force` match the
+  new names only, so old `-part` files are left alone. Old `-part` archives
+  and `.partial` files are still skipped as inputs, old `.partial` files still
+  block a run, and a run lists old `-part` archives in a warning.
+- A run now prints a notice before its temporary `.partial` files appear,
+  asking you not to rename, move or open them until it finishes.
+
 ## [0.1.0] - 2026-10-08
 
 ### Added

@@ -74,7 +74,7 @@ zipseal reports/ -o bundle.zip --max-size 20MB --dry-run
 Prefer a window? Run `zipseal-gui` for the same options with a file picker,
 progress bar and a one-time view of the generated password.
 
-Several parts are named `bundle-part01-of-03.zip`, `bundle-part02-of-03.zip`
+Several parts are named `bundle-volume01-of-03.zip`, `bundle-volume02-of-03.zip`
 and so on. Send the password through a different channel than the zip.
 Run `zipseal --help` for every option.
 
