@@ -12,7 +12,7 @@ set -u
 command -v osascript >/dev/null 2>&1 || exit 0
 [ "$#" -eq 1 ] || exit 0
 
-icon=$(CDPATH= cd -- "$(dirname -- "$0")/.." 2>/dev/null && pwd)/assets/icon.svg || exit 0
+icon=$(CDPATH= cd -- "$(dirname -- "$0")/.." 2>/dev/null && pwd)/src/zipseal/icon.svg || exit 0
 target=$(CDPATH= cd -- "$(dirname -- "$1")" 2>/dev/null && pwd)/$(basename -- "$1") || exit 0
 
 # NSImage reads SVG directly, so no raster copy of the icon is needed.

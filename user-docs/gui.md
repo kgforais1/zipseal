@@ -13,7 +13,8 @@ opens Terminal, and Terminal opens the zipseal window. Leave the Terminal
 window open: it shows any error, and closing it closes zipseal. The first run
 gives the file the zipseal icon. It runs zipseal on a Python that uv
 manages, because those always include Tk, so the first run may pause while uv
-downloads one.
+downloads one. On that Python, the window shows the zipseal icon in the Dock
+or taskbar.
 
 If the copy came from a downloaded ZIP rather than `git clone`, macOS may
 refuse to open it. Open System Settings → Privacy & Security, and press

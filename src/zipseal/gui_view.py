@@ -6,6 +6,7 @@ worker reports through the controller's queue, and this module only reads that
 queue with `after()` and never the other way round.
 """
 
+import sys
 import tkinter as tk
 from dataclasses import replace
 from pathlib import Path
@@ -28,7 +29,9 @@ from zipseal.gui import (
 from zipseal.options import DEFAULT_EXCLUDES
 from zipseal.passwords import Password
 
+APP_ID = "zipseal.gui"
 CLIPBOARD_MS = 60_000
+ICON = Path(__file__).with_name("icon.svg")
 POLL_MS = 50
 SIZE_PRESETS = ("no limit", "10 MB", "20 MB", "25 MB", "45 MB", "100 MB")
 
@@ -422,8 +425,37 @@ def _clash_message(clashes: list[Path]) -> str:
     return f"these files already exist:\n{listing}{more}\n\nOverwrite them?"
 
 
+def _set_app_id() -> None:
+    """Give the process its own Windows taskbar identity, so it does not group
+    under python.exe's icon. It must run before the first window exists."""
+    if sys.platform != "win32":
+        return
+    import ctypes
+
+    try:
+        ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(APP_ID)
+    except (AttributeError, OSError):
+        pass
+
+
+def set_icon(root: tk.Tk) -> bool:
+    """Show the zipseal icon in the Dock, taskbar and title bar.
+
+    Tk 9 reads SVG. An older Tk cannot, and then the default icon stays: an icon
+    is never worth failing a launch. Returns whether the icon was set.
+    """
+    try:
+        image = tk.PhotoImage(master=root, file=str(ICON), format="svg -scaletoheight 256")
+    except tk.TclError:
+        return False
+    root.iconphoto(True, image)
+    return True
+
+
 def run() -> int:
     """Open the window: the `zipseal-gui` script entry point."""
+    _set_app_id()
     root = tk.Tk()
+    set_icon(root)
     View(root).run()
     return 0
