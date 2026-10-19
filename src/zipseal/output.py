@@ -167,7 +167,11 @@ class Output:
         stale = [
             self.dir / n
             for n in names
-            if (self.force and self._part_re.fullmatch(n) and self.dir / n not in finals)
+            if (
+                self.force
+                and (n == self.output.name or self._part_re.fullmatch(n))
+                and self.dir / n not in finals
+            )
             or self._legacy_re.fullmatch(n)
         ]
         if stale:

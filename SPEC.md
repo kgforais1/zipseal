@@ -283,7 +283,8 @@ delegates that file to `7zz -v`.
 ### 6.5 Safe writes
 
 - Each part is written under a `.partial` name. No part is renamed until
-  every part has been written and verified. Then all parts are renamed, in
+  every part has been written and verified, or only size-checked under
+  `--no-verify`. Then all parts are renamed, in
   order. A failure therefore never leaves a final-named part behind.
 - On any failure, all `.partial` files from the run are deleted.
 - Before the first `.partial` is created, the warning sink gets one line
