@@ -121,7 +121,8 @@ the way, the next run stops and lists them. Delete those, then try again.
 
 Press Cancel to stop a run. zipseal removes its `.partial` files, writes no
 archive, and says so in the log area. The window cannot close while a run
-works, so cancel it first.
+works, so cancel it first. A dry run cannot be cancelled, so wait for it to
+finish.
 
 ## What the window keeps
 

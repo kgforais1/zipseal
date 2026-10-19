@@ -377,9 +377,12 @@ class View:
         password would be lost before its modal could show it.
         """
         if self._busy:
-            messagebox.showinfo(
-                "zipseal", "An archive is being written. Cancel it, or wait for it to finish."
+            # A dry run cannot be cancelled, so only a real run offers it.
+            cancellable = str(self.cancel_button["state"]) == "normal"
+            advice = (
+                "Cancel it, or wait for it to finish." if cancellable else "Wait for it to finish."
             )
+            messagebox.showinfo("zipseal", f"zipseal is still working. {advice}")
             return
         self._clear_clipboard()
         self.root.destroy()
