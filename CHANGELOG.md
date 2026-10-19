@@ -8,6 +8,14 @@ All notable user-facing changes are documented here. The format follows
 
 ### Added
 
+- `zipseal-gui.command`: double-click it in Finder to open the zipseal window
+  from a clone, with no install step. It finds `uv` even when Finder's shell
+  has it off `PATH`, and gives itself the zipseal icon on first run.
+  `scripts/install.sh` sets the icon too (`user-docs/gui.md`,
+  [plan](dev-docs/plans/archive/2026-10-18-gui-command-launcher.md)).
+- A project icon (`assets/icon.svg`) and CI, audit, Python, AES-256 and
+  license badges at the top of the README.
+
 - Password guidance in `user-docs/security.md`: concrete minimums (16+
   characters drawn from the 62 letters and digits, or five unrelated words)
   for people who must choose their own password instead of using

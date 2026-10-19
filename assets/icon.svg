@@ -1,0 +1,122 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="128" height="128">
+  <defs>
+    <!-- Drop shadow for the macOS icon container -->
+    <filter id="c4-shadow" x="30" y="30" width="964" height="974" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feDropShadow dx="0" dy="28" stdDeviation="30" flood-color="#000000" flood-opacity="0.45"/>
+      <feDropShadow dx="0" dy="8" stdDeviation="12" flood-color="#000000" flood-opacity="0.25"/>
+    </filter>
+
+    <!-- Drop shadow for the Z monogram -->
+    <filter id="c4-z-shadow" x="220" y="220" width="584" height="584" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feDropShadow dx="0" dy="20" stdDeviation="22" flood-color="#000000" flood-opacity="0.5"/>
+      <feDropShadow dx="0" dy="6" stdDeviation="8" flood-color="#7c2d12" flood-opacity="0.3"/>
+    </filter>
+
+    <!-- Center vault medallion glow -->
+    <filter id="c4-vault-glow" x="380" y="380" width="264" height="264" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feDropShadow dx="0" dy="0" stdDeviation="16" flood-color="#f59e0b" flood-opacity="0.45"/>
+      <feDropShadow dx="0" dy="8" stdDeviation="12" flood-color="#000000" flood-opacity="0.6"/>
+    </filter>
+
+    <!-- Background gradient: deep cosmic twilight -->
+    <linearGradient id="c4-bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#1e1b4b"/>
+      <stop offset="45%" stop-color="#110d29"/>
+      <stop offset="100%" stop-color="#050212"/>
+    </linearGradient>
+
+    <!-- Squircle top rim highlight -->
+    <linearGradient id="c4-rim" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="0.14"/>
+      <stop offset="100%" stop-color="#ffffff" stop-opacity="0"/>
+    </linearGradient>
+
+    <!-- Z Top Bar Gradient (Solar Gold) -->
+    <linearGradient id="c4-gold-top" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#fde047"/>
+      <stop offset="50%" stop-color="#f59e0b"/>
+      <stop offset="100%" stop-color="#d97706"/>
+    </linearGradient>
+
+    <!-- Z Bottom Bar Gradient (Tangerine Flame) -->
+    <linearGradient id="c4-flame-bot" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#ea580c"/>
+      <stop offset="60%" stop-color="#c2410c"/>
+      <stop offset="100%" stop-color="#9a3412"/>
+    </linearGradient>
+
+    <!-- Z Diagonal Gradient -->
+    <linearGradient id="c4-diag" x1="100%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#f59e0b"/>
+      <stop offset="50%" stop-color="#ea580c"/>
+      <stop offset="100%" stop-color="#c2410c"/>
+    </linearGradient>
+
+    <!-- Medallion Rim Gradient -->
+    <linearGradient id="c4-medallion-rim" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#fef08a"/>
+      <stop offset="50%" stop-color="#f59e0b"/>
+      <stop offset="100%" stop-color="#b45309"/>
+    </linearGradient>
+
+    <!-- Teeth gradient -->
+    <linearGradient id="c4-teeth" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#fef08a"/>
+      <stop offset="100%" stop-color="#f59e0b"/>
+    </linearGradient>
+  </defs>
+
+  <!-- macOS App Icon Base: 824x824 rounded squircle centered at (100, 100) -->
+  <rect x="100" y="100" width="824" height="824" rx="185" fill="url(#c4-bg)" stroke="#f59e0b" stroke-opacity="0.22" stroke-width="4" filter="url(#c4-shadow)"/>
+  <rect x="104" y="104" width="816" height="412" rx="181" fill="url(#c4-rim)"/>
+
+  <!-- Background decorative geometric radial rings (subtle) -->
+  <circle cx="512" cy="512" r="340" fill="none" stroke="#818cf8" stroke-opacity="0.08" stroke-width="2"/>
+  <circle cx="512" cy="512" r="300" fill="none" stroke="#f59e0b" stroke-opacity="0.06" stroke-width="2" stroke-dasharray="10 14"/>
+
+  <!-- ==================== THE Z-MONOGRAM ==================== -->
+  <g filter="url(#c4-z-shadow)">
+    <!-- Diagonal stroke connecting top-right to bottom-left -->
+    <polygon points="730,280 764,360 334,744 260,664" fill="url(#c4-diag)"/>
+    <!-- Diagonal facet highlight line -->
+    <line x1="747" y1="320" x2="297" y2="704" stroke="#ffffff" stroke-opacity="0.3" stroke-width="3"/>
+
+    <!-- Top Horizontal Bar of the "Z" -->
+    <rect x="260" y="264" width="504" height="116" rx="28" fill="url(#c4-gold-top)"/>
+    <rect x="262" y="266" width="500" height="112" rx="26" fill="none" stroke="#ffffff" stroke-opacity="0.4" stroke-width="2"/>
+
+    <!-- Interlocking Zipper Teeth along bottom of Top Bar -->
+    <rect x="340" y="374" width="50" height="26" rx="6" fill="url(#c4-teeth)"/>
+    <rect x="424" y="374" width="50" height="26" rx="6" fill="url(#c4-teeth)"/>
+    <rect x="508" y="374" width="50" height="26" rx="6" fill="url(#c4-teeth)"/>
+
+    <!-- Bottom Horizontal Bar of the "Z" -->
+    <rect x="260" y="644" width="504" height="116" rx="28" fill="url(#c4-flame-bot)"/>
+    <rect x="262" y="646" width="500" height="112" rx="26" fill="none" stroke="#fde047" stroke-opacity="0.35" stroke-width="2"/>
+
+    <!-- Interlocking Zipper Teeth along top of Bottom Bar -->
+    <rect x="466" y="624" width="50" height="26" rx="6" fill="url(#c4-teeth)"/>
+    <rect x="550" y="624" width="50" height="26" rx="6" fill="url(#c4-teeth)"/>
+    <rect x="634" y="624" width="50" height="26" rx="6" fill="url(#c4-teeth)"/>
+
+    <!-- ==================== CENTRAL VAULT MEDALLION ==================== -->
+    <g filter="url(#c4-vault-glow)">
+      <!-- Outer Chamber Disc -->
+      <circle cx="512" cy="512" r="102" fill="#090514" stroke="url(#c4-medallion-rim)" stroke-width="8"/>
+      <!-- Inner Chamber Inset -->
+      <circle cx="512" cy="512" r="90" fill="#130d29"/>
+      <circle cx="512" cy="512" r="86" fill="none" stroke="#f59e0b" stroke-opacity="0.4" stroke-width="2" stroke-dasharray="6 6"/>
+
+      <!-- Embossed AES Padlock -->
+      <!-- Shackle (Steel Platinum) -->
+      <path d="M 478,496 L 478,472 A 34,34 0 0,1 546,472 L 546,496 L 532,496 L 532,472 A 20,20 0 0,0 492,472 L 492,496 Z" fill="#ffffff"/>
+      <!-- Padlock Body (Solar Gold) -->
+      <rect x="468" y="488" width="88" height="68" rx="16" fill="url(#c4-gold-top)"/>
+      <rect x="470" y="490" width="84" height="64" rx="14" fill="none" stroke="#ffffff" stroke-opacity="0.5" stroke-width="2"/>
+
+      <!-- Keyhole cutout -->
+      <circle cx="512" cy="514" r="10" fill="#090514"/>
+      <polygon points="507,517 517,517 520,536 504,536" fill="#090514"/>
+    </g>
+  </g>
+</svg>

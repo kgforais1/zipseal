@@ -1,6 +1,6 @@
 # The zipseal window
 
-Last reviewed: 2026-10-10
+Last reviewed: 2026-10-18
 
 `zipseal-gui` opens a window that does the same job as the `zipseal` command.
 The archives are the same either way, and the same rules apply. Options the
@@ -8,7 +8,20 @@ window does not show keep their usual defaults.
 
 ## Start it
 
-From a clone of the project:
+On macOS, double-click `zipseal-gui.command` in a clone of the project. Finder
+opens Terminal, and Terminal opens the zipseal window. Leave the Terminal
+window open: it shows any error, and closing it closes zipseal. The first run
+gives the file the zipseal icon. It runs zipseal on a Python that uv
+manages, because those always include Tk, so the first run may pause while uv
+downloads one.
+
+If the copy came from a downloaded ZIP rather than `git clone`, macOS may
+refuse to open it. Open System Settings → Privacy & Security, and press
+`Open Anyway` next to the message about `zipseal-gui.command`
+([Apple's guide](https://support.apple.com/en-ie/102445)). From a terminal,
+`xattr -d com.apple.quarantine zipseal-gui.command` does the same.
+
+From a terminal in a clone of the project:
 
 ```sh
 uv run zipseal-gui
@@ -22,7 +35,7 @@ scripts/install.sh
 ```
 
 That installs `zipseal-gui` as an editable tool, so it picks up changes to the
-project. `scripts/install.sh --release` installs a snapshot instead, and
+project. On macOS it also gives `zipseal-gui.command` its icon. `scripts/install.sh --release` installs a snapshot instead, and
 `scripts/install.sh --uninstall` removes both commands. You need Python 3.11
 or later and [`uv`](https://docs.astral.sh/uv/). The window needs a display:
 over an SSH session, use the CLI.
