@@ -58,8 +58,8 @@ All notable user-facing changes are documented here. The format follows
   next progress checkpoint, with no error dialog. zipseal tries to remove the
   run's `.temp` files, and warns about any it could not delete. A run that is
   already publishing its parts finishes.
-- In a terminal, a run says that Ctrl-C cancels it. Ctrl-C already removed the
-  run's temporary files.
+- In a terminal, a run says that Ctrl-C cancels it. zipseal then tries to
+  remove the run's temporary files, and warns about any it could not delete.
 - A run now prints a notice before its `.temp` files appear, asking you not
   to rename, move or open them until it finishes.
 
