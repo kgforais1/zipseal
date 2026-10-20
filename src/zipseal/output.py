@@ -198,12 +198,27 @@ class Output:
                 print(f"zipseal: warning: could not restore {final} from {backup}", file=self.warn)
 
     def cleanup(self) -> None:
+        """Delete this run's `.partial` files, and warn about any that stay.
+
+        It runs while another error or a cancel is on its way out, so a failed
+        delete is a warning here and never replaces that error.
+        """
+        kept: list[str] = []
         for path in self.partials:
             try:
                 os.unlink(path)
             except FileNotFoundError:
                 pass
+            except OSError as exc:
+                kept.append(f"  {path}: {exc.strerror}")
         self.partials.clear()
+        if kept:
+            listing = "\n".join(kept)
+            print(
+                f"zipseal: warning: could not delete partial files. Delete them before "
+                f"the next run:\n{listing}",
+                file=self.warn,
+            )
 
 
 def create_exclusive(path: Path) -> int:

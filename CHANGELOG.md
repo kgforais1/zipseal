@@ -37,6 +37,12 @@ All notable user-facing changes are documented here. The format follows
 - The window asks before replacing outputs from an earlier run, instead of
   stopping, and nothing is saved between sessions.
 
+### Fixed
+
+- `Save as…` now opens in the output's folder with only its file name filled
+  in. Before, the name field held the whole old path, so a typed name was
+  added to it.
+
 ### Changed
 
 - Split outputs are now named `NAME-volumeNN-of-MM.zip` instead of
@@ -44,6 +50,11 @@ All notable user-facing changes are documented here. The format follows
   new names only, so old `-part` files are left alone. Old `-part` archives
   and `.partial` files are still skipped as inputs, old `.partial` files still
   block a run, and a run lists old `-part` archives in a warning.
+- The window has a Cancel button while a run works. It stops the run at the
+  next progress checkpoint and removes its `.partial` files, with no error
+  dialog. A run that is already publishing its parts finishes.
+- In a terminal, a run says that Ctrl-C cancels it. Ctrl-C already removed the
+  run's `.partial` files.
 - A run now prints a notice before its temporary `.partial` files appear,
   asking you not to rename, move or open them until it finishes.
 

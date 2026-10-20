@@ -24,10 +24,12 @@ from zipseal.gui import (
     JobSpec,
     Log,
     ProgressUpdate,
+    Stopped,
     build_options,
     existing_outputs,
     parse_level,
     parse_max_size,
+    save_as_start,
 )
 from zipseal.options import DEFAULT_EXCLUDES
 from zipseal.passwords import Password
@@ -185,6 +187,8 @@ class View:
             box, text="Create archive", command=lambda: self._start(dry_run=False)
         )
         self.run_button.grid(row=0, column=1)
+        self.cancel_button = ttk.Button(box, text="Cancel", command=self._cancel, state="disabled")
+        self.cancel_button.grid(row=0, column=2)
 
     # ── window to plain values ────────────────────────────────────────────────
 
@@ -225,8 +229,9 @@ class View:
             self.paths.delete(index)
 
     def _save_as(self) -> None:
+        folder, name = save_as_start(self.output.get())
         chosen = filedialog.asksaveasfilename(
-            title="Save as", defaultextension=".zip", initialfile=self.output.get()
+            title="Save as", defaultextension=".zip", initialdir=folder, initialfile=name
         )
         if chosen:
             self.output.delete(0, "end")
@@ -273,7 +278,14 @@ class View:
         except UsageError as exc:
             self._report(str(exc))
             return
-        self._set_busy(True)
+        # A dry run reports no progress, so there is nothing for Cancel to stop.
+        self._set_busy(True, cancellable=not spec.dry_run)
+
+    def _cancel(self) -> None:
+        """Ask the worker to stop. A `Stopped` event follows once it has cleaned up."""
+        self.controller.cancel()
+        self.cancel_button.configure(state="disabled")
+        self.status.set("cancelling …")
 
     def _poll(self) -> None:
         """Drain the queue on the main loop, then look again in a moment."""
@@ -281,13 +293,15 @@ class View:
             self._handle(event)
         self.root.after(POLL_MS, self._poll)
 
-    def _handle(self, event: Log | ProgressUpdate | Error | Done) -> None:
+    def _handle(self, event: Log | ProgressUpdate | Error | Stopped | Done) -> None:
         if isinstance(event, Log):
             self._append_log(event.line)
         elif isinstance(event, ProgressUpdate):
             self._show_progress(event.phase, event.number, event.value)
         elif isinstance(event, Error):
             self._failed(event.message)
+        elif isinstance(event, Stopped):
+            self._stopped(event.message)
         else:
             self._finished()
 
@@ -304,6 +318,8 @@ class View:
     def _finished(self) -> None:
         """A run succeeded: clear the fields, then show a generated password."""
         self._set_busy(False)
+        # A Cancel pressed too late to stop publication left "cancelling …" here.
+        self.status.set("done")
         self._clear_fields()
         password = self.controller.take_generated_password()
         if password is not None:
@@ -312,9 +328,18 @@ class View:
     def _failed(self, message: str) -> None:
         """A run failed: clear the fields and show the message the core gave."""
         self._set_busy(False)
+        self.status.set("failed")
         self._clear_fields()
         self.controller.clear_password()
         self._report(message)
+
+    def _stopped(self, message: str) -> None:
+        """The user cancelled: clear the fields, and say so without an error dialog."""
+        self._set_busy(False)
+        self._clear_fields()
+        self.controller.clear_password()
+        self.status.set(message)
+        self._append_log(message)
 
     def _report(self, message: str) -> None:
         """Show one message, in the log area and in a dialog."""
@@ -329,10 +354,11 @@ class View:
         self.password.delete(0, "end")
         self.confirm.delete(0, "end")
 
-    def _set_busy(self, busy: bool) -> None:
+    def _set_busy(self, busy: bool, *, cancellable: bool = False) -> None:
         self._busy = busy
         for widget in (self.dry_button, self.run_button):
             widget.configure(state="disabled" if busy else "normal")
+        self.cancel_button.configure(state="normal" if busy and cancellable else "disabled")
         if busy:
             self.bar.start(10)
         else:
@@ -351,7 +377,12 @@ class View:
         password would be lost before its modal could show it.
         """
         if self._busy:
-            messagebox.showinfo("zipseal", "An archive is being written. Wait for it to finish.")
+            # A dry run cannot be cancelled, so only a real run offers it.
+            cancellable = str(self.cancel_button["state"]) == "normal"
+            advice = (
+                "Cancel it, or wait for it to finish." if cancellable else "Wait for it to finish."
+            )
+            messagebox.showinfo("zipseal", f"zipseal is still working. {advice}")
             return
         self._clear_clipboard()
         self.root.destroy()

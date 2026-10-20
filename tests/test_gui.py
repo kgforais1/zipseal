@@ -17,7 +17,7 @@ from pathlib import Path
 import pytest
 from helpers import leftovers, make_tree
 
-from zipseal import passwords, pipeline
+from zipseal import gui, passwords, pipeline
 from zipseal.errors import UsageError, WriteError
 from zipseal.gui import (
     CUSTOM_SIZE,
@@ -28,10 +28,12 @@ from zipseal.gui import (
     JobSpec,
     Log,
     ProgressUpdate,
+    Stopped,
     build_options,
     existing_outputs,
     parse_level,
     parse_max_size,
+    save_as_start,
 )
 from zipseal.options import Options
 from zipseal.passwords import Password
@@ -83,7 +85,7 @@ def run_to_completion(controller: Controller, timeout: float = TIMEOUT) -> list[
             events.append(controller.events.get(timeout=remaining))
         except queue.Empty:
             pytest.fail("the worker never reported finishing")
-        if isinstance(events[-1], (Done, Error)):
+        if isinstance(events[-1], (Done, Error, Stopped)):
             return events
 
 
@@ -293,12 +295,10 @@ def test_a_dry_run_with_generate_makes_no_password(tmp_path: Path) -> None:
 
 def test_byte_events_are_throttled(monkeypatch: pytest.MonkeyPatch) -> None:
     """Running totals replace each other, so only one per interval is queued."""
-    from zipseal import gui
-
     clock = iter([0.0, 0.01, 0.02, 0.5, 0.51])
     monkeypatch.setattr(gui.time, "monotonic", lambda: next(clock))
     events: queue.Queue[object] = queue.Queue()
-    progress = gui._QueueProgress(events)  # type: ignore[arg-type]
+    progress = gui._QueueProgress(events, threading.Event())  # type: ignore[arg-type]
     for written in (10, 20, 30, 40, 50):
         progress.bytes_written(written)
     queued = [events.get_nowait() for _ in range(events.qsize())]
@@ -366,6 +366,33 @@ def test_progress_events_reach_the_view(tmp_path: Path) -> None:
     assert isinstance(first, Log) and "Do not rename" in first.line
 
 
+def test_cancel_mid_write_stops_and_leaves_nothing(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    controller = Controller()
+    original = gui._QueueProgress.bytes_written  # pyright: ignore[reportPrivateUsage]
+
+    def cancel_then_count(self: gui._QueueProgress, written: int) -> None:  # pyright: ignore[reportPrivateUsage]
+        controller.cancel()  # pressed while the first chunk is on disk
+        original(self, written)
+
+    monkeypatch.setattr(gui._QueueProgress, "bytes_written", cancel_then_count)  # pyright: ignore[reportPrivateUsage]
+    events = start(controller, spec(tmp_path), generate=True)
+    last = events[-1]
+    assert isinstance(last, Stopped) and last.message == "cancelled: no archive was written"
+    assert not error_events(events)
+    assert os.listdir(tmp_path / "out") == []
+    assert controller.take_generated_password() is None
+
+
+def test_an_old_cancel_does_not_stop_the_next_run(tmp_path: Path) -> None:
+    controller = Controller()
+    controller.cancel()
+    events = start(controller, spec(tmp_path), password=PASSWORD, confirm=PASSWORD)
+    assert isinstance(events[-1], Done)
+    assert (tmp_path / "out" / "b.zip").exists()
+
+
 def test_a_generated_password_is_cleared_after_a_failed_run(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -431,3 +458,12 @@ def test_existing_outputs_finds_the_names_a_run_would_replace(tmp_path: Path) ->
 
 def test_existing_outputs_of_a_missing_folder_is_empty(tmp_path: Path) -> None:
     assert existing_outputs(options_for(tmp_path)) == []
+
+
+def test_save_as_opens_in_the_folder_with_only_the_name(tmp_path: Path) -> None:
+    assert save_as_start(f"  {tmp_path}/bundle.zip ") == (str(tmp_path), "bundle.zip")
+    assert save_as_start("bundle.zip") == ("", "bundle.zip")
+    assert save_as_start("") == ("", "")
+    assert save_as_start("~no-such-user-zipseal.zip") == ("", "~no-such-user-zipseal.zip")
+    # A folder that does not exist yet is left to the dialog's default.
+    assert save_as_start(f"{tmp_path}/missing/bundle.zip") == ("", "bundle.zip")

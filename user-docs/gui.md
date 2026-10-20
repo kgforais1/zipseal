@@ -119,9 +119,12 @@ fails. The log area says when they appear. Do not rename, move or open them
 while the run works. If an earlier run was killed and left `.partial` files in
 the way, the next run stops and lists them. Delete those, then try again.
 
-The window has no stop button. Closing it during a run ends the job, which
-can leave a `.partial` file in the output folder. Delete it before the next
-run, or zipseal stops and lists it.
+Press Cancel to stop a run. It takes effect at the next progress checkpoint.
+Then zipseal removes its `.partial` files, writes no archive, and says so in
+the log area. If zipseal is already publishing the parts, the run finishes,
+the archive stays, and the status says `done`. The window cannot close while a
+run works, so cancel it first. A dry run cannot be cancelled, so wait for it to
+finish.
 
 ## What the window keeps
 

@@ -119,7 +119,7 @@ and the CLI holds none either: both build an `Options` and call `run_job`.
 for the maximum part size (presets from 10 MB to 20 GB, plus a custom value in MB), compression level,
 `Hide names`, excludes (one glob per line), `Follow symlinks` and
 `Overwrite existing files`; two masked password fields, or a `Generate a
-password` checkbox; `Dry run` and `Create archive`; an indeterminate progress
+password` checkbox; `Dry run`, `Create archive` and `Cancel`; an indeterminate progress
 bar with a status line; and a log area.
 
 The window maps to the CLI's flags: the size box to `--max-size`, the level
@@ -131,7 +131,7 @@ window does not offer stay as they are for the CLI: `default_excludes` on,
 which builds the `Options` from the window's plain values, checks that the two
 password fields match, generates a password on the calling thread, and runs
 one job in a daemon thread. It reports through a `queue.Queue` of small events
-(`Log`, `ProgressUpdate`, `Error`, `Done`), and imports no Tk, so it is
+(`Log`, `ProgressUpdate`, `Error`, `Stopped`, `Done`), and imports no Tk, so it is
 testable without a display. `gui_view.py` is the Tk window and the only module
 that imports Tk; `gui.main` imports it, so importing `zipseal.gui` needs no
 display. The view reads the window into a `JobSpec`, calls the controller, and
@@ -164,9 +164,13 @@ reaches the log area.
 - Error dialogs show `ZipsealError` messages only. An unexpected exception
   shows one generic line, not a traceback with locals.
 
-The GUI has no cancel button and no drag-and-drop. A run in progress cannot
-be stopped from the window, so closing it mid-run can leave `.partial` files
-that the next run reports (§6.5).
+The GUI has a Cancel button while a run works. It stops the job at the next
+progress event, and the usual cleanup removes the run's `.partial` files. A
+cancel is not an error, so it gets a log line and no dialog. A run that is
+already publishing its parts finishes. Verifying a part reports no progress
+until the part is done, so a cancel there waits for it. A dry run reports no
+progress at all, so Cancel stays disabled for one. The window has no drag-and-drop, and it
+cannot close while a run works.
 
 ## 6. Key design decisions
 
