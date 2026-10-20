@@ -66,8 +66,9 @@ would leave it in your shell history and visible to other users.
 ## Safety guarantees
 
 - Each part is written under a temporary name ending in `.temp`, verified
-  (unless `--no-verify`), and only then given its final name. A failure
-  removes every `.temp` file. zipseal prints a notice when they appear. Do not
+  (unless `--no-verify`), and only then given its final name. On a failure,
+  zipseal tries to remove every `.temp` file, and warns about any it could not
+  delete. zipseal prints a notice when they appear. Do not
   rename, move or open them while it runs.
 - zipseal never overwrites a file it did not expect, even one created while
   it was running.

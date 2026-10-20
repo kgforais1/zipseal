@@ -291,7 +291,8 @@ delegates that file to `7zz -v`.
   written and verified, or only size-checked under `--no-verify`. Then all
   parts are renamed, in order. A failure therefore never leaves a final-named
   part behind.
-- On any failure, all `.temp` files from the run are deleted.
+- On any failure, the run deletes its `.temp` files. A file it cannot delete
+  is listed in a warning, and the original error still stands.
 - Before the first `.temp` file is created, the warning sink gets one line
   telling the user not to rename, move or open those files during the run.
 - `.temp` files are opened with `O_CREAT | O_EXCL | O_NOFOLLOW`, so a

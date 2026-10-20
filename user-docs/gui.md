@@ -114,14 +114,14 @@ keeps a generated password from being lost before it is shown.
 
 A dialog says what happened, in the same words the command would use. Nothing
 is written: parts are made under a temporary name ending in `.temp`, and only
-renamed after they are verified. Every `.temp` file is removed when a run
-fails. The log area says when they appear. Do not rename, move or open them
+renamed after they are verified. zipseal tries to remove every `.temp` file
+when a run fails, and the log area lists any it could not delete. The log area says when they appear. Do not rename, move or open them
 while the run works. If an earlier run was killed and left `.temp` files in
 the way, the next run stops and lists them. Delete those, then try again.
 
 Press Cancel to stop a run. It takes effect at the next progress checkpoint.
-Then zipseal removes its `.temp` files, writes no archive, and says so in the
-log area. If zipseal is already publishing the parts, the run finishes, the
+Then zipseal writes no archive and says so in the log area. It tries to remove
+its `.temp` files, and the log area lists any it could not delete. If zipseal is already publishing the parts, the run finishes, the
 archive stays, and the status says `done`. The window cannot close while a
 run works, so cancel it first. A dry run cannot be cancelled, so wait for it to
 finish.
