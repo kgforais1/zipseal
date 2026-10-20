@@ -79,12 +79,13 @@ These rules are the point of the tool. Treat a violation as a bug.
   shown once in a modal (`SPEC.md` §5.1).
 - Never write plaintext to disk. That includes temp files, the `--hide-names`
   inner zip, and debug dumps.
-- Write parts as `.partial`, verify, then rename. Delete every `.partial` on
-  failure. Create outputs with mode `0600`.
+- Write parts as `.temp` files, verify, then rename. Delete every `.temp`
+  file on failure. Create outputs with mode `0600`.
 - Never commit real input data or generated archives. `.gitignore` blocks
-  `*.zip`, `*.partial` and volume files. Tests build their inputs in `tmp_path`.
-  For manual runs, use `uv run python scripts/make_samples.py`, which builds
-  synthetic inputs and sample archives in `sample-data/` (gitignored).
+  `*.zip`, `*.temp`, `*.partial` and volume files. Tests build their inputs in
+  `tmp_path`. For manual runs, use `uv run python scripts/make_samples.py`,
+  which builds synthetic inputs and sample archives in `sample-data/`
+  (gitignored).
 - Test passwords must be obviously fake, such as `test-password`. If gitleaks
   flags a fixture anyway, add a `# gitleaks:allow` comment on that line, and
   say why in the commit message. Never allowlist a whole folder.

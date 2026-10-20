@@ -197,11 +197,11 @@ def test_file_swapped_for_fifo_fails_fast(tree: Path, tmp_path: Path) -> None:
     assert errors and isinstance(errors[0], WriteError)
 
 
-def test_planted_partial_symlink_not_followed(tree: Path, tmp_path: Path) -> None:
+def test_planted_temp_symlink_not_followed(tree: Path, tmp_path: Path) -> None:
     out = tmp_path / "out/bundle.zip"
     victim = tmp_path / "victim.txt"
     victim.write_text("do not touch")
-    (tmp_path / "out/bundle-volume01.zip.partial").symlink_to(victim)
+    (tmp_path / "out/bundle-volume01.zip.temp").symlink_to(victim)
     with pytest.raises(WriteError, match="earlier, interrupted run|refusing to write through"):
         archive([tree], out)
     assert victim.read_text() == "do not touch"
@@ -237,7 +237,7 @@ def test_symlinked_root_and_folder_followed(tmp_path: Path) -> None:
 
 
 @pytest.mark.skipif(sys.platform == "win32", reason="POSIX only")
-def test_interrupt_cleans_partials(
+def test_interrupt_cleans_temp_files(
     tree: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     out = tmp_path / "out/bundle.zip"
@@ -268,7 +268,7 @@ def test_non_ascii_password_interop(tree: Path, tmp_path: Path, pw: str) -> None
     assert (dest / "src/a.txt").read_text() == "hello\n"
 
 
-def test_partial_planted_after_preflight_not_followed(
+def test_temp_planted_after_preflight_not_followed(
     tree: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """The O_EXCL | O_NOFOLLOW open is the last line of defence after preflight."""
@@ -293,11 +293,22 @@ def test_partial_planted_after_preflight_not_followed(
     assert planted and all(p.is_symlink() for p in planted)
 
 
-def test_leftover_partial_fails_preflight(tree: Path, tmp_path: Path) -> None:
-    (tmp_path / "out/bundle-volume03.zip.partial").write_text("crashed run")
+# `.partial` and `-part` are the names older versions used.
+@pytest.mark.parametrize(
+    "name", ["bundle-volume03.zip.temp", "bundle-volume03.zip.partial", "bundle-part03.zip.partial"]
+)
+def test_leftover_temp_file_fails_preflight(tree: Path, tmp_path: Path, name: str) -> None:
+    (tmp_path / "out" / name).write_text("crashed run")
     with pytest.raises(WriteError, match="earlier, interrupted run"):
         archive([tree], tmp_path / "out/bundle.zip")
-    assert (tmp_path / "out/bundle-volume03.zip.partial").read_text() == "crashed run"
+    assert (tmp_path / "out" / name).read_text() == "crashed run"
+
+
+def test_a_part_name_with_dot_temp_does_not_block(tree: Path, tmp_path: Path) -> None:
+    """No version wrote `-partNN.zip.temp`, so it is someone else's file."""
+    (tmp_path / "out/bundle-part03.zip.temp").write_text("not ours")
+    archive([tree], tmp_path / "out/bundle.zip")
+    assert (tmp_path / "out/bundle-part03.zip.temp").read_text() == "not ours"
 
 
 def test_symlinked_ancestor_is_followed_by_default(tmp_path: Path) -> None:

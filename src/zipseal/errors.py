@@ -31,6 +31,6 @@ class VerifyError(ZipsealError):
 
 
 class Cancelled(ZipsealError):
-    """The user stopped the run. Its `.partial` files are removed, as on any failure."""
+    """The user stopped the run. Cleanup tries to delete its `.temp` files, as on any failure."""
 
     exit_code = EXIT_INTERRUPT

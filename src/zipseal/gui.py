@@ -106,12 +106,12 @@ class _LogSink(io.StringIO):
     def __init__(self, events: queue.Queue[Event]) -> None:
         super().__init__()
         self._events = events
-        self._partial = ""
+        self._pending = ""
 
     def write(self, text: str) -> int:
-        self._partial += text
-        while "\n" in self._partial:
-            line, _, self._partial = self._partial.partition("\n")
+        self._pending += text
+        while "\n" in self._pending:
+            line, _, self._pending = self._pending.partition("\n")
             if line:
                 self._events.put(Log(line))
         return len(text)
@@ -132,7 +132,7 @@ class _QueueProgress:
 
     It is also where a cancel lands. The core calls it once per chunk written, so
     raising `Cancelled` here stops the job within one chunk, and the core's usual
-    cleanup removes the `.partial` files.
+    cleanup removes the `.temp` files.
     """
 
     def __init__(self, events: queue.Queue[Event], cancel: threading.Event) -> None:

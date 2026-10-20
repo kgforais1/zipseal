@@ -8,6 +8,7 @@ sample-data/
 *.zip
 *.ZIP
 *.7z
+*.temp
 *.partial
 # Personal documents and images (tests generate their own inputs):
 *.png

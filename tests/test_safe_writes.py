@@ -25,7 +25,7 @@ def src(tmp_path: Path) -> Path:
 def test_failure_mid_part_leaves_nothing(
     src: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """A read error in the fourth file (second part) removes every partial."""
+    """A read error in the fourth file (second part) removes every `.temp` file."""
     import zipseal.sources as sources
 
     real_read = os.read
@@ -64,12 +64,12 @@ def test_no_verify_still_checks_cap_and_writes(src: Path, tmp_path: Path) -> Non
         extract(r.path)
 
 
-def test_a_partial_that_cannot_be_deleted_is_a_warning_not_the_error(
+def test_a_temp_file_that_cannot_be_deleted_is_a_warning_not_the_error(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     err = io.StringIO()
     out = output_mod.Output(tmp_path / "b.zip", force=False, warn=err)
-    path, fd = out.new_partial(1)
+    path, fd = out.new_temp(1)
     os.close(fd)
 
     def refuse(_path: object) -> None:
@@ -77,9 +77,30 @@ def test_a_partial_that_cannot_be_deleted_is_a_warning_not_the_error(
 
     monkeypatch.setattr(output_mod.os, "unlink", refuse)
     out.cleanup()
-    assert f"could not delete partial files. Delete them before the next run:\n  {path}" in (
+    assert f"could not delete temporary files. Delete them before the next run:\n  {path}" in (
         err.getvalue()
     )
+
+
+def test_a_published_part_that_cannot_be_removed_is_not_called_no_archive(
+    src: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    out = tmp_path / "out"
+    real_unlink = output_mod.os.unlink
+
+    def keep_temp_and_final(path, *a, **kw):  # type: ignore[no-untyped-def]
+        if str(path).endswith((".temp", "b.zip")):
+            raise PermissionError(1, "Operation not permitted")
+        return real_unlink(path, *a, **kw)
+
+    monkeypatch.setattr(output_mod.os, "unlink", keep_temp_and_final)
+    err = io.StringIO()
+    options = args_for([src], out / "b.zip")
+    with collect_for(options) as c, pytest.raises(WriteError) as info:
+        pipeline.write_archive(options, c, lambda _: Password(PASSWORD), err=err)
+    assert "a published part could not be removed" in str(info.value)
+    assert "no archive was written" not in str(info.value)
+    assert f"could not remove {out / 'b.zip'}" in err.getvalue()
 
 
 def test_force_overwrites_only_own_targets(src: Path, tmp_path: Path) -> None:
@@ -200,6 +221,14 @@ def test_disk_full_is_a_write_error(
         archive([src], tmp_path / "out/b.zip")
     monkeypatch.setattr("zipseal.write.os.write", real_write)
     assert os.listdir(tmp_path / "out") == []
+
+
+def test_temp_files_are_named_dot_temp(tmp_path: Path) -> None:
+    out = output_mod.Output(tmp_path / "b.zip", force=False)
+    path, fd = out.new_temp(1)
+    os.close(fd)
+    assert path.name == "b-volume01.zip.temp"
+    out.cleanup()
 
 
 def test_part_names_sort_with_many_parts(tmp_path: Path) -> None:

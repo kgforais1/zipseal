@@ -165,7 +165,7 @@ reaches the log area.
   shows one generic line, not a traceback with locals.
 
 The GUI has a Cancel button while a run works. It stops the job at the next
-progress event, and the usual cleanup removes the run's `.partial` files. A
+progress event, and the usual cleanup removes the run's `.temp` files. A
 cancel is not an error, so it gets a log line and no dialog. A run that is
 already publishing its parts finishes. Verifying a part reports no progress
 until the part is done, so a cancel there waits for it. A dry run reports no
@@ -286,14 +286,16 @@ delegates that file to `7zz -v`.
 
 ### 6.5 Safe writes
 
-- Each part is written under a `.partial` name. No part is renamed until
-  every part has been written and verified, or only size-checked under
-  `--no-verify`. Then all parts are renamed, in
-  order. A failure therefore never leaves a final-named part behind.
-- On any failure, all `.partial` files from the run are deleted.
-- Before the first `.partial` is created, the warning sink gets one line
+- Each part is written under a temporary name, such as
+  `NAME-volume01.zip.temp`. No part is renamed until every part has been
+  written and verified, or only size-checked under `--no-verify`. Then all
+  parts are renamed, in order. A failure therefore never leaves a final-named
+  part behind.
+- On any failure, the run deletes its `.temp` files. A file it cannot delete
+  is listed in a warning, and the original error still stands.
+- Before the first `.temp` file is created, the warning sink gets one line
   telling the user not to rename, move or open those files during the run.
-- `.partial` files are opened with `O_CREAT | O_EXCL | O_NOFOLLOW`, so a
+- `.temp` files are opened with `O_CREAT | O_EXCL | O_NOFOLLOW`, so a
   planted file or symlink is never written through.
 - A source that changes between collection and reading stops the run.
   Collection records the device, inode and type of every file and of every
@@ -311,9 +313,9 @@ delegates that file to `7zz -v`.
   symlink is skipped with a warning. With `--follow-symlinks`,
   components are opened without `O_NOFOLLOW`, so symlinks resolve. The
   identity of what they resolve to is still checked against the record.
-- Final names are published without clobbering. Each `.partial` is
-  hard-linked to its final name with `os.link`, which fails if the name
-  exists, and then the `.partial` is removed. A file that appears at a final
+- Final names are published without clobbering. Each `.temp` file
+  is hard-linked to its final name with `os.link`, which fails if the name
+  exists, and then the `.temp` file is removed. A file that appears at a final
   name during the run is therefore never overwritten. If the filesystem does
   not support hard links, the run fails with exit 3 before writing.
 - With `--force`, each existing final name is first renamed to a private
@@ -429,7 +431,11 @@ breaks the result for the recipient unless they also run a restore step.
   Parts named `NAME-partNN-of-MM.zip` by older versions never block a run and
   are never replaced. They are listed in the same warning.
 - **Output inside an input.** The walker skips the output name, any
-  existing part name for it, and `.partial` files.
+  existing part name for it, and its `.temp` files.
+- **Leftover temporary files.** A `NAME-volumeNN.zip.temp` file in the output
+  folder stops the run before writing, with a list to check and delete. Older
+  versions named these files `.partial`, so `NAME-volumeNN.zip.partial` and
+  `NAME-partNN.zip.partial` stop it too, and the walker skips them as well.
 - **Dry run.** `--dry-run` needs no password. It plans from worst-case
   bounds, so it reports "at most N parts".
 - **Timestamps.** DOS timestamps in local time are clamped to 1980-01-01
@@ -440,7 +446,8 @@ breaks the result for the recipient unless they also run a restore step.
   on macOS or Windows.
 - **Manifest collision.** If an input already maps to `MANIFEST.txt` at the
   archive root, `--manifest` fails with exit 2.
-- **Interrupt.** Ctrl-C removes this run's `.partial` files and exits 130.
+- **Interrupt.** Ctrl-C deletes this run's `.temp` files, warning about any it
+  cannot delete (§6.5), and exits 130.
 - **Generated password.** `--generate-password` prints the password once,
   to stderr, after every part has verified (or passed the size check under
   `--no-verify`) and just before publication. A run that fails earlier
@@ -493,7 +500,7 @@ This section is the summary.
 3. **Single archive.** Write one AES-256 zip with no cap. Verify it opens in
    `7zz` and Keka.
 4. **Split.** Add the bound function, the admit rule and part renaming.
-5. **Verify and safe writes.** Add the `.partial` → rename flow, cleanup on
+5. **Verify and safe writes.** Add the `.temp` file → rename flow, cleanup on
    failure, and `0600` permissions.
 6. **Polish.** Add the manifest, `--order size`, progress output on stderr,
    and the README.

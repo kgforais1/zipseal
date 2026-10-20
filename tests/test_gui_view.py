@@ -73,3 +73,18 @@ def test_save_as_passes_the_folder_and_a_bare_name(
     assert seen["initialdir"] == str(tmp_path)
     assert seen["initialfile"] == "old.zip"
     assert view.output.get() == str(tmp_path / "new.zip")
+
+
+@pytest.mark.gui
+def test_queued_progress_does_not_hide_cancelling(view) -> None:  # type: ignore[no-untyped-def]
+    from zipseal.gui import ProgressUpdate, Stopped
+
+    view._set_busy(True, cancellable=True)
+    view._cancel()
+    view._handle(ProgressUpdate("bytes", 0, 4096))  # queued before the cancel landed
+    assert view.status.get() == "cancelling …"
+    view._handle(Stopped("cancelled: no archive was written"))
+    assert view.status.get() == "cancelled: no archive was written"
+    view._set_busy(True, cancellable=True)  # the next run shows progress again
+    view._handle(ProgressUpdate("started", 1, 0))
+    assert view.status.get() == "writing part 1 …"

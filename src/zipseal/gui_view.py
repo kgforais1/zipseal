@@ -51,6 +51,7 @@ class View:
         self._clipboard: str | None = None
         self._clipboard_timer: str | None = None
         self._busy = False
+        self._cancelling = False
 
         root.title("zipseal")
         root.columnconfigure(0, weight=1)
@@ -284,6 +285,7 @@ class View:
     def _cancel(self) -> None:
         """Ask the worker to stop. A `Stopped` event follows once it has cleaned up."""
         self.controller.cancel()
+        self._cancelling = True
         self.cancel_button.configure(state="disabled")
         self.status.set("cancelling …")
 
@@ -306,6 +308,10 @@ class View:
             self._finished()
 
     def _show_progress(self, phase: str, number: int, value: int) -> None:
+        # Events queued before the cancel landed must not hide "cancelling …".
+        # The run's final event still sets the status.
+        if self._cancelling:
+            return
         if phase == "started":
             self.status.set(f"writing part {number} …")
         elif phase == "bytes":
@@ -356,6 +362,7 @@ class View:
 
     def _set_busy(self, busy: bool, *, cancellable: bool = False) -> None:
         self._busy = busy
+        self._cancelling = False
         for widget in (self.dry_button, self.run_button):
             widget.configure(state="disabled" if busy else "normal")
         self.cancel_button.configure(state="normal" if busy and cancellable else "disabled")

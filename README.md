@@ -30,7 +30,8 @@ AES-256 parts: send part 2 alone and it still opens.
   `payload.zip`.
 - `--manifest` adds a list of which part holds each file.
 - Every part is decrypted and checked after writing, before it gets its
-  final name. A failed run leaves nothing behind.
+  final name. A failed run removes what it wrote, and warns about any file it
+  could not remove.
 - Existing files are never overwritten unless you pass `--force`, and even
   then the old ones are restored if the run fails.
 - The password never goes on the command line. It comes from a prompt, an

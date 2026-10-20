@@ -23,7 +23,7 @@ class Progress(Protocol):
     """
 
     def part_started(self, number: int) -> None:
-        """Part `number` (1-based) is about to be written to a `.partial` file."""
+        """Part `number` (1-based) is about to be written to a `.temp` file."""
         ...
 
     def bytes_written(self, written: int) -> None:

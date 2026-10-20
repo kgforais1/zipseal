@@ -60,16 +60,19 @@ would leave it in your shell history and visible to other users.
 | 0 | Success. |
 | 1 | Usage error, such as a bad option or mismatched passwords. |
 | 2 | Input error, such as a missing path, a name collision, a file too large for `--max-size`, or nothing left to archive after skips and excludes. |
-| 3 | Write or verify failure. Nothing is left behind. |
-| 130 | Cancelled with Ctrl-C. A cancel before the parts are published leaves nothing behind. |
+| 3 | Write or verify failure. zipseal tries to remove everything the run wrote, and warns about any file it could not remove. |
+| 130 | Cancelled with Ctrl-C. Before the parts are published, zipseal writes no archive. It tries to remove its temporary files, and warns about any it could not delete. |
 
 ## Safety guarantees
 
-- Each part is written under a temporary `.partial` name, verified (unless
-  `--no-verify`), and only then given its final name. A failure removes every `.partial` file. zipseal
-  prints a notice when they appear. Do not rename, move or open them while it runs.
+- Each part is written under a temporary name ending in `.temp`, verified
+  (unless `--no-verify`), and only then given its final name. On a failure,
+  zipseal tries to remove every `.temp` file, and warns about any it could not
+  delete. zipseal prints a notice when they appear. Do not
+  rename, move or open them while it runs.
 - zipseal never overwrites a file it did not expect, even one created while
   it was running.
-- If an earlier run was killed and left `.partial` files, the next run stops
-  before writing and lists them. Check them, then delete them.
+- If an earlier run was killed and left `.temp` files, the next run stops
+  before writing and lists them. Check them, then delete them. Older versions
+  named these files `.partial`, and those stop a run too.
 - If a source file changes or is swapped while zipseal runs, the run stops.

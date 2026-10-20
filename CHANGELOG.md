@@ -48,15 +48,20 @@ All notable user-facing changes are documented here. The format follows
 - Split outputs are now named `NAME-volumeNN-of-MM.zip` instead of
   `NAME-partNN-of-MM.zip`. The existing-output check and `--force` match the
   new names only, so old `-part` files are left alone. Old `-part` archives
-  and `.partial` files are still skipped as inputs, old `.partial` files still
-  block a run, and a run lists old `-part` archives in a warning.
+  are still skipped as inputs, and a run lists old `-part` archives in a warning.
+- Temporary files are now named `NAME-volumeNN.zip.temp` instead of
+  `.partial`. Leftover temporary files from older versions
+  (`NAME-volumeNN.zip.partial` and `NAME-partNN.zip.partial`) still stop a run
+  and are still skipped as inputs. Other files ending in `.partial` or `.temp`
+  are archived like any other file.
 - The window has a Cancel button while a run works. It stops the run at the
-  next progress checkpoint and removes its `.partial` files, with no error
-  dialog. A run that is already publishing its parts finishes.
-- In a terminal, a run says that Ctrl-C cancels it. Ctrl-C already removed the
-  run's `.partial` files.
-- A run now prints a notice before its temporary `.partial` files appear,
-  asking you not to rename, move or open them until it finishes.
+  next progress checkpoint, with no error dialog. zipseal tries to remove the
+  run's `.temp` files, and warns about any it could not delete. A run that is
+  already publishing its parts finishes.
+- In a terminal, a run says that Ctrl-C cancels it. zipseal then tries to
+  remove the run's temporary files, and warns about any it could not delete.
+- A run now prints a notice before its `.temp` files appear, asking you not
+  to rename, move or open them until it finishes.
 
 ## [0.1.0] - 2026-10-08
 

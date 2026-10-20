@@ -10,6 +10,20 @@ from typing import TextIO
 from zipseal.errors import WriteError
 
 
+def temp_name_re(stem: str, suffix: str) -> re.Pattern[str]:
+    """Match this output's temporary files, current or left by an older version.
+
+    The current name is `NAME-volumeNN.zip.temp`. Older versions wrote
+    `NAME-volumeNN.zip.partial`, and before the -volume rename,
+    `NAME-partNN.zip.partial`. No version ever wrote `NAME-partNN.zip.temp`,
+    and every version numbered parts with at least two digits.
+    """
+    s = re.escape(suffix)
+    return re.compile(
+        re.escape(stem) + rf"(?:-volume\d{{2,}}{s}\.(?:temp|partial)|-part\d{{2,}}{s}\.partial)"
+    )
+
+
 class Output:
     """Owns every file this run creates. `cleanup()` removes whatever was not published."""
 
@@ -21,7 +35,7 @@ class Output:
         self.force = force
         self.warn = warn or sys.stderr
         self.token = secrets.token_hex(4)
-        self.partials: list[Path] = []
+        self.temps: list[Path] = []
         self._part_re = re.compile(
             re.escape(self.stem) + r"-volume\d+-of-\d+" + re.escape(self.suffix)
         )
@@ -30,9 +44,8 @@ class Output:
         self._legacy_re = re.compile(
             re.escape(self.stem) + r"-part\d+-of-\d+" + re.escape(self.suffix)
         )
-        self._partial_re = re.compile(
-            re.escape(self.stem) + r"-(?:volume|part)\d+" + re.escape(self.suffix) + r"\.partial"
-        )
+        # Leftover temporary files block a run, including older versions' names.
+        self._temp_re = temp_name_re(self.stem, self.suffix)
 
     # ── before writing ────────────────────────────────────────────────────────
 
@@ -53,12 +66,12 @@ class Output:
         if not self.dir.is_dir():
             raise WriteError(f"{self.dir}: output folder does not exist")
         leftovers = [
-            self.dir / n for n in sorted(os.listdir(self.dir)) if self._partial_re.fullmatch(n)
+            self.dir / n for n in sorted(os.listdir(self.dir)) if self._temp_re.fullmatch(n)
         ]
         if leftovers:
             listing = "\n".join(f"  {p}" for p in leftovers)
             raise WriteError(
-                "partial files from an earlier, interrupted run are in the way. Check them, "
+                "temporary files from an earlier, interrupted run are in the way. Check them, "
                 f"then delete them:\n{listing}"
             )
         if not self.force:
@@ -92,15 +105,15 @@ class Output:
 
     # ── while writing ─────────────────────────────────────────────────────────
 
-    def new_partial(self, number: int) -> tuple[Path, int]:
-        """Create the next `.partial` file and return its path and open descriptor.
+    def new_temp(self, number: int) -> tuple[Path, int]:
+        """Create the next `.temp` file and return its path and open descriptor.
 
         The path is registered for cleanup only after this run has created it, so a
         failed create never deletes a file another run owns.
         """
-        path = self.dir / f"{self.stem}-volume{number:02d}{self.suffix}.partial"
+        path = self.dir / f"{self.stem}-volume{number:02d}{self.suffix}.temp"
         fd = create_exclusive(path)
-        self.partials.append(path)
+        self.temps.append(path)
         return path, fd
 
     def final_names(self, count: int) -> list[Path]:
@@ -114,8 +127,8 @@ class Output:
 
     # ── publication ───────────────────────────────────────────────────────────
 
-    def publish(self, partials: list[Path], finals: list[Path]) -> None:
-        """Hard-link each partial to its final name, never overwriting a file.
+    def publish(self, temps: list[Path], finals: list[Path]) -> None:
+        """Hard-link each `.temp` file to its final name, never overwriting a file.
 
         With --force, existing final names are first moved to private backups,
         restored if anything fails before the last part is published, and deleted
@@ -123,28 +136,34 @@ class Output:
         """
         backups: list[tuple[Path, Path]] = []
         published: list[Path] = []
+        clash: Path | None = None
         try:
-            for partial, final in zip(partials, finals, strict=True):
+            for temp, final in zip(temps, finals, strict=True):
                 if self.force and os.path.lexists(final):
                     backup = final.with_name(f".{final.name}.zipseal-backup-{self.token}")
                     os.rename(final, backup)
                     backups.append((backup, final))
                 try:
-                    os.link(partial, final)
+                    os.link(temp, final)
                 except FileExistsError:
-                    raise WriteError(
-                        f"{final}: appeared while zipseal was running; not overwritten, "
-                        "and no archive was written"
-                    ) from None
+                    clash = final
+                    raise
                 published.append(final)
-                os.unlink(partial)
-                self.partials.remove(partial)
+                os.unlink(temp)
+                self.temps.remove(temp)
         except BaseException as exc:
-            self._rollback(published, backups)
-            if isinstance(exc, OSError):
+            # Say "no archive" only if the rollback really removed every published part.
+            outcome = (
+                "no archive was written"
+                if self._rollback(published, backups)
+                else "a published part could not be removed, see the warning above"
+            )
+            if clash is not None:
                 raise WriteError(
-                    f"publishing failed: {exc.strerror}; no archive was written"
+                    f"{clash}: appeared while zipseal was running; not overwritten, and {outcome}"
                 ) from None
+            if isinstance(exc, OSError):
+                raise WriteError(f"publishing failed: {exc.strerror}; {outcome}") from None
             raise
         # Commit point: every part is published. Nothing below rolls back.
         leftover = []
@@ -181,11 +200,14 @@ class Output:
                 file=self.warn,
             )
 
-    def _rollback(self, published: list[Path], backups: list[tuple[Path, Path]]) -> None:
+    def _rollback(self, published: list[Path], backups: list[tuple[Path, Path]]) -> bool:
+        """Undo a failed publication. Returns whether every published part is gone."""
+        removed = True
         for final in published:
             try:
                 os.unlink(final)
             except OSError:
+                removed = False
                 print(
                     f"zipseal: warning: could not remove {final}; it is a complete, "
                     "verified part of the failed run",
@@ -196,26 +218,27 @@ class Output:
                 os.rename(backup, final)
             except OSError:
                 print(f"zipseal: warning: could not restore {final} from {backup}", file=self.warn)
+        return removed
 
     def cleanup(self) -> None:
-        """Delete this run's `.partial` files, and warn about any that stay.
+        """Delete this run's `.temp` files, and warn about any that stay.
 
         It runs while another error or a cancel is on its way out, so a failed
         delete is a warning here and never replaces that error.
         """
         kept: list[str] = []
-        for path in self.partials:
+        for path in self.temps:
             try:
                 os.unlink(path)
             except FileNotFoundError:
                 pass
             except OSError as exc:
                 kept.append(f"  {path}: {exc.strerror}")
-        self.partials.clear()
+        self.temps.clear()
         if kept:
             listing = "\n".join(kept)
             print(
-                f"zipseal: warning: could not delete partial files. Delete them before "
+                f"zipseal: warning: could not delete temporary files. Delete them before "
                 f"the next run:\n{listing}",
                 file=self.warn,
             )

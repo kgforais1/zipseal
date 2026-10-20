@@ -175,14 +175,27 @@ def test_output_inside_input_is_skipped(tmp_path: Path) -> None:
             "d/a.txt": "x",
             "d/bundle.zip": "old",
             "d/bundle-volume01-of-02.zip": "old",
-            "d/bundle-volume01.zip.partial": "tmp",
+            "d/bundle-volume01.zip.temp": "tmp",
+            "d/bundle-part02.zip.partial": "tmp, old naming",
             "d/bundle-part02-of-02.zip": "old naming",
             "d/bundle-party.zip": "keep",
+            "d/bundle-notes.temp": "keep, not a zipseal name",
+            "d/bundle-notes.partial": "keep, not a zipseal name either",
+            "d/bundle-part03.zip.temp": "keep, no version wrote this name",
+            "d/bundle-volume1.zip.temp": "keep, parts always have two digits",
             "d/sub/bundle.zip": "keep, different folder",
         },
     )
     with run([tmp_path / "d"], tmp_path, output=tmp_path / "d/bundle.zip")[0] as c:
-        assert names(c) == ["d/a.txt", "d/bundle-party.zip", "d/sub/bundle.zip"]
+        assert names(c) == [
+            "d/a.txt",
+            "d/bundle-notes.partial",
+            "d/bundle-notes.temp",
+            "d/bundle-part03.zip.temp",
+            "d/bundle-party.zip",
+            "d/bundle-volume1.zip.temp",
+            "d/sub/bundle.zip",
+        ]
 
 
 def test_timestamps_clamped(tmp_path: Path) -> None:
