@@ -60,7 +60,7 @@ would leave it in your shell history and visible to other users.
 | 0 | Success. |
 | 1 | Usage error, such as a bad option or mismatched passwords. |
 | 2 | Input error, such as a missing path, a name collision, a file too large for `--max-size`, or nothing left to archive after skips and excludes. |
-| 3 | Write or verify failure. zipseal writes no archive. It tries to remove its temporary files, and warns about any it could not delete. |
+| 3 | Write or verify failure. zipseal tries to remove everything the run wrote, and warns about any file it could not remove. |
 | 130 | Cancelled with Ctrl-C. Before the parts are published, zipseal writes no archive. It tries to remove its temporary files, and warns about any it could not delete. |
 
 ## Safety guarantees

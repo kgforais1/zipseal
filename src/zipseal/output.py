@@ -136,6 +136,7 @@ class Output:
         """
         backups: list[tuple[Path, Path]] = []
         published: list[Path] = []
+        clash: Path | None = None
         try:
             for temp, final in zip(temps, finals, strict=True):
                 if self.force and os.path.lexists(final):
@@ -145,19 +146,24 @@ class Output:
                 try:
                     os.link(temp, final)
                 except FileExistsError:
-                    raise WriteError(
-                        f"{final}: appeared while zipseal was running; not overwritten, "
-                        "and no archive was written"
-                    ) from None
+                    clash = final
+                    raise
                 published.append(final)
                 os.unlink(temp)
                 self.temps.remove(temp)
         except BaseException as exc:
-            self._rollback(published, backups)
-            if isinstance(exc, OSError):
+            # Say "no archive" only if the rollback really removed every published part.
+            outcome = (
+                "no archive was written"
+                if self._rollback(published, backups)
+                else "a published part could not be removed, see the warning above"
+            )
+            if clash is not None:
                 raise WriteError(
-                    f"publishing failed: {exc.strerror}; no archive was written"
+                    f"{clash}: appeared while zipseal was running; not overwritten, and {outcome}"
                 ) from None
+            if isinstance(exc, OSError):
+                raise WriteError(f"publishing failed: {exc.strerror}; {outcome}") from None
             raise
         # Commit point: every part is published. Nothing below rolls back.
         leftover = []
@@ -194,11 +200,14 @@ class Output:
                 file=self.warn,
             )
 
-    def _rollback(self, published: list[Path], backups: list[tuple[Path, Path]]) -> None:
+    def _rollback(self, published: list[Path], backups: list[tuple[Path, Path]]) -> bool:
+        """Undo a failed publication. Returns whether every published part is gone."""
+        removed = True
         for final in published:
             try:
                 os.unlink(final)
             except OSError:
+                removed = False
                 print(
                     f"zipseal: warning: could not remove {final}; it is a complete, "
                     "verified part of the failed run",
@@ -209,6 +218,7 @@ class Output:
                 os.rename(backup, final)
             except OSError:
                 print(f"zipseal: warning: could not restore {final} from {backup}", file=self.warn)
+        return removed
 
     def cleanup(self) -> None:
         """Delete this run's `.temp` files, and warn about any that stay.
