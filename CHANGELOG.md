@@ -54,8 +54,9 @@ All notable user-facing changes are documented here. The format follows
   (`NAME-volumeNN.zip.partial` and `NAME-partNN.zip.partial`) still stop a run
   and are still skipped as inputs. Other files ending in `.partial` or `.temp`
   are archived like any other file.
-- The window has a Cancel button while a run works. It stops the run and
-  removes its `.temp` files, with no error dialog.
+- The window has a Cancel button while a run works. It stops the run at the
+  next progress checkpoint and removes its `.temp` files, with no error
+  dialog. A run that is already publishing its parts finishes.
 - In a terminal, a run says that Ctrl-C cancels it. Ctrl-C already removed the
   run's temporary files.
 - A run now prints a notice before its `.temp` files appear, asking you not
