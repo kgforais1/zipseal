@@ -10,6 +10,19 @@ from typing import TextIO
 from zipseal.errors import WriteError
 
 
+def temp_name_re(stem: str, suffix: str) -> re.Pattern[str]:
+    """Match this output's temporary files, current or left by an older version.
+
+    The current name is `NAME-volumeNN.zip.temp`. Older versions wrote
+    `NAME-volumeNN.zip.partial`, and before the -volume rename,
+    `NAME-partNN.zip.partial`. No version ever wrote `NAME-partNN.zip.temp`.
+    """
+    s = re.escape(suffix)
+    return re.compile(
+        re.escape(stem) + rf"(?:-volume\d+{s}\.(?:temp|partial)|-part\d+{s}\.partial)"
+    )
+
+
 class Output:
     """Owns every file this run creates. `cleanup()` removes whatever was not published."""
 
@@ -30,14 +43,8 @@ class Output:
         self._legacy_re = re.compile(
             re.escape(self.stem) + r"-part\d+-of-\d+" + re.escape(self.suffix)
         )
-        # Leftover temporary files block a run. Older versions named them
-        # `-partNN.zip.partial` or `-volumeNN.zip.partial`, so those count too.
-        self._temp_re = re.compile(
-            re.escape(self.stem)
-            + r"-(?:volume|part)\d+"
-            + re.escape(self.suffix)
-            + r"\.(?:temp|partial)"
-        )
+        # Leftover temporary files block a run, including older versions' names.
+        self._temp_re = temp_name_re(self.stem, self.suffix)
 
     # ── before writing ────────────────────────────────────────────────────────
 

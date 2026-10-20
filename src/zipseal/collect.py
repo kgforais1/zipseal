@@ -17,6 +17,7 @@ from pathlib import Path
 from typing import TextIO
 
 from zipseal.errors import InputError
+from zipseal.output import temp_name_re
 
 DOS_MIN = datetime(1980, 1, 1, 0, 0, 0)
 DOS_MAX = datetime(2107, 12, 31, 23, 59, 58)
@@ -92,10 +93,7 @@ class _OutputFilter:
         self.part_re = re.compile(
             re.escape(stem) + r"-(?:volume|part)\d+-of-\d+" + re.escape(suffix)
         )
-        # `.partial` is what older versions called their temporary files.
-        self.temp_re = re.compile(
-            re.escape(stem) + r"-(?:volume|part)\d+" + re.escape(suffix) + r"\.(?:temp|partial)"
-        )
+        self.temp_re = temp_name_re(stem, suffix)
         try:
             self.dir_ident: Identity | None = _ident(os.stat(out.parent))
         except OSError:

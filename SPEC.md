@@ -446,7 +446,8 @@ breaks the result for the recipient unless they also run a restore step.
   on macOS or Windows.
 - **Manifest collision.** If an input already maps to `MANIFEST.txt` at the
   archive root, `--manifest` fails with exit 2.
-- **Interrupt.** Ctrl-C removes this run's `.temp` files and exits 130.
+- **Interrupt.** Ctrl-C deletes this run's `.temp` files, warning about any it
+  cannot delete (§6.5), and exits 130.
 - **Generated password.** `--generate-password` prints the password once,
   to stderr, after every part has verified (or passed the size check under
   `--no-verify`) and just before publication. A run that fails earlier

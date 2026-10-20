@@ -226,7 +226,8 @@ def run(command: Command) -> int:
     progress = _TtyProgress(log) if log.isatty() else None
     if progress is not None and not command.options.dry_run:
         print(
-            "zipseal: press Ctrl-C to cancel. Before publishing, that leaves nothing behind.",
+            "zipseal: press Ctrl-C to cancel. zipseal then removes its temporary files, "
+            "and warns about any it could not delete.",
             file=log,
             flush=True,
         )

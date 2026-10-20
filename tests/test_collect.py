@@ -181,6 +181,7 @@ def test_output_inside_input_is_skipped(tmp_path: Path) -> None:
             "d/bundle-party.zip": "keep",
             "d/bundle-notes.temp": "keep, not a zipseal name",
             "d/bundle-notes.partial": "keep, not a zipseal name either",
+            "d/bundle-part03.zip.temp": "keep, no version wrote this name",
             "d/sub/bundle.zip": "keep, different folder",
         },
     )
@@ -189,6 +190,7 @@ def test_output_inside_input_is_skipped(tmp_path: Path) -> None:
             "d/a.txt",
             "d/bundle-notes.partial",
             "d/bundle-notes.temp",
+            "d/bundle-part03.zip.temp",
             "d/bundle-party.zip",
             "d/sub/bundle.zip",
         ]

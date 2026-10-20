@@ -304,6 +304,13 @@ def test_leftover_temp_file_fails_preflight(tree: Path, tmp_path: Path, name: st
     assert (tmp_path / "out" / name).read_text() == "crashed run"
 
 
+def test_a_part_name_with_dot_temp_does_not_block(tree: Path, tmp_path: Path) -> None:
+    """No version wrote `-partNN.zip.temp`, so it is someone else's file."""
+    (tmp_path / "out/bundle-part03.zip.temp").write_text("not ours")
+    archive([tree], tmp_path / "out/bundle.zip")
+    assert (tmp_path / "out/bundle-part03.zip.temp").read_text() == "not ours"
+
+
 def test_symlinked_ancestor_is_followed_by_default(tmp_path: Path) -> None:
     make_tree(tmp_path, {"real/data/a.txt": "a"})
     (tmp_path / "link").symlink_to(tmp_path / "real")
