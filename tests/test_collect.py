@@ -182,6 +182,7 @@ def test_output_inside_input_is_skipped(tmp_path: Path) -> None:
             "d/bundle-notes.temp": "keep, not a zipseal name",
             "d/bundle-notes.partial": "keep, not a zipseal name either",
             "d/bundle-part03.zip.temp": "keep, no version wrote this name",
+            "d/bundle-volume1.zip.temp": "keep, parts always have two digits",
             "d/sub/bundle.zip": "keep, different folder",
         },
     )
@@ -192,6 +193,7 @@ def test_output_inside_input_is_skipped(tmp_path: Path) -> None:
             "d/bundle-notes.temp",
             "d/bundle-part03.zip.temp",
             "d/bundle-party.zip",
+            "d/bundle-volume1.zip.temp",
             "d/sub/bundle.zip",
         ]
 

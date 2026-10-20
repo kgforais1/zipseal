@@ -15,11 +15,12 @@ def temp_name_re(stem: str, suffix: str) -> re.Pattern[str]:
 
     The current name is `NAME-volumeNN.zip.temp`. Older versions wrote
     `NAME-volumeNN.zip.partial`, and before the -volume rename,
-    `NAME-partNN.zip.partial`. No version ever wrote `NAME-partNN.zip.temp`.
+    `NAME-partNN.zip.partial`. No version ever wrote `NAME-partNN.zip.temp`,
+    and every version numbered parts with at least two digits.
     """
     s = re.escape(suffix)
     return re.compile(
-        re.escape(stem) + rf"(?:-volume\d+{s}\.(?:temp|partial)|-part\d+{s}\.partial)"
+        re.escape(stem) + rf"(?:-volume\d{{2,}}{s}\.(?:temp|partial)|-part\d{{2,}}{s}\.partial)"
     )
 
 
