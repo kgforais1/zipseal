@@ -7,6 +7,11 @@ edits and refactors. User-visible changes go in [`CHANGELOG.md`](CHANGELOG.md).
 
 ### Added
 
+- `latest-deps.yml`: a weekly run (and on demand) that re-resolves uv.lock
+  with `uv lock --upgrade` in the runner only, logs which versions moved, and
+  runs the fast tests and basedpyright, so an upstream release that breaks
+  zipseal shows up before the next lock refresh. A failing run is the
+  notification, as in `dependency-audit.yml`.
 - `tests/test_launcher.py` covers `zipseal-gui.command` (uv on and off
   `PATH`, a spaced clone path, a foreign working directory, no uv with
   Return or EOF) and `scripts/set-icon.sh`. `scripts/install.sh` now sets the

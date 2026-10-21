@@ -1,0 +1,51 @@
+# Weekly run against the newest dependency releases that pyproject.toml allows.
+#
+# ci.yml installs from uv.lock, so a new upstream release (stream-zip,
+# stream-unzip, or the dev tools) cannot break a PR, but it also goes unnoticed
+# until someone refreshes the lock. This job re-resolves the lock with
+# `uv lock --upgrade` in the runner's checkout only (nothing is committed), then
+# runs the fast tests and basedpyright. As in dependency-audit.yml, a failing
+# run is the notification. The "Show what moved" step lists the versions that
+# differ from uv.lock, so the log says which release to suspect.
+#
+# The <0.1 caps on stream-zip and stream-unzip still apply: this probes what
+# a fresh `pip install zipseal` gets today, not releases past the caps.
+#
+# Actions usage: ~2 Linux minutes per run; weekly.
+#
+# GitHub disables scheduled workflows in a public repository after 60 days
+# with no repository activity. If that happens, re-enable this workflow from
+# the Actions tab.
+
+name: Latest dependencies
+
+on:
+  schedule:
+    # Thursdays 16:47 UTC, half an hour after the dependency audit.
+    - cron: "47 16 * * 4"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  latest:
+    name: Tests against the newest allowed releases
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884  # v10.3.0
+        with:
+          python-version: "3.13"
+          version: "0.12.24"
+      - name: Install 7-Zip and bsdtar
+        run: sudo apt-get update && sudo apt-get install -y 7zip libarchive-tools
+      - run: uv lock --upgrade
+      - name: Show what moved
+        run: git diff --unified=0 uv.lock | grep -E '^[-+](name|version) = ' || echo "Nothing differs from uv.lock."
+      - run: uv sync
+      - run: uv run pytest -q
+      - run: uv run basedpyright
