@@ -46,6 +46,13 @@ jobs:
       - run: uv lock --upgrade
       - name: Show what moved
         run: git diff --unified=0 uv.lock | grep -E '^[-+](name|version) = ' || echo "Nothing differs from uv.lock."
-      - run: uv sync
-      - run: uv run pytest -q
-      - run: uv run basedpyright
+      # --locked holds every step to the lock re-resolved above. --no-build refuses
+      # sdists, so no upstream setup script runs; the project itself is therefore
+      # not installed but imported from src/ (its entry points are not needed here).
+      - run: uv sync --locked --no-build --no-install-project
+      - run: uv run --locked --no-build --no-sync pytest -q
+        env:
+          PYTHONPATH: src
+      - run: uv run --locked --no-build --no-sync basedpyright
+        env:
+          PYTHONPATH: src
