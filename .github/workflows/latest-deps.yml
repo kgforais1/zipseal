@@ -50,16 +50,21 @@ jobs:
       - name: Install 7-Zip and bsdtar
         run: sudo apt-get update && sudo apt-get install -y 7zip libarchive-tools
       - run: cp uv.lock "$RUNNER_TEMP/uv.lock.committed"
-      - run: uv lock --upgrade
+      - run: uv lock --upgrade --no-build
       - name: Show what moved
         run: |
           python3 - "$RUNNER_TEMP/uv.lock.committed" uv.lock <<'EOF'
           import sys
           import tomllib
 
+          # A lock can hold several versions of one package (one per Python range),
+          # so compare the full set of versions under each name.
           def versions(path):
+              found = {}
               with open(path, "rb") as handle:
-                  return {p["name"]: p.get("version", "-") for p in tomllib.load(handle)["package"]}
+                  for p in tomllib.load(handle)["package"]:
+                      found.setdefault(p["name"], set()).add(p.get("version", "-"))
+              return {name: ", ".join(sorted(v)) for name, v in found.items()}
 
           old, new = versions(sys.argv[1]), versions(sys.argv[2])
           moved = [(n, old.get(n, "-"), new.get(n, "-")) for n in sorted(old.keys() | new.keys())
