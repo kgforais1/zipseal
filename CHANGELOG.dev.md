@@ -32,6 +32,10 @@ edits and refactors. User-visible changes go in [`CHANGELOG.md`](CHANGELOG.md).
 
 ### Changed
 
+- Dependabot version updates for uv and GitHub Actions now run monthly, on
+  the 22nd at 16:00 America/New_York, with a 7-day cooldown. Security updates
+  are unaffected. The weekly dependency audit keeps its Thursday schedule.
+
 - Every `uvx` call in `ci.yml` and `dependency-audit.yml` now passes
   `--no-build` and pins an exact version (`pip-audit==2.10.1`,
   `pre-commit==4.7.0`, `zizmor==1.31.0`). `--no-build` stops uv from falling

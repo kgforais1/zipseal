@@ -1,19 +1,25 @@
+# Version updates run monthly on the 22nd at 16:00 Eastern.
+# Security updates are separate: they open as soon as an advisory is
+# published. They ignore this schedule, the cooldown and
+# open-pull-requests-limit, and have their own cap of 10 open PRs.
 version: 2
 updates:
   - package-ecosystem: "uv"
     directory: "/"
     schedule:
-      interval: "weekly"
-      day: "thursday"
-      time: "17:00"
+      interval: "cron"
+      cronjob: "0 16 22 * *"
       timezone: "America/New_York"
+    cooldown:
+      default-days: 7
     open-pull-requests-limit: 5
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
-      interval: "weekly"
-      day: "thursday"
-      time: "17:00"
+      interval: "cron"
+      cronjob: "0 16 22 * *"
       timezone: "America/New_York"
+    cooldown:
+      default-days: 7
     commit-message:
       prefix: "ci"
