@@ -30,8 +30,9 @@ name: Dependency audit
 on:
   pull_request:
   schedule:
-    # Thursdays 16:17 UTC, ahead of Dependabot's Thursday 17:00 ET run and off
-    # the top of the hour to avoid scheduler congestion.
+    # Thursdays 16:17 UTC, off the top of the hour to avoid scheduler
+    # congestion. It runs weekly, independent of Dependabot's monthly
+    # version updates on the 22nd.
     - cron: "17 16 * * 4"
   workflow_dispatch:
 
