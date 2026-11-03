@@ -1,6 +1,6 @@
 # TODO
 
-Last reviewed: 2026-10-10
+Last reviewed: 2026-11-02
 
 Future work only. Each item is something nobody has started or finished.
 
@@ -28,5 +28,8 @@ An item that needs more than a few lines of thought gets a plan in
   reports no progress until the whole part is decrypted, so a cancel waits for
   it. It needs a progress or cancel hook inside verification.
 - Add drag-and-drop to the GUI via `tkinterdnd2` ([GUI plan](dev-docs/plans/2026-10-10-gui.md)).
-- Package the GUI as a signed, double-clickable macOS `.app` with PyInstaller or Briefcase ([GUI plan](dev-docs/plans/2026-10-10-gui.md)).
+- Ship `zipseal-gui` as downloadable apps for macOS (signed and notarized
+  `.app` in a DMG), Windows (zip) and Linux (AppImage), built and smoke-tested
+  in CI from a tag and published as GitHub Releases. The CLI stays a GitHub
+  project. ([executables plan](dev-docs/plans/2026-11-02-gui-executables.md)).
 - Consider `--format 7z`, `--oversize=volumes` and `--tight` (`SPEC.md` §6.2, §6.4, §6.7).
