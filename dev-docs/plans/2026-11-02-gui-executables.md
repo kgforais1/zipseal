@@ -88,7 +88,7 @@ published. A smoke-tested artifact, never a second local build, is what ships.
    are never removed without re-approval and a note here saying why.
 5. **Nothing build-output is ever committed.** `dist/` and `build/` are already
    in `.gitignore`; extend both `.gitignore` and `.forbidden-paths` with the
-   artifact globs (`*.dmg`, `*.msi`, `*.exe`, `*.AppImage`) so even a
+   artifact globs (`*.dmg`, `*.msi`, `*.exe`, `*.AppImage`, `*.tar.gz`) so even a
    force-added artifact cannot be committed.
 6. **Release mechanics**: tag `vX.Y.Z` → `release.yml` builds on a pinned
    runner image per platform → smoke tests the built artifact → writes
@@ -129,8 +129,7 @@ published. A smoke-tested artifact, never a second local build, is what ships.
 - [ ] Extend `.gitignore` and `.forbidden-paths` with the artifact globs
       (`*.dmg`, `*.msi`, `*.exe`, `*.AppImage`, `*.tar.gz`) so even a
       force-added artifact cannot be committed; confirm `dist/` and `build/`
-      are in both files' spirit (already ignored; add to `.forbidden-paths`).
-- [ ] Create `packaging/`:
+      are in both files' spirit (already ignored; add to `.forbidden-paths`).- [ ] Create `packaging/`:
   - `run_gui.py` — the PyInstaller entry point: `import sys; from zipseal.gui import main; sys.exit(main())`.
     Neither `gui.py` nor `gui_view.py` has an `if __name__ == "__main__"` block, so this thin script
     is what the `.spec` targets.
@@ -142,7 +141,10 @@ published. A smoke-tested artifact, never a second local build, is what ships.
     `name="zipseal-gui"`, macOS BUNDLE `zipseal-gui.app`, bundle id, version
     substitution, `datas` (the SVG), and `excludes` (`pytest`, `hypothesis`,
     `basedpyright`, `yaml`, `PIL` if unused).
-  - `macos/entitlements.plist` — empty `<dict>` to start.
+  - `macos/entitlements.plist` — pre-populated with
+      `com.apple.security.cs.allow-unsigned-executable-memory` and
+      `com.apple.security.cs.disable-library-validation` (Decision 4; CPython
+      crashes under Hardened Runtime without them).
   - `windows/version_info.txt` template.
   - `linux/zipseal-gui.desktop` and `linux/AppRun` for the AppImage.
   - `icons.py` — SVG to `.icns`/`.ico`/`.png` at build time; pinned tool.
