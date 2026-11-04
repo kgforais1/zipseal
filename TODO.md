@@ -1,6 +1,6 @@
 # TODO
 
-Last reviewed: 2026-11-02
+Last reviewed: 2026-11-03
 
 Future work only. Each item is something nobody has started or finished.
 
@@ -32,4 +32,15 @@ An item that needs more than a few lines of thought gets a plan in
   `.app` in a DMG), Windows (zip) and Linux (AppImage), built and smoke-tested
   in CI from a tag and published as GitHub Releases. The CLI stays a GitHub
   project. ([executables plan](dev-docs/plans/2026-11-02-gui-executables.md)).
+- Ship Linux arm64 and Windows arm64 GUI executables once someone asks —
+  deferred as non-goals in the
+  [executables plan](dev-docs/plans/2026-11-02-gui-executables.md), where the
+  research already exists: free `ubuntu-24.04-arm` and `windows-11-arm` runners
+  for public repos, PyInstaller aarch64 Linux wheels and native Windows-arm64
+  support. Do Linux arm64 first (no emulated fallback — x86_64 artifacts do not
+  run there; start with the `.tar.gz` because aarch64 AppImage tooling is thin).
+  Windows on ARM already runs the x64 zip via Prism emulation; a native build
+  mainly needs a check that the arm64 python-build-standalone ships Tcl/Tk.
+  Manual acceptance is possible with Windows 11 ARM under Parallels on the
+  Apple Silicon Mac.
 - Consider `--format 7z`, `--oversize=volumes` and `--tight` (`SPEC.md` §6.2, §6.4, §6.7).
