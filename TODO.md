@@ -29,9 +29,11 @@ An item that needs more than a few lines of thought gets a plan in
   it. It needs a progress or cancel hook inside verification.
 - Add drag-and-drop to the GUI via `tkinterdnd2` ([GUI plan](dev-docs/plans/2026-10-10-gui.md)).
 - Ship `zipseal-gui` as downloadable apps for macOS (signed and notarized
-  `.app` in a DMG), Windows (zip) and Linux (AppImage), built and smoke-tested
-  in CI from a tag and published as GitHub Releases. The CLI stays a GitHub
-  project. ([executables plan](dev-docs/plans/2026-11-02-gui-executables.md)).
+  `.app` in a DMG), Windows (zip) and Linux (AppImage and a `.tar.gz` of the
+  onedir), built and smoke-tested in CI from a tag and published as GitHub
+  Releases. The CLI remains source-installable from GitHub with
+  `uv tool install`.
+  ([executables plan](dev-docs/plans/2026-11-02-gui-executables.md)).
 - Ship Linux arm64 and Windows arm64 GUI executables once someone asks —
   deferred as non-goals in the
   [executables plan](dev-docs/plans/2026-11-02-gui-executables.md), where the

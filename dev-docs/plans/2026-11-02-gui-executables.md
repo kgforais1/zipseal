@@ -9,8 +9,8 @@ macOS-only `.app` bullet in `dev-docs/plans/2026-10-10-gui.md` ("Later")
 
 Ship `zipseal-gui` as a downloadable app for macOS, Windows and Linux that needs
 no Python, no `uv` and no terminal. These are the only executables this project
-builds: the CLI stays a GitHub project for `uv tool install` (Phase 6 adds PyPI,
-which is a package, not a binary).
+builds: the CLI remains source-installable from GitHub with `uv tool install`
+(Phase 6 adds PyPI, which is a package, not a binary).
 
 | Platform | Artifact | Install |
 |---|---|---|
@@ -102,6 +102,8 @@ published. A smoke-tested artifact, never a second local build, is what ships.
    `SHA256SUMS` → attests each artifact (`actions/attest-build-provenance`
    v4.x; public repo, so free) → creates a **draft** GitHub Release. The
    maintainer publishes it after the manual acceptance checks below.
+   `release.yml` also runs on `workflow_dispatch` (no inputs) to rehearse
+   the build and smoke test without drafting a release.
 7. **Icons are generated at build time from `src/zipseal/icon.svg`**
    (nothing raster enters the repo; `*.png` is blocked by design). macOS needs
    an `.icns`, Windows an `.ico` for the exe plus a window icon, Linux a
@@ -117,7 +119,14 @@ published. A smoke-tested artifact, never a second local build, is what ships.
    runners entirely in Fall 2027 anyway. Revisit Intel only if someone asks.
 9. **One version.** `pyproject.toml` stays the single source of truth; the
    build script substitutes it into `Info.plist`, the Windows version resource
-   and artifact names, and the release workflow fails unless the tag equals it.
+   and artifact names. On a tag push, the release workflow fails unless the
+   tag equals `v` plus that version and nothing else (`v0.1.0` when the
+   project version is `0.1.0`). Compare the whole tag; do not strip a prefix.
+   `lstrip("v")` would turn `vv0.1.0` into `0.1.0` and accept it, and
+   `removeprefix("v")` leaves a tag that never had the prefix unchanged, so
+   either check can accept a tag the rule rejects. On a `workflow_dispatch`
+   rehearsal there is no release tag, so this check is skipped and the build
+   uses the version in `pyproject.toml`.
 10. **The CLI package stays source-installable** (`uv tool install git+…`).
     PyPI is Phase 6: the name `zipseal` is unclaimed there (checked
     2026-11-02), and Trusted Publishing means no tokens.
@@ -203,15 +212,20 @@ published. A smoke-tested artifact, never a second local build, is what ships.
       `spctl --assess -t open --context context:primary-signature -v
       dist/zipseal-*.dmg` for the DMG (without `-v`, `spctl` prints nothing on
       success).
-- [ ] `.github/workflows/release.yml`: `on: push: tags: ["v*"]`; jobs `check`
-      (tag equals `pyproject.toml` version; fast suite passes), `build-macos`,
-      `publish` — macos-only at M2; Phases 3 and 4 append `build-windows` and
-      `build-linux` when those platforms land, so no job sits dead before its
-      phase. Every action pinned by full SHA with a tag comment (the
-      `check-pins` hook enforces SHA validity; `# tag` comments on workflow
-      actions are repo style convention). Minimal top-level `permissions:`;
-      `contents: write` only in `publish`; `id-token: write` +
-      `attestations: write` for provenance.
+- [ ] `.github/workflows/release.yml` triggers on `push` of tags matching
+      `v*` and on `workflow_dispatch` with no inputs. Jobs: `check` (fast
+      suite passes on both triggers; on a tag push, also require the tag to
+      equal `v` plus the `pyproject.toml` version per Decision 9),
+      `build-macos`, `publish`. `publish` runs only when
+      `github.event_name == 'push'` for a tag. A `workflow_dispatch` run
+      builds and smoke-tests and skips `publish`, because a branch dispatch
+      has no release tag and must not create one. macOS-only at M2; Phases 3
+      and 4 append `build-windows` and `build-linux` when those platforms
+      land, so no job sits dead before its phase. Every action pinned by
+      full SHA with a tag comment (the `check-pins` hook enforces SHA
+      validity; `# tag` comments on workflow actions are repo style
+      convention). Minimal top-level `permissions:`; `contents: write` only
+      in `publish`; `id-token: write` + `attestations: write` for provenance.
 - [ ] CI smoke: launch the built app's inner binary, wait, confirm it is
       alive, terminate. Mark advisory if the runner proves flaky; the real
       gate is the manual acceptance at the end of this phase.
@@ -227,10 +241,11 @@ published. A smoke-tested artifact, never a second local build, is what ships.
       → re-tag), and the acceptance checklist from M1–M3. Add it to
       `REQUIRED_FILES` in `hooks/scripts/check_doc_freshness.py` and to the
       durable-doc list in `dev-docs/README.md` so the freshness hook covers it.
-- [ ] Rehearse first: a `workflow_dispatch` dry-run input builds the artifact
-      without publishing (pushing a tag creates the release, so a rehearsal
-      tag would not do). Then the first real run at the next version bump;
-      v0.1.0 stays source-only.
+- [ ] Rehearse first: run the workflow with `workflow_dispatch` (the
+      `release.yml` bullet above). That builds the artifact and skips
+      `publish`. Pushing a tag is what creates the draft release, so a
+      rehearsal tag would not do. Then the first real run at the next version
+      bump; v0.1.0 stays source-only.
 - [ ] Manual acceptance (from M2 on): download the drafted release asset fresh
       (the browser sets the quarantine flag), open the DMG, drag to
       Applications, launch, create an archive with a generated password, open
@@ -409,3 +424,10 @@ in this plan with a date.
   dispatch or environment approval, added how-to-identify-the-version to the
   troubleshooting docs, and deferred Linux/Windows arm64 to `TODO.md` via the
   non-goals.
+
+- 2026-11-04: A CodeRabbit review, then an agy/gemini-3.8-flash-high review
+  of those fixes. The release workflow requires the tag to equal `v` plus
+  the `pyproject.toml` version (no prefix stripping) and skips that check
+  on `workflow_dispatch`. `workflow_dispatch` takes no inputs and cannot
+  publish; only a tag push runs `publish`. TODO.md names the Linux
+  `.tar.gz` and the `uv tool install` CLI contract.
