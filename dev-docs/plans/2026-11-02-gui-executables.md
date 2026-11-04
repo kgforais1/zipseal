@@ -18,10 +18,16 @@ builds: the CLI remains source-installable from GitHub with `uv tool install`
 | Windows (x64) | `zipseal-gui-<version>-windows-x64.zip` (PyInstaller onedir) | unzip anywhere, run `zipseal-gui.exe` |
 | Linux (x86_64) | `zipseal-gui-<version>-linux-x86_64.AppImage`, plus a `.tar.gz` of the onedir | `chmod +x` and run (tar.gz runs from any folder) |
 
-Every artifact is built and smoke-tested in CI from the tagged commit, attached
-to a GitHub Release together with `SHA256SUMS` and a build provenance
-attestation, and accepted on a machine without Python before the release is
-published. A smoke-tested artifact, never a second local build, is what ships.
+Every artifact is built in CI from the tagged commit and attached to a GitHub
+Release together with `SHA256SUMS` and a build provenance attestation. CI
+smoke launches that same artifact: Windows and Linux fail the job if the
+process does not stay alive, and the macOS launch check may be marked
+advisory when the headless runner is flaky. `codesign`, `spctl` and `stapler`
+still fail the macOS job, and the manual acceptance below is the blocking
+gate on every platform. Before the release is published, the drafted artifact
+for macOS, Windows and Linux is accepted on a machine without Python: launch
+it, create an archive with a generated password, and open that archive. The
+artifact that was smoke-tested is what ships, never a second local build.
 
 ## Non-goals
 
@@ -52,7 +58,10 @@ published. A smoke-tested artifact, never a second local build, is what ships.
    `tkinter` ("Tkinter is not available", briefcase docs, checked 2026-11-02) —
    a hard blocker for this GUI. Nuitka is rejected: no need for compilation,
    slower Python-version support. PyInstaller 6.22.3 (2026-09-12) supports
-   Python 3.11–3.15 and bundles `ldd`-era glibc floors of 2.17 on Linux.
+   Python 3.11–3.15. On Linux its bootloader is built for glibc 2.17. That is
+   the bootloader floor only. The application floor is measured from the
+   bundled Python, Tcl/Tk and extension modules (Phase 4, Risk 8), and that
+   measured value is what the release notes and user docs publish.
 2. **Build Python: uv-managed python-build-standalone**, the same family the
    `zipseal-gui.command` launcher already uses, because Tk is present on every
    platform and PyInstaller compatibility with its dynamically linked
@@ -174,8 +183,9 @@ published. A smoke-tested artifact, never a second local build, is what ships.
 
 ## Phase 1 — macOS app (milestone M1)
 
-- [ ] Build a local unsigned `zipseal-gui.app`; open it from `dist/` and run a real
-      archive end to end (same inputs as the GUI plan smoke test).
+- [ ] Build a local unsigned `zipseal-gui.app`; open it from `dist/<version>/`
+      and run a real archive end to end (same inputs as the GUI plan smoke
+      test).
 - [ ] `Info.plist`: `CFBundleShortVersionString`/`CFBundleVersion` from
       `pyproject.toml`, a reverse-DNS `CFBundleIdentifier` derived from the
       GitHub owner (record the exact id when implementing),
@@ -202,16 +212,19 @@ published. A smoke-tested artifact, never a second local build, is what ships.
       up a GUI prompt in headless CI and hangs until the job times out), sign
       via the spec's `codesign_identity` + entitlements, verify with
       `codesign --verify --deep --strict`.
-- [ ] Notarization path: `xcrun notarytool submit --wait` does not accept a
-      bare `.app` bundle, so first zip it with `ditto -c -k --keepParent
-      dist/zipseal-gui.app dist/zipseal-gui-app.zip` and submit that zip; staple the
-      `.app` with `xcrun stapler staple dist/zipseal-gui.app`. Then build the DMG,
-      sign the DMG with `codesign`, submit the DMG to `notarytool`, and staple
-      the DMG with `xcrun stapler staple dist/zipseal-*.dmg`. Gate on
-      `spctl --assess -t exec -v dist/zipseal-gui.app` for the `.app` and
-      `spctl --assess -t open --context context:primary-signature -v
-      dist/zipseal-*.dmg` for the DMG (without `-v`, `spctl` prints nothing on
-      success).
+- [ ] Notarization path. Every path below is under `dist/<version>/`, the
+      directory `build.py` writes. `xcrun notarytool submit --wait` does not
+      accept a bare `.app` bundle, so first zip it with `ditto -c -k
+      --keepParent dist/<version>/zipseal-gui.app
+      dist/<version>/zipseal-gui-app.zip` and submit that zip; staple the
+      `.app` with `xcrun stapler staple dist/<version>/zipseal-gui.app`. Then
+      build the DMG, sign the DMG with `codesign`, submit the DMG to
+      `notarytool`, and staple the DMG with `xcrun stapler staple
+      dist/<version>/zipseal-*.dmg`. Gate on `spctl --assess -t exec -v
+      dist/<version>/zipseal-gui.app` for the `.app` and `spctl --assess -t
+      open --context context:primary-signature -v
+      dist/<version>/zipseal-*.dmg` for the DMG (without `-v`, `spctl` prints
+      nothing on success).
 - [ ] `.github/workflows/release.yml` triggers on `push` of tags matching
       `v*` and on `workflow_dispatch` with no inputs. Jobs: `check` (fast
       suite passes on both triggers; on a tag push, also require the tag to
@@ -234,8 +247,9 @@ published. A smoke-tested artifact, never a second local build, is what ships.
       `actions/attest-build-provenance`, then
       `gh release create vX.Y.Z --draft --title … --notes …` attaching
       everything. Release notes include the resolved Python, PyInstaller
-      version, runner image, glibc floor and Tk version per artifact, plus the
-      `SHA256SUMS` verification line and the `gh attestation verify` line.
+      version, runner image, and Tk version per artifact, the measured Linux
+      glibc floor, the `SHA256SUMS` verification line, and the
+      `gh attestation verify` line.
 - [ ] `dev-docs/releasing.md` (new durable doc): the tag-to-release runbook,
       the secrets list (names only), rollback (delete draft → delete tag → fix
       → re-tag), and the acceptance checklist from M1–M3. Add it to
@@ -246,16 +260,23 @@ published. A smoke-tested artifact, never a second local build, is what ships.
       `publish`. Pushing a tag is what creates the draft release, so a
       rehearsal tag would not do. Then the first real run at the next version
       bump; v0.1.0 stays source-only.
-- [ ] Manual acceptance (from M2 on): download the drafted release asset fresh
-      (the browser sets the quarantine flag), open the DMG, drag to
-      Applications, launch, create an archive with a generated password, open
-      it in Finder and 7-Zip. Record the date and macOS version here.
+- [ ] Manual acceptance (from M2 on, on a machine without Python): download
+      the drafted release asset fresh (the browser sets the quarantine flag),
+      open the DMG, drag to Applications, launch, create an archive with a
+      generated password, open it in Finder and 7-Zip. Record the date and
+      macOS version here.
 
 ## Phase 3 — Windows app
 
 - [ ] Build the onedir zip on `windows-latest` with the uv-managed Python;
       embed the exe icon and the file version resource.
 - [ ] CI smoke: start `zipseal-gui.exe`, wait, confirm it is alive, stop it.
+      A failure fails the job.
+- [ ] Manual acceptance (drafted release, on a machine without Python):
+      download the zip, unzip, run `zipseal-gui.exe`, create an archive with a
+      generated password, and open it in 7-Zip (Explorer's built-in zip
+      support is unreliable for AES; see `user-docs/opening-archives.md`).
+      Record the date and Windows version here.
 - [ ] Resolve signing (Decision 3) on both tracks:
   - SignPath Foundation application — only after the first tagged release has
     shipped the (unsigned) zip: SignPath requires the project to be already
@@ -279,12 +300,16 @@ published. A smoke-tested artifact, never a second local build, is what ships.
 
 ## Phase 4 — Linux app
 
-- [ ] Build inside a pinned `ubuntu:22.04` container for a glibc 2.35 floor
-      (PyInstaller bootloader itself is glibc 2.17+), onedir, then AppImage via
-      a pinned `appimagetool`; also produce the `.tar.gz`. `appimagetool` is
+- [ ] Build inside a pinned `ubuntu:22.04` container. That image has glibc
+      2.35; the PyInstaller bootloader itself is glibc 2.17+. Neither number
+      is the shipped floor. After the build, read the glibc requirement from
+      the bundled Python, Tcl/Tk and extension modules (Risk 8) and record
+      that measured floor in the release notes. Produce the onedir tree, then
+      an AppImage via a pinned `appimagetool`, and also the `.tar.gz`.
+      `appimagetool` is
       itself a Type 2 AppImage and will not run inside an unprivileged
       container without `/dev/fuse`, so extract it first (`./appimagetool-x86_64.AppImage --appimage-extract`) and invoke
-      `ARCH=x86_64 ./squashfs-root/AppRun dist/AppDir ...` with
+      `ARCH=x86_64 ./squashfs-root/AppRun dist/<version>/AppDir ...` with
       `APPIMAGE_EXTRACT_AND_RUN=1`. The container needs `file`, `binutils`
       (PyInstaller shells out to `objdump`/`objcopy`), `libc-bin` (for
       `ldd`), `desktop-file-utils` (`desktop-file-validate`), plus `xvfb` and
@@ -293,15 +318,21 @@ published. A smoke-tested artifact, never a second local build, is what ships.
       `Categories=Utility;Security;`), `AppRun`, generated icon.
 - [ ] CI smoke under `xvfb-run`: launch, wait, assert the process is alive, and
       if practical assert a window named `zipseal` exists
-      (`xdotool search --name`), then terminate.
+      (`xdotool search --name`), then terminate. A failure fails the job.
+- [ ] Manual acceptance (drafted release, on a machine without Python):
+      download the AppImage and the `.tar.gz`; extract the `.tar.gz` and run
+      the binary; run the AppImage (use `--appimage-extract-and-run` if FUSE
+      is unavailable); create an archive with a generated password, and open
+      it in 7-Zip or `bsdtar`. Record the date and distro here.
 - [ ] Docs: `chmod +x`, the FUSE fallback
       (`./zipseal-gui.AppImage --appimage-extract-and-run`), and that the
       `.tar.gz` runs from any folder.
 
 ## Phase 5 — Docs
 
-- [ ] `README.md` Install: a downloads table (macOS / Windows / Linux) and keep
-      `uv tool install` for the CLI.
+- [ ] `README.md` Install: a downloads table (macOS / Windows / Linux), the
+      measured Linux glibc floor from the release notes, and `uv tool install`
+      for the CLI.
 - [ ] `user-docs/gui.md` "Start it" → "Get the app": per-OS first-run notes
       (macOS: nothing to do; Windows: SmartScreen; Linux: chmod +x).
 - [ ] New `user-docs/troubleshooting-app.md` (or a section): SmartScreen, Smart
@@ -349,9 +380,12 @@ Each behavior gets a pytest test per repo convention. Packaging tests:
       present, returns False and the launch is unaffected".
 
 CI smoke gates (not pytest): the per-platform launch checks run
-against the artifact the workflow uploads, and the macOS job additionally gates
-on `codesign`/`spctl`/`stapler`. The manual acceptance is recorded
-in this plan with a date.
+against the artifact the workflow uploads. Windows and Linux fail the job
+when the process does not stay alive. The macOS launch check may be advisory
+when the runner is flaky; that job still gates on `codesign`/`spctl`/`stapler`.
+Manual acceptance of the drafted artifact, on a machine without Python, is
+recorded in this plan with a date for each platform and is the blocking gate
+for publish.
 
 ## Secrets to set up (names only)
 
@@ -382,17 +416,19 @@ in this plan with a date.
 7. **Size**: expect roughly 15–40 MB per artifact. If that matters, revisit
    `excludes` — not a gate.
 8. **Run-time floors** (macOS minimum, glibc, Windows version) come from the
-   bundled Python, not from Python's docs; measure and document the real ones.
+   bundled binaries — Python, Tcl/Tk and the extension modules — not from
+   Python's docs; measure and document the real ones.
 
 ## Milestones
 
-- **M1**: local macOS `zipseal-gui.app` runs from `dist/`, does a real archive;
+- **M1**: local macOS `zipseal-gui.app` runs from `dist/<version>/`, does a
+  real archive;
   Phase 0 tests green. No CI yet.
 - **M2**: tagged workflow produces a signed, notarized, stapled DMG as a draft
   release; manual acceptance recorded; maintainer publishes.
 - **M3**: Windows zip and Linux AppImage + tar.gz join the same workflow,
-  smoke-tested in CI, `SHA256SUMS` + attestations attached; Windows signing
-  resolved one way or the other.
+  smoke-tested in CI, accepted on a machine without Python, `SHA256SUMS` +
+  attestations attached; Windows signing resolved one way or the other.
 - **M4**: README, `user-docs/`, `AGENTS.md` and `SPEC.md` updated;
   `dev-docs/releasing.md` finalized (created and freshness-hooked in Phase 2);
   PyPI decision recorded.
@@ -431,3 +467,19 @@ in this plan with a date.
   on `workflow_dispatch`. `workflow_dispatch` takes no inputs and cannot
   publish; only a tag push runs `publish`. TODO.md names the Linux
   `.tar.gz` and the `uv tool install` CLI contract.
+
+- 2026-11-04: A second CodeRabbit review. The release contract now matches
+  the gates: CI smoke is a liveness check and may be advisory on macOS only,
+  and each platform's drafted artifact is accepted on a machine without
+  Python. Decision 1's glibc 2.17 is the bootloader floor; the shipped floor
+  is measured from the bundle. Signing and notarization paths use
+  `dist/<version>/`. The pre-populated Hardened Runtime entitlements stay;
+  an empty plist was not adopted.
+
+- 2026-11-04: An OpenCode DeepSeek V4.1 Flash review of those gates. Windows
+  acceptance opens the archive in 7-Zip, because Explorer's AES support is
+  unreliable. macOS acceptance runs on a machine without Python. The goal
+  states that only Windows and Linux CI smoke fails the job. Risk 8 measures
+  Python, Tcl/Tk and extension modules. The release-notes glibc floor is
+  Linux-only. Linux acceptance names the AppImage FUSE fallback and 7-Zip
+  or `bsdtar`.
