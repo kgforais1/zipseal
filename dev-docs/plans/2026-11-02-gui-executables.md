@@ -25,9 +25,10 @@ process does not stay alive, and the macOS launch check may be marked
 advisory when the headless runner is flaky. `codesign`, `spctl` and `stapler`
 still fail the macOS job, and the manual acceptance below is the blocking
 gate on every platform. Before the release is published, the drafted artifact
-for macOS, Windows and Linux is accepted on a machine without Python: launch
-it, create an archive with a generated password, and open that archive. The
-artifact that was smoke-tested is what ships, never a second local build.
+for every platform that release contains is accepted on a machine without
+Python (macOS only at M2; Windows and Linux join at M3): launch it, create an
+archive with a generated password, and open that archive. The artifact that
+was smoke-tested is what ships, never a second local build.
 
 ## Non-goals
 
@@ -87,32 +88,44 @@ artifact that was smoke-tested is what ships, never a second local build.
      re-signing removes SmartScreen warnings. Decision after the spike passes
      certification once; do not commit to the Store before that.
    - **In parallel until one lands**: the zip ships unsigned with documented
-     "More info → Run anyway" steps and a note that Windows 11 Smart App Control
-     may block unsigned apps outright. No calendar cost, only documentation debt.
+     "More info → Run anyway" steps and a note that Windows 11 Smart App
+     Control may block unsigned apps outright. No calendar cost, only
+     documentation debt. Each route signs a different thing: SignPath signs
+     the downloadable zip itself, while the Store re-signs only the MSIX it
+     distributes, so the portable zip stays unsigned if the Store is the
+     route that lands. "Windows signing resolved" always names the artifact.
 4. **macOS: Developer ID + notarization** (the Apple Developer account is
    already available). Sign the `.app` with hardened runtime and a secure
    timestamp, notarize with `notarytool` using an App Store Connect API key,
    staple the `.app` and the DMG, and gate CI on `codesign --verify --deep
-   --strict`, `spctl --assess -t exec -v` and `stapler validate`. Pre-populate
-   `packaging/macos/entitlements.plist` with
-   `com.apple.security.cs.allow-unsigned-executable-memory` and
-   `com.apple.security.cs.disable-library-validation` — the documented fix for
-   W^X and loader failures under Hardened Runtime (`--options runtime`), which
-   bite some CPython/libffi builds. Keep both for the first signed build,
-   then verify empirically: the signed app must launch and notarize. If either
-   entitlement is provably unneeded, remove it and record why here (Risk 3
-   expects entitlement iteration).
+   --strict`, `spctl --assess -t exec -v` and `stapler validate`. Start with
+   an empty `packaging/macos/entitlements.plist`, then add
+   `com.apple.security.cs.allow-unsigned-executable-memory` or
+   `com.apple.security.cs.disable-library-validation` only after a
+   reproducible W^X or loader failure on the exact signed bundle, recording
+   the failing log and the entitlement that fixed it here. Both exceptions
+   weaken hardened runtime (unsigned executable memory, library validation
+   off), so neither is carried "just in case", and release acceptance rejects
+   any entitlement the bundle does not demonstrably need. Risk 3 expects this
+   iteration.
 5. **Nothing build-output is ever committed.** `dist/` and `build/` are already
    in `.gitignore`; extend both `.gitignore` and `.forbidden-paths` with the
    artifact globs (`*.dmg`, `*.msi`, `*.exe`, `*.AppImage`, `*.tar.gz`) so even a
    force-added artifact cannot be committed.
-6. **Release mechanics**: tag `vX.Y.Z` → `release.yml` builds on a pinned
-   runner image per platform → smoke tests the built artifact → writes
-   `SHA256SUMS` → attests each artifact (`actions/attest-build-provenance`
-   v4.x; public repo, so free) → creates a **draft** GitHub Release. The
-   maintainer publishes it after the manual acceptance checks below.
-   `release.yml` also runs on `workflow_dispatch` (no inputs) to rehearse
-   the build and smoke test without drafting a release.
+6. **Release mechanics**: tag `vX.Y.Z` → `release.yml` builds on a pinned,
+   versioned runner image per platform (`macos-15`, `windows-2025`,
+   `ubuntu-24.04`; never a `-latest` label, so a tagged release cannot change
+   under the project without a commit) → smoke tests the built artifact →
+   writes `SHA256SUMS` → attests each artifact
+   (`actions/attest-build-provenance` v4.x; public repo, so free) → creates a
+   **draft** GitHub Release. The maintainer publishes it after the manual
+   acceptance checks below. `release.yml` also runs on `workflow_dispatch`
+   (no inputs) to rehearse the build and smoke test without drafting a
+   release; a rehearsal builds with signing skipped and never receives the
+   signing secrets (Phase 2). `publish` runs only for a tag push, groups on
+   `release-<tag>` so two runs cannot publish one version, and first asserts
+   the tag still resolves to `github.sha` — a moved or deleted tag fails instead
+   of shipping artifacts under a label that now points elsewhere.
 7. **Icons are generated at build time from `src/zipseal/icon.svg`**
    (nothing raster enters the repo; `*.png` is blocked by design). macOS needs
    an `.icns`, Windows an `.ico` for the exe plus a window icon, Linux a
@@ -162,16 +175,20 @@ artifact that was smoke-tested is what ships, never a second local build.
   - `build.py` — one entry point:
     `uv run --group build python packaging/build.py --target {macos,windows,linux}`
     with `--skip-sign` for local runs and `--version` defaulting to
-    `pyproject.toml`. Outputs under `dist/<version>/`.
+    `pyproject.toml`. Outputs under `dist/<version>/`. Before freezing it
+    runs a per-target preflight under the target's display setup (none on
+    macOS and Windows, `xvfb-run` in the Linux container): import
+    `tkinter`, create and destroy a `tk.Tk()` root, and assert that Tcl/Tk
+    resolve to support files inside the extracted Python distribution, so a
+    build that silently picks up the host's Tcl/Tk fails there instead of on
+    a user's machine.
   - `zipseal-gui.spec` — onedir, windowed, entry point `run_gui.py`,
     `name="zipseal-gui"`, macOS BUNDLE `zipseal-gui.app`, bundle id, version
     substitution, `datas` (the SVG), and `excludes` (`pytest`, `hypothesis`,
     `basedpyright`, `yaml`, `PIL` if unused).
-  - `macos/entitlements.plist` — pre-populated with
-      `com.apple.security.cs.allow-unsigned-executable-memory` and
-      `com.apple.security.cs.disable-library-validation` (Decision 4's
-      documented Hardened-Runtime fix; verify on the first signed build and
-      trim only per Decision 4).
+  - `macos/entitlements.plist` — empty at first; entitlements are added one
+      at a time only for a reproducible failure on the exact signed bundle,
+      with the failing log recorded in Decision 4.
   - `windows/version_info.txt` template.
   - `linux/zipseal-gui.desktop` and `linux/AppRun` for the AppImage.
   - `icons.py` — SVG to `.icns`/`.ico`/`.png` at build time; pinned tool.
@@ -196,17 +213,23 @@ artifact that was smoke-tested is what ships, never a second local build.
       supports — verify on the oldest macOS you can, do not guess the floor.
 - [ ] Make the DMG: `hdiutil create -format UDZO`, `zipseal-gui.app` plus an
       Applications symlink (drag-install).
-- [ ] Manual acceptance (local build — M1 has no CI): set a synthetic
-      `com.apple.quarantine` xattr on `zipseal-gui.app` so the Gatekeeper path
-      is exercised, open the DMG, drag to Applications, launch, create an
-      archive with a generated password, open it in Finder and 7-Zip. Record
-      the date and macOS version here. The download-from-the-draft-release
+- [ ] Manual acceptance (local build — M1 has no CI): open the DMG, drag the
+      app to Applications, then set a synthetic `com.apple.quarantine` xattr
+      on the installed copy so the Gatekeeper path is exercised. The unsigned
+      build is expected to be refused; confirm the block, then launch anyway
+      (macOS 15+ removed the Control-click override: System Settings →
+      Privacy & Security → "Open Anyway"; older macOS: Control-click the app
+      → Open) and finish the check: create an archive with a generated
+      password and open it in Finder and 7-Zip. Record the date, macOS
+      version and the override path used. The download-from-the-draft-release
       variant runs from M2 on (the last bullet of Phase 2).
 
 ## Phase 2 — macOS signing, notarization & release pipeline (milestone M2)
 
-- [ ] CI signing path: import the Developer ID certificate from secrets into a
-      temporary keychain, then unlock it for codesign with `security
+- [ ] CI signing path (tag pushes only; the `release.yml` bullet below holds
+      the environment gate): import the Developer ID certificate from the
+      environment's secrets into a temporary keychain, then unlock it for
+      codesign with `security
       set-key-partition-list -S apple-tool:,apple:,codesign: -s -k
       "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"` (without this, `codesign` pops
       up a GUI prompt in headless CI and hangs until the job times out), sign
@@ -230,15 +253,26 @@ artifact that was smoke-tested is what ships, never a second local build.
       suite passes on both triggers; on a tag push, also require the tag to
       equal `v` plus the `pyproject.toml` version per Decision 9),
       `build-macos`, `publish`. `publish` runs only when
-      `github.event_name == 'push'` for a tag. A `workflow_dispatch` run
-      builds and smoke-tests and skips `publish`, because a branch dispatch
-      has no release tag and must not create one. macOS-only at M2; Phases 3
-      and 4 append `build-windows` and `build-linux` when those platforms
-      land, so no job sits dead before its phase. Every action pinned by
-      full SHA with a tag comment (the `check-pins` hook enforces SHA
-      validity; `# tag` comments on workflow actions are repo style
-      convention). Minimal top-level `permissions:`; `contents: write` only
-      in `publish`; `id-token: write` + `attestations: write` for provenance.
+      `github.event_name == 'push'` for a tag, checks out with
+      `fetch-depth: 0`, and starts by asserting the tag still resolves to the
+      triggering commit (`git rev-parse "refs/tags/$GITHUB_REF_NAME^{commit}"`
+      equals `GITHUB_SHA`), so a tag moved or deleted mid-run fails instead
+      of shipping artifacts under a label that now points elsewhere.
+      `concurrency: group: release-${{ github.ref_name }}` with
+      `cancel-in-progress: false` keeps two runs from publishing one version.
+      macOS signing and notarization read the Apple secrets from a protected
+      `release` environment restricted to `v*` tags with a required reviewer,
+      and are guarded by `if: startsWith(github.ref, 'refs/tags/v')`; a
+      `workflow_dispatch` run builds with `--skip-sign` and never sees them,
+      so branch code cannot make off with the certificate. A dispatch also
+      skips `publish`, because it has no release tag and must not create one.
+      macOS-only at M2; Phases 3 and 4 append `build-windows` and
+      `build-linux` when those platforms land, so no job sits dead before its
+      phase. Every action pinned by full SHA with a tag comment (the
+      `check-pins` hook enforces SHA validity; `# tag` comments on workflow
+      actions are repo style convention). Minimal top-level `permissions:`;
+      `contents: write` only in `publish`; `id-token: write` +
+      `attestations: write` for provenance.
 - [ ] CI smoke: launch the built app's inner binary, wait, confirm it is
       alive, terminate. Mark advisory if the runner proves flaky; the real
       gate is the manual acceptance at the end of this phase.
@@ -256,10 +290,10 @@ artifact that was smoke-tested is what ships, never a second local build.
       `REQUIRED_FILES` in `hooks/scripts/check_doc_freshness.py` and to the
       durable-doc list in `dev-docs/README.md` so the freshness hook covers it.
 - [ ] Rehearse first: run the workflow with `workflow_dispatch` (the
-      `release.yml` bullet above). That builds the artifact and skips
-      `publish`. Pushing a tag is what creates the draft release, so a
-      rehearsal tag would not do. Then the first real run at the next version
-      bump; v0.1.0 stays source-only.
+      `release.yml` bullet above). That builds the unsigned artifact
+      (`--skip-sign`, no secrets) and skips `publish`. Pushing a tag is what
+      creates the draft release, so a rehearsal tag would not do. Then the
+      first real run at the next version bump; v0.1.0 stays source-only.
 - [ ] Manual acceptance (from M2 on, on a machine without Python): download
       the drafted release asset fresh (the browser sets the quarantine flag),
       open the DMG, drag to Applications, launch, create an archive with a
@@ -268,8 +302,12 @@ artifact that was smoke-tested is what ships, never a second local build.
 
 ## Phase 3 — Windows app
 
-- [ ] Build the onedir zip on `windows-latest` with the uv-managed Python;
-      embed the exe icon and the file version resource.
+- [ ] Build the onedir zip on a versioned Windows label (`windows-2025`, or
+      `windows-2022` if that image is what the plan offers when this phase
+      lands — decide then; never `windows-latest`) with the uv-managed
+      Python; embed the exe icon and the file version resource. A deliberate
+      runner bump is its own commit and is recorded in
+      `dev-docs/releasing.md`.
 - [ ] CI smoke: start `zipseal-gui.exe`, wait, confirm it is alive, stop it.
       A failure fails the job.
 - [ ] Manual acceptance (drafted release, on a machine without Python):
@@ -292,9 +330,17 @@ artifact that was smoke-tested is what ships, never a second local build.
     onedir as a full-trust MSIX, submit once, confirm Microsoft re-signing
     removes SmartScreen warnings. Decision after the spike; do not commit to
     the Store before it passes certification once.
-  - Until signed: document "More info → Run anyway", note Smart App Control on
-    Windows 11 may block unsigned apps, and submit any AV false positive to
-    Microsoft's portal.
+  - Guidance that outlives signing: keep the "More info → Run anyway" steps
+    in the docs for every zip until a signed release is observed warning-free
+    on a clean Windows machine — a fresh signature and publisher start with no
+    SmartScreen reputation, so a signed build can still warn. Document the
+    verified-publisher variant where the prompt names the publisher. Note
+    that Windows 11 Smart App Control may block unsigned apps outright, and
+    submit any AV false positive to Microsoft's portal.
+  - What Store signing covers: the Store re-signs only the MSIX it
+    distributes. If that is the route that lands, the downloadable zip stays
+    unsigned and keeps the guidance above; only SignPath (or a purchased
+    certificate) signs the zip itself.
 - [ ] Optional, deferred until asked: Inno Setup installer (the portable zip is
       the artifact this plan promises) and a winget manifest PR.
 
@@ -340,8 +386,9 @@ artifact that was smoke-tested is what ships, never a second local build.
       and how to tell which version is installed (the download filename and
       the release page — the frozen window shows no version).
 - [ ] `AGENTS.md`: build command, `packaging/` in the layout, release workflow.
-- [ ] `SPEC.md`: the packaging line (around line 106) becomes the artifact
-      table above; note the GUI ships frozen while the CLI stays source.
+- [ ] `SPEC.md`: replace the "planned, not implemented" note added with this
+      plan (around line 106) with the artifact table above; the GUI ships
+      frozen while the CLI stays source-installable.
 - [ ] `CHANGELOG.md` (user-visible) and `CHANGELOG.dev.md` (workflow internals);
       doc-gardening pass; bump `Last reviewed` dates after re-reading.
 
@@ -369,10 +416,9 @@ Each behavior gets a pytest test per repo convention. Packaging tests:
       fails the forbidden-paths hook when tracked.
 - [ ] `packaging/linux/zipseal-gui.desktop` has `Name`, `Exec`, `Icon`,
       `Terminal=false`, sorted `Categories`; `AppRun` is tracked executable.
-- [ ] `packaging/macos/entitlements.plist` parses with `plistlib` and contains
-      `com.apple.security.cs.allow-unsigned-executable-memory` and
-      `com.apple.security.cs.disable-library-validation` (Decision 4 — removal
-      requires a Decision 4 note).
+- [ ] `packaging/macos/entitlements.plist` parses with `plistlib` and
+      contains only keys Decision 4 lists with the failure that required them
+      (an empty plist passes).
 - [ ] `collect_data_files()` includes `src/zipseal/icon.svg` (the freeze-time
       icon dependency), matching `gui.ICON`'s source path.
 - [ ] If the PNG fallback lands: `tests/test_window_icon.py` gains a case for
@@ -392,8 +438,11 @@ for publish.
 `APPLE_CERT_P12` (base64 Developer ID Application .p12), `APPLE_CERT_PASSWORD`,
 `APPLE_TEAM_ID`, `APPLE_API_KEY_ID`, `APPLE_API_ISSUER_ID`,
 `APPLE_API_PRIVATE_KEY` (base64 .p8), `KEYCHAIN_PASSWORD` (ephemeral chain).
-`SIGNPATH_*` only if Phase 3 signing is approved. Linux needs no secrets.
-`dev-docs/releasing.md` documents where each comes from and how to rotate it.
+All Apple secrets live in the protected `release` environment (tag-only
+deployment rule, required reviewer); `workflow_dispatch` rehearsals run
+without them. `SIGNPATH_*` only if Phase 3 signing is approved. Linux needs
+no secrets. `dev-docs/releasing.md` documents where each comes from and how
+to rotate it.
 
 ## Risks and open questions
 
@@ -403,9 +452,10 @@ for publish.
    the Store spike. Neither path costs money, which is the point of Decision 3.
 2. **Store MSIX effort is unknown** for a PyInstaller onedir app (full-trust
    packaging, Store certification). The spike is deliberately time-boxed.
-3. **Notarization surprises**: first submission may need an entitlement tweak
-   (Tk/PyInstaller). Budget a few iterations; every future release must stay
-   signed and stapled or user trust breaks.
+3. **Notarization surprises**: the first submission may need an entitlement
+   (Tk/PyInstaller). Budget a few iterations; each added entitlement needs
+   its failure recorded in Decision 4. Every future release must stay signed
+   and stapled or user trust breaks.
 4. **AV false positives** are a PyInstaller reality; onedir reduces them, and
    consistent signing helps reputation. Respond to reports via Microsoft's
    portal; document known reports in the troubleshooting page.
@@ -428,7 +478,9 @@ for publish.
   release; manual acceptance recorded; maintainer publishes.
 - **M3**: Windows zip and Linux AppImage + tar.gz join the same workflow,
   smoke-tested in CI, accepted on a machine without Python, `SHA256SUMS` +
-  attestations attached; Windows signing resolved one way or the other.
+  attestations attached; the Windows signing outcome is recorded per
+  artifact (zip signed, or zip unsigned with the Store MSIX signed
+  separately).
 - **M4**: README, `user-docs/`, `AGENTS.md` and `SPEC.md` updated;
   `dev-docs/releasing.md` finalized (created and freshness-hooked in Phase 2);
   PyPI decision recorded.
@@ -473,8 +525,9 @@ for publish.
   and each platform's drafted artifact is accepted on a machine without
   Python. Decision 1's glibc 2.17 is the bootloader floor; the shipped floor
   is measured from the bundle. Signing and notarization paths use
-  `dist/<version>/`. The pre-populated Hardened Runtime entitlements stay;
-  an empty plist was not adopted.
+  `dist/<version>/`. The pre-populated Hardened Runtime entitlements stayed
+  at that pass; the 2026-11-10 review below reversed that to least
+  privilege.
 
 - 2026-11-04: An OpenCode DeepSeek V4.1 Flash review of those gates. Windows
   acceptance opens the archive in 7-Zip, because Explorer's AES support is
@@ -483,3 +536,18 @@ for publish.
   Python, Tcl/Tk and extension modules. The release-notes glibc floor is
   Linux-only. Linux acceptance names the AppImage FUSE fallback and 7-Zip
   or `bsdtar`.
+
+- 2026-11-10: CodeRabbit, Greptile and Sourcery reviews of the current head.
+  Entitlements start empty and are added only for a reproducible failure on
+  the exact signed bundle; least privilege wins over "just in case".
+  Rehearsals run `--skip-sign` and the Apple secrets sit in a protected
+  `release` environment restricted to `v*` tags, so branch code cannot reach
+  them. `publish` groups per tag and asserts the tag still resolves to
+  `github.sha`. The acceptance gate names only the platforms a release
+  contains (macOS at M2). Windows notes separate Store MSIX signing from the
+  unsigned portable zip and keep SmartScreen guidance until a signed release
+  is observed warning-free. M1 acceptance expects Gatekeeper to block the
+  unsigned build and documents the Open Anyway override. Runners use
+  versioned labels. `build.py` preflights Tk per target. `SPEC.md` gains a
+  marked "planned, not implemented" distribution note so the design doc and
+  the plan agree until Phase 5.

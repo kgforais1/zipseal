@@ -1,7 +1,7 @@
 # zipseal — plan and design specification
 
 Status: implemented and released as v0.1.0, 2026-10-08. Drafted 2026-10-07.
-Last reviewed: 2026-10-10
+Last reviewed: 2026-11-10
 
 `zipseal` is a CLI that takes files and folders and writes them into one
 password-protected zip, or into several zips that each stay under a size cap.
@@ -108,6 +108,12 @@ Run them with `uv run zipseal …` and `uv run zipseal-gui`, or install both
 with `uv tool install .`. On macOS, `zipseal-gui.command` at the repo root
 runs `uv run --managed-python zipseal-gui` from the clone when double-clicked in Finder, and
 `scripts/set-icon.sh` gives it the `src/zipseal/icon.svg` icon.
+
+Planned, not implemented: the GUI is also intended to ship as a frozen
+download per platform (macOS DMG, Windows zip, Linux AppImage and tarball),
+needing neither Python nor `uv`; `dev-docs/plans/2026-11-02-gui-executables.md`
+is the plan. Until its Phase 5 lands, this section describes the supported
+install.
 
 ### 5.1 The GUI
 
