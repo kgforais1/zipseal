@@ -20,15 +20,12 @@ builds: the CLI remains source-installable from GitHub with `uv tool install`
 
 Every artifact is built in CI from the tagged commit and attached to a GitHub
 Release together with `SHA256SUMS` and a build provenance attestation. CI
-smoke launches that same artifact: Windows and Linux fail the job if the
-process does not stay alive, and the macOS launch check may be marked
-advisory when the headless runner is flaky. `codesign`, `spctl` and `stapler`
-still fail the macOS job, and the manual acceptance below is the blocking
-gate on every platform. Before the release is published, the drafted artifact
-for every platform that release contains is accepted on a machine without
-Python (macOS only at M2; Windows and Linux join at M3): launch it, create an
-archive with a generated password, and open that archive. The artifact that
-was smoke-tested is what ships, never a second local build.
+smoke launches that same artifact; Windows and Linux fail the job, the macOS
+check may be advisory, and `codesign`/`spctl`/`stapler` still fail it. Before
+publishing, the drafted artifact for every platform the release contains
+(macOS at M2; Windows and Linux from M3) is accepted on a machine with no
+Python on PATH: launch it, create an archive with a generated password, open
+it. The smoke-tested artifact is what ships, never a second local build.
 
 ## Non-goals
 
@@ -52,9 +49,9 @@ was smoke-tested is what ships, never a second local build.
 
 1. **Freezer: PyInstaller** (pinned in a build dependency group). It handles
    Tcl/Tk on all three targets, can codesign `.app` bundles
-   (`--codesign-identity`, hardened runtime) and produces both `onedir` and
-   `onefile`; `onedir` is chosen to keep AV false positives rare (a known
-   `onefile` problem) and startup fast. **Briefcase is rejected**: its Windows
+   (`--codesign-identity`, hardened runtime) and produces `onedir` and
+   `onefile`; `onedir` keeps AV false positives rare and startup fast.
+   **Briefcase is rejected**: its Windows
    backend uses the python.org Windows Embeddable package, which has no
    `tkinter` ("Tkinter is not available", briefcase docs, checked 2026-11-02) —
    a hard blocker for this GUI. Nuitka is rejected: no need for compilation,
@@ -90,10 +87,10 @@ was smoke-tested is what ships, never a second local build.
      `signtool verify /pa /v` in CI and again at manual acceptance.
    - **Microsoft Store (MSIX)**: individual registration is free since
      September 2025, and Store MSIX packages are re-signed by Microsoft — the
-     only recorded way to get zero SmartScreen warnings. Run a time-boxed spike:
-     package the onedir app as a full-trust MSIX, submit once, confirm Microsoft
-     re-signing removes SmartScreen warnings. Decision after the spike passes
-     certification once; do not commit to the Store before that.
+     only recorded way to zero SmartScreen warnings. Run a time-boxed spike:
+     package the onedir as a full-trust MSIX, submit once, and confirm
+     re-signing removes the warnings. Decide only after it passes
+     certification once.
    - **In parallel until one lands**: the zip ships unsigned with documented
      "More info → Run anyway" steps and a note that Windows 11 Smart App
      Control may block unsigned apps outright. No calendar cost, only
@@ -184,7 +181,11 @@ was smoke-tested is what ships, never a second local build.
   - `build.py` — one entry point:
     `uv run --group build python packaging/build.py --target {macos,windows,linux}`
     with `--skip-sign` for local runs and `--version` defaulting to
-    `pyproject.toml`. Outputs under `dist/<version>/`. Before freezing it
+    `pyproject.toml`. Outputs under `dist/<version>/`. The interpreter is
+    pinned by exact version from one shared constant: the job runs `uv python
+    install <pin>` then `uv run --python <pin> --group build …`, and
+    `build.py` fails unless `platform.python_version()` matches, so
+    `.python-version` (3.12) cannot leak into a release. Before freezing it
     runs a per-target preflight under the target's display setup (none on
     macOS and Windows, `xvfb-run` in the Linux container): import
     `tkinter`, create and destroy a `tk.Tk()` root, and assert that Tcl/Tk
@@ -193,8 +194,10 @@ was smoke-tested is what ships, never a second local build.
     a user's machine.
   - `zipseal-gui.spec` — onedir, windowed, entry point `run_gui.py`,
     `name="zipseal-gui"`, macOS BUNDLE `zipseal-gui.app`, bundle id, version
-    substitution, `datas` (the SVG), and `excludes` (`pytest`, `hypothesis`,
-    `basedpyright`, `yaml`, `PIL` if unused).
+    substitution, `datas` (the SVG and the generated PNG), and `excludes`
+    (`pytest`, `hypothesis`, `basedpyright`, `yaml`) — build-only tools such
+    as Pillow and `resvg` never enter the bundle, because the entry point is
+    `run_gui.py`.
   - `macos/entitlements.plist` — empty at first; entitlements are added one
       at a time only for a reproducible failure on the exact signed bundle,
       with the failing log recorded in Decision 4.
@@ -203,16 +206,15 @@ was smoke-tested is what ships, never a second local build.
   - `icons.py` — SVG → PNG (`resvg`), `.ico` (Pillow, `build` group) and
       `.icns` (`iconutil`, macOS runner) at build time; pinned tools.
       Generated rasters are written to `build/icons/` (never `src/`, since
-      `*.png` is blocked by `.forbidden-paths`), and PyInstaller bundles them
-      via `datas`.
+      `*.png` is blocked by `.forbidden-paths`), and the window-icon PNG is
+      bundled with `datas=[("build/icons/icon.png", "zipseal")]` — the same
+      `_MEIPASS/zipseal/` location the Tk 8.6 fallback looks next to `ICON`.
 - [ ] Bring `packaging/` under the existing quality gates, or its first
-      commit fails `pre-commit run --all-files`: add `"packaging"` to
-      `[tool.basedpyright].include` in `pyproject.toml` (today
-      `["src", "tests"]`) and to the basedpyright hook's `files:` regex in
-      `.pre-commit-config.yaml`, and add
-      `"packaging/**" = ["S603", "S607"]` to `ruff.toml`'s per-file-ignores
-      (`build.py` shells out to `hdiutil`, `codesign`, `xcrun`, `objcopy` and
-      `appimagetool`).
+      commit fails `pre-commit run --all-files`: add it to
+      `[tool.basedpyright].include` (`pyproject.toml`, today `["src",
+      "tests"]`) and the basedpyright hook's `files:` regex, and add
+      `"packaging/**" = ["S603", "S607"]` to `ruff.toml` (`build.py` shells
+      out to `hdiutil`, `codesign`, `xcrun`, `objcopy`, `appimagetool`).
 - [ ] `tests/test_packaging.py` covering the test list below; load
       `packaging/build.py` with `importlib.util.spec_from_file_location`, as
       `tests/test_check_pins.py` loads its hook, and never add `packaging` to
@@ -258,18 +260,23 @@ was smoke-tested is what ships, never a second local build.
       set-key-partition-list -S apple-tool:,apple:,codesign: -s -k
       "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"` (without this, `codesign` pops
       up a GUI prompt in headless CI and hangs until the job times out).
-      Import the certificate, sign via the spec's `codesign_identity` +
-      entitlements, verify with `codesign --verify --deep --strict`, and run
-      `security delete-keychain "$KEYCHAIN_PATH"` from an `if: always()` step.
+      Import the certificate, then sign the downloaded bundle in place —
+      nested Mach-O first, then the outer bundle: `codesign --force --options
+      runtime --timestamp --entitlements packaging/macos/entitlements.plist
+      --sign "$IDENTITY" dist/<version>/zipseal-gui.app`. The spec leaves
+      `codesign_identity` unset and `build-macos` always passes `--skip-sign`,
+      so freezing and signing stay in separate jobs. Verify with `codesign
+      --verify --deep --strict`, and run `security delete-keychain
+      "$KEYCHAIN_PATH"` from an `if: always()` step.
 - [ ] Notarization path. Every path is under `dist/<version>/`, the directory
       `build.py` writes. `notarytool submit --wait` rejects a bare `.app`, so
       zip it first (`ditto -c -k --keepParent dist/<version>/zipseal-gui.app
       dist/<version>/zipseal-gui-app.zip`), submit, then staple the `.app`.
-      Then build and sign the DMG, notarize and staple it. Gate on `spctl
-      --assess -t exec -v dist/<version>/zipseal-gui.app` and `spctl --assess
-      -t open --context context:primary-signature -v
-      dist/<version>/zipseal-*.dmg` (without `-v`, `spctl` prints nothing on
-      success).
+      Then build and sign the DMG, notarize and staple it. Gate on `xcrun
+      stapler validate` for both the `.app` and the DMG, `spctl --assess -t
+      exec -v dist/<version>/zipseal-gui.app`, and `spctl --assess -t open
+      --context context:primary-signature -v dist/<version>/zipseal-*.dmg`
+      (without `-v`, `spctl` prints nothing on success).
 - [ ] `.github/workflows/release.yml` triggers on `push` of tags matching
       `v*` and on `workflow_dispatch` with no inputs. Jobs: `check` (fast
       suite passes on both triggers; on a tag push, also require the tag to
@@ -280,41 +287,33 @@ was smoke-tested is what ships, never a second local build.
       `persist-credentials: false` elsewhere; without them `ls-remote` is
       anonymous), and starts by asking the remote where the tag points:
       `git ls-remote --tags origin "refs/tags/$GITHUB_REF_NAME"` returns the
-      tag ref and, for an annotated tag, a peeled
-      `refs/tags/$GITHUB_REF_NAME^{}` entry too. Compare the peeled SHA with
-      `GITHUB_SHA` when it is present, and the tag ref's own SHA when it is
-      not (a lightweight tag). The local ref only reflects what was fetched
-      at checkout, so the remote is the authority. It then creates the
-      release with `gh release create --verify-tag`, so a tag moved or deleted
-      after the checkout fails the job instead of shipping artifacts under a
-      label that now points elsewhere. A `v*` repository tag ruleset lets only
-      maintainers create tags and forbids updates and deletions, so the
-      publication window cannot be exploited.
+      tag ref, plus a peeled `^{}` entry for an annotated tag; compare the
+      peeled SHA with `GITHUB_SHA` when present and the tag ref's own SHA for
+      a lightweight tag (the local ref only shows what was fetched). It then
+      runs `gh release create --verify-tag`, so a moved or deleted tag fails
+      instead of shipping under a label that points elsewhere, and a `v*` tag
+      ruleset lets only maintainers create tags and forbids updates and
+      deletions.
       `concurrency: group: release-${{ github.ref_name }}` with
       `cancel-in-progress: false` keeps two runs from publishing one version.
-      Signing needs its own job: `environment` exists only at job level, and
-      a `release` environment whose deployment rule allows only `v*` tags
-      fails any job that requests it from a branch ref — which is what a
-      dispatch gives you. So `build-macos` runs on both triggers with no
-      environment and no secrets (it builds, smoke-tests and uploads), and
-      `sign-macos` is guarded by
+      Signing needs its own job: `environment` is job-level only, and a
+      `release` environment restricted to `v*` tags fails any job that
+      requests it from a branch ref — which is what a dispatch gives you. So
+      `build-macos` runs on both triggers with no environment and no secrets
+      (build, smoke test, upload), and `sign-macos` is guarded by
       `if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')`,
-      declares `environment: release` (restricted to `v*` tags, required
-      reviewer, "prevent self-review"), downloads the uploaded bytes, and
-      signs, notarizes, staples and builds the DMG around them. Only a
-      signature is added, so the smoke-tested artifact is still what ships.
-      The event guard is load-bearing: `workflow_dispatch` can target a `v*`
-      tag, and without the event test the ref alone would satisfy the
-      condition and request the environment. Keep the roles disjoint: a
-      maintainer allowed to create `v*` tags is not an environment approver,
-      so one account cannot both create the tag and approve its own secret
-      access. On a single-maintainer setup, record the compensating control
-      here (a second approver account, or a written exception). `publish`
-      takes no environment — it holds no Apple secrets — and a dispatch skips
-      it because it must not create a release.
-      macOS-only at M2; Phases 3 and 4 append `build-windows` and
-      `build-linux` when those platforms land, so no job sits dead before its
-      phase. Every action pinned by full SHA with a tag comment (the
+      declares `environment: release` (restricted to `v*`, required reviewer,
+      self-review prevented), downloads the uploaded bytes and signs,
+      notarizes, staples and builds the DMG around them. Only a signature is
+      added, so the smoke-tested artifact is still what ships. The event guard
+      is load-bearing: a dispatch can target a `v*` tag, so the ref test alone
+      would request the environment. Tag creators are not approvers, so one
+      account cannot both create the tag and approve its own secret access; a
+      single-maintainer setup records its compensating control here. `publish`
+      takes no environment, and a dispatch skips it.
+      macOS-only at M2; Phases 3 and 4 append `build-windows`/`sign-windows`
+      and `build-linux` when those platforms land, so no job sits dead before
+      its phase. Every action pinned by full SHA with a tag comment (the
       `check-pins` hook enforces SHA validity; `# tag` comments on workflow
       actions are repo style convention). Minimal top-level `permissions:`;
       `contents: write` only in `publish`; `id-token: write` +
@@ -322,16 +321,14 @@ was smoke-tested is what ships, never a second local build.
 - [ ] CI smoke: launch the built app's inner binary, wait, confirm it is
       alive, terminate. Mark advisory if the runner proves flaky; the real
       gate is the manual acceptance at the end of this phase.
-- [ ] Publish job: collect artifacts, write `SHA256SUMS` (sha256 over every
-      artifact), attest each artifact and the sums with
-      `actions/attest-build-provenance`, then
+- [ ] Publish job: collect artifacts, write `SHA256SUMS`, attest each artifact
+      and the sums with `actions/attest-build-provenance`, then
       `gh release create vX.Y.Z --draft --verify-tag --title … --notes …`
-      attaching everything. `--verify-tag` refuses to create the tag itself,
-      which would otherwise happen silently from the default branch. Release
-      notes include the resolved Python, PyInstaller version, runner image,
-      and Tk version per artifact, the measured Linux
-      glibc floor, the `SHA256SUMS` verification line, and the
-      `gh attestation verify` line.
+      attaching everything (`--verify-tag` refuses to create the tag itself,
+      which would otherwise happen silently from the default branch). Release
+      notes include the resolved Python, PyInstaller, runner image and Tk
+      version per artifact, the measured Linux glibc floor, and the
+      `SHA256SUMS` / `gh attestation verify` lines.
 - [ ] `dev-docs/releasing.md` (new durable doc): the tag-to-release runbook,
       the secrets list (names only), rollback (delete draft → delete tag → fix
       → re-tag; deleting a tag needs a deliberate bypass of the `v*` tag
@@ -358,11 +355,12 @@ was smoke-tested is what ships, never a second local build.
 
 ## Phase 3 — Windows app
 
-- [ ] Build the onedir zip on a versioned Windows label (`windows-2025`, or
-      `windows-2022` if that image is what the plan offers when this phase
-      lands — decide then; never `windows-latest`) with the uv-managed
-      Python; embed the exe icon and the file version resource. A deliberate
-      runner bump is its own commit and is recorded in
+- [ ] Build the onedir zip unsigned in `build-windows` (both triggers, no
+      environment, uploads the zip) on a versioned Windows label
+      (`windows-2025`, or `windows-2022` if that image is what the plan
+      offers when this phase lands — decide then; never `windows-latest`)
+      with the uv-managed Python; embed the exe icon and the file version
+      resource. A deliberate runner bump is its own commit, recorded in
       `dev-docs/releasing.md`.
 - [ ] CI smoke: start `zipseal-gui.exe`, wait, confirm it is alive, stop it.
       A failure fails the job.
@@ -380,21 +378,22 @@ was smoke-tested is what ships, never a second local build.
     against signpath.io at application time; the 2026-11-02 snapshot is
     "Free code signing provided by SignPath.io, certificate by SignPath
     Foundation"), list committer/approver roles, then apply with the
-    repository and download URLs. If approved, integrate their GitHub Action,
-    pin it by SHA, keep per-release approvals in mind, and have the Windows
-    job Authenticode-sign `zipseal-gui.exe` before zipping, then fail unless
-    `signtool verify /pa /v` passes on the exe extracted from the final zip.
+    repository and download URLs. If approved, integrate their GitHub Action
+    (pinned by SHA) into a separate `sign-windows` job — tag-only `if`,
+    `environment: release`, and no rewrite of `build-windows`. It extracts
+    `zipseal-gui.exe` from the uploaded zip, Authenticode-signs it, repacks
+    the zip, and fails unless `signtool verify /pa /v` passes on the exe
+    extracted from the final zip. Keep per-release approvals in mind.
   - Store MSIX spike: free individual Partner Center account, package the
     onedir as a full-trust MSIX, submit once, confirm Microsoft re-signing
     removes SmartScreen warnings. Decision after the spike; do not commit to
     the Store before it passes certification once.
   - Guidance that outlives signing: keep the "More info → Run anyway" steps
-    in the docs for every zip until a signed release is observed warning-free
-    on a clean Windows machine — a fresh signature and publisher start with no
-    SmartScreen reputation, so a signed build can still warn. Document the
-    verified-publisher variant where the prompt names the publisher. Note
-    that Windows 11 Smart App Control may block unsigned apps outright, and
-    submit any AV false positive to Microsoft's portal.
+    for every zip until a signed release is observed warning-free on a clean
+    Windows machine — a new signature has no SmartScreen reputation, so a
+    signed build can still warn. Document the verified-publisher variant.
+    Smart App Control may still block the unsigned zip outright; submit AV
+    false positives to Microsoft's portal.
   - What Store signing covers: the Store re-signs only the MSIX it
     distributes. If that is the route that lands, `zipseal-gui.exe` in the
     downloadable zip stays unsigned and keeps the guidance above; only
@@ -404,14 +403,13 @@ was smoke-tested is what ships, never a second local build.
 
 ## Phase 4 — Linux app
 
-- [ ] Build inside a pinned `ubuntu:22.04` container. That image has glibc
-      2.35; the PyInstaller bootloader itself is glibc 2.17+. Neither number
-      is the shipped floor. After the build, read the glibc requirement from
-      the bundled Python, Tcl/Tk and extension modules (Risk 8) and record
-      that measured floor in the release notes. Produce the onedir tree, then
-      an AppImage via a pinned `appimagetool`, and also the `.tar.gz`.
-      `appimagetool` is
-      itself a Type 2 AppImage and will not run inside an unprivileged
+- [ ] Build inside a pinned `ubuntu:22.04` container (glibc 2.35; the
+      PyInstaller bootloader needs 2.17+ — neither is the shipped floor).
+      After the build, read the glibc requirement from the bundled Python,
+      Tcl/Tk and extension modules (Risk 8) and record it in the release
+      notes. Produce the onedir tree, then an AppImage via a pinned
+      `appimagetool` and the `.tar.gz`. `appimagetool` is itself a Type 2
+      AppImage and will not run inside an unprivileged
       container without `/dev/fuse`, so extract it first
       (`./appimagetool-x86_64.AppImage --appimage-extract`) and invoke
       `ARCH=x86_64 ./squashfs-root/AppRun dist/<version>/AppDir
@@ -540,12 +538,13 @@ only if Phase 3 signing is approved. Linux needs no secrets, and
 - **M2**: tagged workflow produces a signed, notarized, stapled DMG as a draft
   release; manual acceptance recorded; maintainer publishes.
 - **M3**: Windows zip and Linux AppImage + tar.gz join the same workflow,
-  smoke-tested in CI and accepted on machines without Python (the M2 Mac for
-  macOS; a clean Windows 11 VM under Parallels/UTM for Windows, where the x64
-  zip runs emulated on Windows-on-ARM; any Linux VM with no system Python for
-  Linux), `SHA256SUMS` + attestations attached; the Windows signing outcome is
-  recorded per artifact (zip signed, or zip unsigned with the Store MSIX
-  signed separately).
+  smoke-tested in CI and accepted on machines with no Python on PATH
+  (macOS: a clean VM or second account, not the dev account where `uv` and its
+  managed interpreters live; Windows: a clean Windows 11 VM under
+  Parallels/UTM, where the x64 zip runs emulated on Windows-on-ARM; Linux: a
+  VM with no system Python), `SHA256SUMS` + attestations attached; the
+  Windows signing outcome is recorded per artifact (zip signed, or zip
+  unsigned with the Store MSIX signed separately).
 - **M4**: README, `user-docs/`, `AGENTS.md` and `SPEC.md` updated;
   `dev-docs/releasing.md` finalized (created and freshness-hooked in Phase 2);
   PyPI decision recorded.
@@ -596,4 +595,6 @@ only if Phase 3 signing is approved. Linux needs no secrets, and
   real index; `.python-version` vs the CI matrix is clarified; `ls-remote`
   credentials and the default-branch requirement are noted; `releasing.md`
   carries its freshness marker; the review log is condensed to stay near the
-  600-line convention.
+  600-line convention. Its second pass fixed the in-place `codesign` step, the
+  Windows build/sign split, a Python-free M3 host, the PNG `datas`, the
+  `stapler validate` gate and the interpreter pin.
