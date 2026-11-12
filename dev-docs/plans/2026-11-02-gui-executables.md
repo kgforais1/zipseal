@@ -269,16 +269,31 @@ it. The smoke-tested artifact is what ships, never a second local build.
 
 ## Phase 2 — macOS signing, notarization & release pipeline (milestone M2)
 
-- [ ] Create the `release` environment and the `v*` tag ruleset before any
+- [ ] Create the `release` environment and two `v*` tag rulesets before any
       signing secret is stored. Deployment branches and tags are `v*` only.
       The required reviewer is the second GitHub account, Prevent self-review
-      is on, and Allow administrators to bypass is off. The ruleset lets only
-      the tag-pushing account create `v*` tags and blocks updates and
-      deletions. Record the exact settings, the account names, and the
-      tag-deletion bypass in `dev-docs/releasing.md`. Until this exists, the
-      approval split below does not hold: a missing environment fails
-      `sign-macos` opaquely, and a missing ruleset leaves `publish`'s
-      `--verify-tag` with nothing behind it.
+      is on, and Allow administrators to bypass is off. A bypass list covers
+      every rule in its ruleset, so creation and immutability are separate.
+      The creation ruleset targets `v*` with Restrict creations, and its only
+      bypass is the tag-pushing account. The immutability ruleset targets
+      `v*` with Restrict updates and Restrict deletions, and its bypass list
+      is empty: the tag-pushing account is not on it and cannot change or
+      remove a tag. Deleting a tag for rollback is a temporary entry on that
+      bypass list, added by the account that can edit rulesets (not the
+      tag-pushing account). That account adds itself, deletes the tag, and
+      removes the entry in the same session, before the replacement tag is
+      pushed. An empty list blocks every actor, including the owner, so
+      there is no other route, and leaving the entry in place drops
+      immutability for every `v*` tag. This repository is not an
+      organization, so the add and the remove are written by hand into the
+      release's rollback note. The tag-pushing account, the only creation
+      bypass, then pushes the replacement tag. `dev-docs/releasing.md` names
+      both accounts. Record the exact
+      settings and the account names for both rulesets in
+      `dev-docs/releasing.md`. Until this exists, the approval split below
+      does not hold: a missing environment fails `sign-macos` opaquely, and
+      a missing immutability ruleset leaves `publish`'s `--verify-tag` with
+      nothing behind it.
 - [ ] CI signing path (tag pushes only, inside `sign-macos`): `security
       create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"`, `security
       unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"`, `security
@@ -330,17 +345,32 @@ it. The smoke-tested artifact is what ships, never a second local build.
       --context context:primary-signature -v dist/<version>/zipseal-*.dmg`
       (without `-v`, `spctl` prints nothing on success).
 - [ ] `.github/workflows/release.yml` triggers on `push` of tags matching
-      `v*` and on `workflow_dispatch` with no inputs. Jobs: `check`,
-      `build-macos`, `sign-macos`, `publish`. `ci.yml` runs on pushes to
-      `main` and on pull requests only, so a tag runs none of it. `check`
-      therefore re-runs those gates on both triggers: `uvx --no-build
-      pre-commit==4.7.0 run --all-files --show-diff-on-failure`, `uv run
-      pytest -q` (the fast suite — `addopts` drops `slow` and `gui`), and
-      `ci.yml`'s `audit` job unchanged (`pip-audit==2.10.1`). On a tag push
-      it also requires the tag to equal `v` plus the `pyproject.toml` version
-      (Decision 9). `check` and `build-macos` have no `needs`. `sign-macos`
-      has `needs: build-macos`. At M2, `publish` has `needs: [check,
-      sign-macos]`. Phase 3 adds whichever job uploads the zip that ships
+      `v*` and on `workflow_dispatch` with no inputs. Jobs: `check-hooks`,
+      `check-test`, `check-audit`, `build-macos`, `sign-macos`, `publish`.
+      `ci.yml` runs on pushes to `main` and on pull requests only, so a tag
+      runs none of it. The three check jobs re-run those gates on both
+      triggers. `check-hooks` is `uvx --no-build pre-commit==4.7.0 run
+      --all-files --show-diff-on-failure`. `check-audit` is `ci.yml`'s
+      `audit` job unchanged (`pip-audit==2.10.1`). `check-test` is `ci.yml`'s
+      `test` job copied step for step: `timeout-minutes: 30`, matrix
+      `os: [ubuntu-latest, macos-latest]` × `python: ["3.11", "3.13"]`,
+      `fail-fast: false`, checkout with `persist-credentials: false`,
+      `setup-uv` at `version: "0.12.24"` with
+      `python-version: ${{ matrix.python }}`, Linux
+      `sudo apt-get update && sudo apt-get install -y 7zip libarchive-tools`,
+      macOS `brew install sevenzip`, then `uv sync --locked` and
+      `uv run pytest -q` (the fast suite — `addopts` drops `slow` and `gui`).
+      Those are the test runners `ci.yml` uses, separate from the versioned
+      build images in Decision 6. On a tag push `check-hooks` also requires
+      the tag to equal `v` plus the `pyproject.toml` version (Decision 9).
+      The check jobs have no `needs`. `build-macos` has
+      `needs: [check-hooks, check-test, check-audit]`, and `sign-macos` has
+      `needs: build-macos`, so a red gate never reaches the Apple secrets or
+      `notarytool`. `build-windows` and `build-linux` take that same `needs`
+      when they land. At M2, `publish` has `needs: [check-hooks, check-test,
+      check-audit, sign-macos]`. `needs: check-test` waits for every matrix
+      cell; one red cell fails that job and blocks the draft. Phase 3 adds
+      whichever job uploads the zip that ships
       (`sign-windows` once it repacks, otherwise `build-windows`); Phase 4
       adds `build-linux`. A failed need blocks the draft. `publish`'s own
       `if` still skips it on a dispatch, where `sign-macos` is skipped too.
@@ -354,9 +384,9 @@ it. The smoke-tested artifact is what ships, never a second local build.
       peeled SHA with `GITHUB_SHA` when present and the tag ref's own SHA for
       a lightweight tag (the local ref only shows what was fetched). It then
       runs `gh release create --verify-tag`, so a moved or deleted tag fails
-      instead of shipping under a label that points elsewhere, and a `v*` tag
-      ruleset lets only maintainers create tags and forbids updates and
-      deletions.
+      instead of shipping under a label that points elsewhere. The two `v*`
+      rulesets are the setup task's: the tag-pushing account can create a
+      tag and cannot update or delete one.
       `concurrency: group: release-${{ github.ref_name }}` with
       `cancel-in-progress: false` keeps two runs from publishing one version.
       Signing needs its own job: `environment` is job-level only, and a
@@ -403,8 +433,11 @@ it. The smoke-tested artifact is what ships, never a second local build.
       `SHA256SUMS` / `gh attestation verify` lines.
 - [ ] `dev-docs/releasing.md` (new durable doc): the tag-to-release runbook,
       the secrets list (names only), rollback (delete draft → delete tag → fix
-      → re-tag; deleting a tag needs a deliberate bypass of the `v*` tag
-      ruleset, and the runbook says so), the acceptance checklist from M1–M3,
+      → re-tag; the ruleset-edit account adds itself to the immutability
+      bypass list, deletes the tag, and removes that entry in the same
+      session, and both steps are written into the rollback note here; the
+      tag-pushing account then pushes the replacement tag), the acceptance
+      checklist from M1–M3,
       and the note that `workflow_dispatch` needs the workflow on the default
       branch but runs the selected ref's copy. It opens with a `Last reviewed:`
       marker — `REQUIRED_FILES` turns a missing marker into a hard hook error.
@@ -412,11 +445,12 @@ it. The smoke-tested artifact is what ships, never a second local build.
       update the hook's error text (it lists the required paths), and add it
       to the durable-doc list in `dev-docs/README.md`.
 - [ ] Rehearse first: run the workflow with `workflow_dispatch` (the
-      `release.yml` bullet above). A dispatch runs `check` and `build-macos`
-      and skips `sign-macos` and `publish`: no `release` environment and no
-      secrets. On a dispatch, `check` is the pre-commit gates, the fast pytest
-      suite and the dependency audit; the tag-equals-version requirement
-      stays tag-push only (Decision 9).
+      `release.yml` bullet above). A dispatch runs `check-hooks`,
+      `check-test`, `check-audit` and, only if those pass, `build-macos`. It
+      skips `sign-macos` and `publish`: no `release` environment and no
+      secrets. On a dispatch the check jobs are the pre-commit gates, the
+      full pytest matrix and the dependency audit; the tag-equals-version
+      requirement stays tag-push only (Decision 9).
       `workflow_dispatch` requires the workflow on the default branch, so this
       is available once `release.yml` is merged to `main`; a dispatch can still
       select another ref and runs that ref's copy, so dispatching a branch
@@ -438,7 +472,10 @@ it. The smoke-tested artifact is what ships, never a second local build.
       offers when this phase lands — decide then; never `windows-latest`)
       with the uv-managed Python; embed the exe icon and the file version
       resource. Runner and image bumps follow Decision 6.
-- [ ] CI smoke: start `zipseal-gui.exe`, wait, confirm it is alive, stop it.
+- [ ] CI smoke: extract the uploaded
+      `zipseal-gui-<version>-windows-x64.zip` into a fresh directory and
+      launch `zipseal-gui.exe` from that extraction. Running the exe from
+      the build tree does not count. Wait, confirm it is alive, stop it.
       A failure fails the job.
 - [ ] Manual acceptance (drafted release, on a machine without Python):
       download the zip, unzip, run `zipseal-gui.exe`, create an archive with a
@@ -460,8 +497,10 @@ it. The smoke-tested artifact is what ships, never a second local build.
     `zipseal-gui.exe` and the bundled DLLs from the uploaded zip,
     Authenticode-signs them all, repacks the zip, and fails unless `signtool
     verify /pa /v` passes on the exe extracted from the final zip. It then
-    runs the same launch smoke as `build-windows` against that signed exe,
-    and uploads only the repacked zip. Keep per-release approvals in mind.
+    extracts that repacked zip into a fresh directory and runs the same
+    launch smoke from there, and uploads only the repacked zip. Running the
+    exe from the build tree does not count. Keep per-release approvals in
+    mind.
   - Store MSIX spike: free individual Partner Center account, package the
     onedir as a full-trust MSIX, submit once, confirm Microsoft re-signing
     removes SmartScreen warnings. Decision after the spike; do not commit to
@@ -490,7 +529,10 @@ it. The smoke-tested artifact is what ships, never a second local build.
       After the build, read the glibc requirement from the bundled Python,
       Tcl/Tk and extension modules (Risk 8) and record it in the release
       notes. Produce the onedir tree, then an AppImage via a pinned
-      `appimagetool` and the `.tar.gz`. `appimagetool` is itself a Type 2
+      `appimagetool`, and pack the onedir as one top-level directory with the
+      binary at mode `0755`: `tar -czf
+      dist/<version>/zipseal-gui-<version>-linux-x86_64.tar.gz -C
+      dist/<version> zipseal-gui`. `appimagetool` is itself a Type 2
       AppImage and will not run inside an unprivileged
       container without `/dev/fuse`, so extract it first
       (`./appimagetool-x86_64.AppImage --appimage-extract`) and invoke
@@ -509,9 +551,12 @@ it. The smoke-tested artifact is what ships, never a second local build.
 - [ ] CI smoke under `xvfb-run`, both artifacts. The AppImage has no FUSE
       here: `./zipseal-gui-<version>-linux-x86_64.AppImage
       --appimage-extract-and-run` (or `--appimage-extract`, then
-      `./squashfs-root/AppRun`). Also run
-      `dist/<version>/zipseal-gui/zipseal-gui` from the `.tar.gz` tree. Wait
-      until the process is alive, and if practical assert a window named
+      `./squashfs-root/AppRun`). For the archive, extract
+      `dist/<version>/zipseal-gui-<version>-linux-x86_64.tar.gz` into a fresh
+      directory and launch `<fresh>/zipseal-gui/zipseal-gui`. Running
+      `dist/<version>/zipseal-gui/zipseal-gui` in the build tree does not
+      count. Wait until the process is alive, and if practical assert a
+      window named
       `zipseal` (`xdotool search --name`), then terminate. Run
       `desktop-file-validate` on the AppDir desktop file. A failure fails
       the job.
@@ -710,3 +755,17 @@ only if Phase 3 signing is approved. Linux needs no secrets, and
   is gated before notarization. The PNG tests use a `tmp_path` icon and a
   selective SVG failure. Linux smoke names both artifacts and the FUSE-less
   launch; the container image is digest-pinned on `ubuntu-24.04`.
+
+- 2026-11-12: CodeRabbit: `check-test` is `ci.yml`'s Linux/macOS × Python
+  3.11/3.13 matrix, with the archive-tool setup, and `publish` needs every
+  cell plus the pre-commit and audit jobs. Tag creation and tag immutability
+  are separate rulesets; the tag-pushing account bypasses only creation.
+  The Linux smoke extracts the shipped `.tar.gz` into a fresh directory.
+
+- 2026-11-12: Step 5 Preview (NVIDIA). The three CodeRabbit edits stood.
+  Rollback adds a temporary immutability bypass and removes it in the same
+  session, before the tag-pushing account re-tags. `check-test` copies the
+  CI test job step for step, and `build-macos` waits on the check jobs so
+  a red gate never starts signing. Windows smoke extracts the shipped zip.
+  The Linux archive is one `zipseal-gui/` directory with the binary at
+  `0755`.
