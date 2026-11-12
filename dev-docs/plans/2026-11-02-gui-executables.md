@@ -260,19 +260,32 @@ was smoke-tested is what ships, never a second local build.
       equal `v` plus the `pyproject.toml` version per Decision 9),
       `build-macos`, `publish`. `publish` runs only when
       `github.event_name == 'push'` for a tag, checks out with
-      `fetch-depth: 0`, and starts by asking the remote where the tag points
-      (`git ls-remote --tags origin "refs/tags/$GITHUB_REF_NAME"` compared
-      with `GITHUB_SHA`), because the local ref only reflects what was fetched
-      at checkout. It then creates the release with
-      `gh release create --verify-tag`, so a tag moved or deleted after the
-      checkout fails the job instead of shipping artifacts under a label that
-      now points elsewhere. A `v*` repository tag ruleset forbids updates and
-      deletions, closing the window while a release runs.
+      `fetch-depth: 0`, and starts by asking the remote where the tag points:
+      `git ls-remote --tags origin "refs/tags/$GITHUB_REF_NAME"` returns the
+      tag ref and, for an annotated tag, a peeled
+      `refs/tags/$GITHUB_REF_NAME^{}` entry too. Compare the peeled SHA with
+      `GITHUB_SHA` when it is present, and the tag ref's own SHA when it is
+      not (a lightweight tag). The local ref only reflects what was fetched
+      at checkout, so the remote is the authority. It then creates the
+      release with `gh release create --verify-tag`, so a tag moved or deleted
+      after the checkout fails the job instead of shipping artifacts under a
+      label that now points elsewhere. A `v*` repository tag ruleset lets only
+      maintainers create tags and forbids updates and deletions, so the
+      publication window cannot be exploited.
       `concurrency: group: release-${{ github.ref_name }}` with
       `cancel-in-progress: false` keeps two runs from publishing one version.
       macOS signing and notarization read the Apple secrets from a protected
-      `release` environment restricted to `v*` tags with a required reviewer,
-      and are guarded by
+      `release` environment restricted to `v*` tags, with a required reviewer
+      and "prevent self-review" enabled, so the account that triggered a run
+      cannot approve its own secret access. Keep the roles disjoint: a
+      maintainer allowed to create `v*` tags is not an environment approver.
+      What this buys is narrower than "branch code can never see the
+      secrets": a dispatch never receives them (event guard plus
+      `--skip-sign`), and a tag-push run receives them only for a commit whose
+      tag one maintainer created and a different account approved. On a
+      single-maintainer setup, record the compensating control here (a second
+      approver account, or a written exception) instead of quietly dropping
+      the reviewer. The steps are guarded by
       `if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')`.
       The event check is load-bearing: `workflow_dispatch` can target a `v*`
       tag, which satisfies the ref test on its own. A dispatch always builds
@@ -457,10 +470,13 @@ for publish.
 `APPLE_TEAM_ID`, `APPLE_API_KEY_ID`, `APPLE_API_ISSUER_ID`,
 `APPLE_API_PRIVATE_KEY` (base64 .p8), `KEYCHAIN_PASSWORD` (ephemeral chain).
 All Apple secrets live in the protected `release` environment (tag-only
-deployment rule, required reviewer); `workflow_dispatch` rehearsals run
-without them. `SIGNPATH_*` only if Phase 3 signing is approved. Linux needs
-no secrets. `dev-docs/releasing.md` documents where each comes from and how
-to rotate it.
+deployment rule, required reviewer, self-review prevented); `workflow_dispatch`
+rehearsals run without them. `v*` tag creation is itself restricted to
+maintainers who are not environment approvers, so one account cannot both
+create the tag and unlock the secrets; a single-maintainer setup records the
+exception explicitly. `SIGNPATH_*` only if Phase 3 signing is approved.
+Linux needs no secrets. `dev-docs/releasing.md` documents where each comes
+from and how to rotate it.
 
 ## Risks and open questions
 
@@ -559,8 +575,11 @@ to rotate it.
   Entitlements start empty and are added only for a reproducible failure on
   the exact signed bundle; least privilege wins over "just in case".
   Rehearsals run `--skip-sign` and the Apple secrets sit in a protected
-  `release` environment restricted to `v*` tags, so branch code cannot reach
-  them. `publish` groups per tag and asserts the tag still resolves to
+  `release` environment restricted to `v*` tags with a required reviewer and
+  self-review prevented, while tag creation is limited to maintainers who are
+  not approvers. A dispatch therefore never receives the secrets, and a
+  tag-push run needs a maintainer's tag plus another account's approval.
+  `publish` groups per tag and asserts the tag still resolves to
   `github.sha`. The acceptance gate names only the platforms a release
   contains (macOS at M2). Windows notes separate Store MSIX signing from the
   unsigned portable zip and keep SmartScreen guidance until a signed release
@@ -578,3 +597,10 @@ to rotate it.
   `GITHUB_SHA`, passes `--verify-tag` to `gh release create`, and relies on a
   `v*` tag ruleset that forbids updates and deletions; the rollback runbook
   notes that deleting a protected tag needs a deliberate bypass.
+
+- 2026-11-11 (second pass): CodeRabbit on the tag and environment controls.
+  Tag verification compares the peeled `^{}` SHA for annotated tags and the
+  tag ref's own SHA for lightweight ones. Tag creation is restricted to
+  maintainers who are not `release` environment approvers, self-review is
+  prevented, and the "branch code cannot reach the secrets" claim is
+  replaced with what the controls actually guarantee.
