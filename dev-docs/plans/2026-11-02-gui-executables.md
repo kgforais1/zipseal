@@ -76,10 +76,10 @@ it. The smoke-tested artifact is what ships, never a second local build.
    2024, so the premium is pointless. Both free routes are pursued:
    - **SignPath Foundation**: free OV-level signing for qualifying OSS
      projects (SignPath's certificate and HSM; publisher shows as "SignPath
-     Foundation"). It Authenticode-signs `zipseal-gui.exe` (and the bundled
-     DLLs) before the zip is assembled: signing the archive itself does
-     nothing for SmartScreen, which reads the signature of the executable the
-     user runs. Apply with the repository and download URLs, add the required
+     Foundation"). It Authenticode-signs `zipseal-gui.exe` and every bundled
+     DLL inside the zip `build-windows` uploads — signing the archive itself
+     does nothing for SmartScreen, which reads the signature of the
+     executable the user runs. Apply with the repository and download URLs, add the required
      "Code signing policy" section to `README.md` with their exact wording and
      role list, then integrate their GitHub Action (pinned by SHA) with
      per-release approvals. Verify the shipped artifact, not the build tree:
@@ -180,8 +180,9 @@ it. The smoke-tested artifact is what ships, never a second local build.
     is what the `.spec` targets.
   - `build.py` — one entry point:
     `uv run --group build python packaging/build.py --target {macos,windows,linux}`
-    with `--skip-sign` for local runs and `--version` defaulting to
-    `pyproject.toml`. Outputs under `dist/<version>/`. The interpreter is
+    with `--skip-sign` (local runs and `build-macos`; signing lives in
+    `sign-macos`) and `--version` defaulting to `pyproject.toml`. Outputs
+    under `dist/<version>/`. The interpreter is
     pinned by exact version from one shared constant: the job runs `uv python
     install <pin>` then `uv run --python <pin> --group build …`, and
     `build.py` fails unless `platform.python_version()` matches, so
@@ -381,9 +382,10 @@ it. The smoke-tested artifact is what ships, never a second local build.
     repository and download URLs. If approved, integrate their GitHub Action
     (pinned by SHA) into a separate `sign-windows` job — tag-only `if`,
     `environment: release`, and no rewrite of `build-windows`. It extracts
-    `zipseal-gui.exe` from the uploaded zip, Authenticode-signs it, repacks
-    the zip, and fails unless `signtool verify /pa /v` passes on the exe
-    extracted from the final zip. Keep per-release approvals in mind.
+    `zipseal-gui.exe` and the bundled DLLs from the uploaded zip,
+    Authenticode-signs them all, repacks the zip, and fails unless `signtool
+    verify /pa /v` passes on the exe extracted from the final zip. Keep
+    per-release approvals in mind.
   - Store MSIX spike: free individual Partner Center account, package the
     onedir as a full-trust MSIX, submit once, confirm Microsoft re-signing
     removes SmartScreen warnings. Decision after the spike; do not commit to
@@ -416,9 +418,8 @@ it. The smoke-tested artifact is what ships, never a second local build.
       dist/<version>/zipseal-gui-<version>-linux-x86_64.AppImage`. Name the
       output explicitly: appimagetool otherwise derives it from the AppDir
       name and drops the version. The container needs `file`, `binutils`
-      (PyInstaller shells out to `objdump`/`objcopy`), `libc-bin` (for
-      `ldd`), `desktop-file-utils` (`desktop-file-validate`), plus `xvfb` and
-      `xdotool` for the smoke test below.
+      (PyInstaller shells out to `objdump`/`objcopy`), `libc-bin` (`ldd`),
+      `desktop-file-utils`, plus `xvfb`/`xdotool` for the smoke test below.
 - [ ] AppDir contents: `zipseal-gui.desktop` (`Terminal=false`,
       `Categories=Utility;Security;`), `AppRun`, generated icon.
 - [ ] CI smoke under `xvfb-run`: launch, wait, assert the process is alive, and
