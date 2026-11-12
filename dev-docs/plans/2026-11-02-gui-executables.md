@@ -66,10 +66,12 @@ was smoke-tested is what ships, never a second local build.
 2. **Build Python: uv-managed python-build-standalone**, the same family the
    `zipseal-gui.command` launcher already uses, because Tk is present on every
    platform and PyInstaller compatibility with its dynamically linked
-   `_tkinter`/`libtcl`/`libtk` landed in 2025. The build script pins the Python
-   minor; the resolved version and Tk version go in the release notes. Start on
-   the version CI tests (today 3.13) and revisit 3.14 for Tk 9 on Windows if the
-   window icon is judged to matter (Decision 7).
+   `_tkinter`/`libtcl`/`libtk` landed in 2025. The build script pins an exact
+   python-build-standalone release (a date-stamped asset, so a rebuild gets the
+   same interpreter); the resolved Python and Tk versions go in the release
+   notes. Start on the highest minor CI tests — 3.13 today; `.python-version`
+   (3.12) only drives local `uv` runs — and revisit 3.14 for Tk 9 on Windows if
+   the window icon is judged to matter (Decision 7).
 3. **Windows signing: do not buy Azure Artifact Signing.** Microsoft's current
    docs (2026-08-29) say it costs $9.99/month *and* gives no instant
    SmartScreen trust — reputation builds over time; individual developers are
@@ -118,28 +120,26 @@ was smoke-tested is what ships, never a second local build.
    in `.gitignore`; extend both `.gitignore` and `.forbidden-paths` with the
    artifact globs (`*.dmg`, `*.msi`, `*.exe`, `*.AppImage`, `*.tar.gz`) so even a
    force-added artifact cannot be committed.
-6. **Release mechanics**: tag `vX.Y.Z` → `release.yml` builds on a pinned,
-   versioned runner image per platform (`macos-15`, `windows-2025`,
-   `ubuntu-24.04`; never a `-latest` label, so a tagged release cannot change
-   under the project without a commit) → smoke tests the built artifact →
-   writes `SHA256SUMS` → attests each artifact
-   (`actions/attest-build-provenance` v4.x; public repo, so free) → creates a
-   **draft** GitHub Release. The maintainer publishes it after the manual
-   acceptance checks below. `release.yml` also runs on `workflow_dispatch`
-   (no inputs) to rehearse the build and smoke test without drafting a
-   release; a rehearsal builds with signing skipped and never receives the
-   signing secrets (Phase 2). `publish` runs only for a tag push, groups on
-   `release-<tag>` so two runs cannot publish one version, and first asserts
-   the tag still resolves to `github.sha` — a moved or deleted tag fails instead
-   of shipping artifacts under a label that now points elsewhere.
+6. **Release mechanics**: tag `vX.Y.Z` → `release.yml` builds on versioned
+   runner images (`macos-15`, `windows-2025`, `ubuntu-24.04`; never `-latest`,
+   so a tag cannot change under the project without a commit) → smoke tests
+   the artifact → writes `SHA256SUMS` → attests each artifact
+   (`actions/attest-build-provenance` v4.x, free on public repos) → creates a
+   **draft** release the maintainer publishes after manual acceptance.
+   `workflow_dispatch` (no inputs) rehearses build and smoke test without
+   drafting; it skips the signing job and never receives the signing secrets
+   (Phase 2). `publish` runs only for a tag push, groups on `release-<tag>`,
+   and asserts the tag still resolves to `github.sha`.
 7. **Icons are generated at build time from `src/zipseal/icon.svg`**
-   (nothing raster enters the repo; `*.png` is blocked by design). macOS needs
-   an `.icns`, Windows an `.ico` for the exe plus a window icon, Linux a
-   `.desktop` icon. A pinned rasterizer (`resvg` static binary, or platform
-   tools) does the conversion in the build script. The app's
-   `gui_view.set_icon` already prefers Tk 9's SVG reader; where a bundle
-   carries Tk 8.6, add a PNG fallback generated at build time so the window and
-   taskbar still get the zipseal icon.
+   (nothing raster enters the repo; `*.png` is blocked by design). One pinned
+   toolchain, not "or platform tools": `resvg` (checksummed static binary)
+   renders the PNGs, Pillow (in the `build` group, excluded from the bundle)
+   packs the multi-size `.ico`, and macOS `iconutil` turns an `.iconset` into
+   the `.icns` — the macOS build runs on a macOS runner, so it is present.
+   Linux needs one PNG for the `.desktop` icon. The app's `gui_view.set_icon`
+   already prefers Tk 9's SVG reader; where a bundle carries Tk 8.6, the
+   generated PNG is the fallback so the window and taskbar still get the
+   zipseal icon.
 8. **macOS architecture**: ship Apple silicon (arm64) only. Universal2 is not
    viable — PyInstaller only emits it when every bundled wheel is universal2,
    and python-build-standalone has no universal2 builds. No Intel build: Intel
@@ -163,9 +163,12 @@ was smoke-tested is what ships, never a second local build.
 
 - [ ] Audit the GUI's frozen-run assumptions. Today the only file reference is
       `gui.ICON = Path(__file__).with_name("icon.svg")` (`gui.py:168`), loaded
-      by `gui_view.set_icon` with Tk's SVG reader. The spec must collect
-      `src/zipseal/icon.svg` into the bundle next to the module, and a smoke
-      check must confirm it exists in the frozen tree. No cwd or `__file__` use
+      by `gui_view.set_icon` with Tk's SVG reader. The spec must collect it
+      with `datas=[("src/zipseal/icon.svg", "zipseal")]`: a frozen module's
+      `__file__` is `sys._MEIPASS/zipseal/gui.py`, so the icon has to land in
+      `_MEIPASS/zipseal/`, and a `"."` destination would put it at the bundle
+      root where `set_icon` silently returns False. A smoke check asserts the
+      resolved path exists in the frozen tree. No cwd or `__file__` use
       elsewhere.
 - [ ] Add a `build` dependency group to `pyproject.toml`
       (`pyinstaller==6.22.3` first entry; locks into `uv.lock`, Dependabot
@@ -197,12 +200,26 @@ was smoke-tested is what ships, never a second local build.
       with the failing log recorded in Decision 4.
   - `windows/version_info.txt` template.
   - `linux/zipseal-gui.desktop` and `linux/AppRun` for the AppImage.
-  - `icons.py` — SVG to `.icns`/`.ico`/`.png` at build time; pinned tool.
+  - `icons.py` — SVG → PNG (`resvg`), `.ico` (Pillow, `build` group) and
+      `.icns` (`iconutil`, macOS runner) at build time; pinned tools.
       Generated rasters are written to `build/icons/` (never `src/`, since
       `*.png` is blocked by `.forbidden-paths`), and PyInstaller bundles them
       via `datas`.
-- [ ] `tests/test_packaging.py` covering the test list below.
-- [ ] `AGENTS.md` command for a local build; `dev-docs/README.md` unchanged.
+- [ ] Bring `packaging/` under the existing quality gates, or its first
+      commit fails `pre-commit run --all-files`: add `"packaging"` to
+      `[tool.basedpyright].include` in `pyproject.toml` (today
+      `["src", "tests"]`) and to the basedpyright hook's `files:` regex in
+      `.pre-commit-config.yaml`, and add
+      `"packaging/**" = ["S603", "S607"]` to `ruff.toml`'s per-file-ignores
+      (`build.py` shells out to `hdiutil`, `codesign`, `xcrun`, `objcopy` and
+      `appimagetool`).
+- [ ] `tests/test_packaging.py` covering the test list below; load
+      `packaging/build.py` with `importlib.util.spec_from_file_location`, as
+      `tests/test_check_pins.py` loads its hook, and never add `packaging` to
+      pytest's `pythonpath` — it would shadow the PyPI `packaging`
+      distribution that pytest imports.
+- [ ] `AGENTS.md` command for a local build; `dev-docs/README.md` unchanged in
+      this phase (Phase 2 registers `releasing.md` there).
 
 ## Phase 1 — macOS app (milestone M1)
 
@@ -232,35 +249,36 @@ was smoke-tested is what ships, never a second local build.
 
 ## Phase 2 — macOS signing, notarization & release pipeline (milestone M2)
 
-- [ ] CI signing path (tag pushes only; the `release.yml` bullet below holds
-      the environment gate): import the Developer ID certificate from the
-      environment's secrets into a temporary keychain, then unlock it for
-      codesign with `security
+- [ ] CI signing path (tag pushes only, inside `sign-macos`): `security
+      create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"`, `security
+      unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"`, `security
+      list-keychains -d user -s "$KEYCHAIN_PATH" login.keychain` (without the
+      search-list entry `codesign` fails with "no identity found", a
+      different failure from the hang below), then `security
       set-key-partition-list -S apple-tool:,apple:,codesign: -s -k
       "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"` (without this, `codesign` pops
-      up a GUI prompt in headless CI and hangs until the job times out), sign
-      via the spec's `codesign_identity` + entitlements, verify with
-      `codesign --verify --deep --strict`.
-- [ ] Notarization path. Every path below is under `dist/<version>/`, the
-      directory `build.py` writes. `xcrun notarytool submit --wait` does not
-      accept a bare `.app` bundle, so first zip it with `ditto -c -k
-      --keepParent dist/<version>/zipseal-gui.app
-      dist/<version>/zipseal-gui-app.zip` and submit that zip; staple the
-      `.app` with `xcrun stapler staple dist/<version>/zipseal-gui.app`. Then
-      build the DMG, sign the DMG with `codesign`, submit the DMG to
-      `notarytool`, and staple the DMG with `xcrun stapler staple
-      dist/<version>/zipseal-*.dmg`. Gate on `spctl --assess -t exec -v
-      dist/<version>/zipseal-gui.app` for the `.app` and `spctl --assess -t
-      open --context context:primary-signature -v
-      dist/<version>/zipseal-*.dmg` for the DMG (without `-v`, `spctl` prints
-      nothing on success).
+      up a GUI prompt in headless CI and hangs until the job times out).
+      Import the certificate, sign via the spec's `codesign_identity` +
+      entitlements, verify with `codesign --verify --deep --strict`, and run
+      `security delete-keychain "$KEYCHAIN_PATH"` from an `if: always()` step.
+- [ ] Notarization path. Every path is under `dist/<version>/`, the directory
+      `build.py` writes. `notarytool submit --wait` rejects a bare `.app`, so
+      zip it first (`ditto -c -k --keepParent dist/<version>/zipseal-gui.app
+      dist/<version>/zipseal-gui-app.zip`), submit, then staple the `.app`.
+      Then build and sign the DMG, notarize and staple it. Gate on `spctl
+      --assess -t exec -v dist/<version>/zipseal-gui.app` and `spctl --assess
+      -t open --context context:primary-signature -v
+      dist/<version>/zipseal-*.dmg` (without `-v`, `spctl` prints nothing on
+      success).
 - [ ] `.github/workflows/release.yml` triggers on `push` of tags matching
       `v*` and on `workflow_dispatch` with no inputs. Jobs: `check` (fast
       suite passes on both triggers; on a tag push, also require the tag to
       equal `v` plus the `pyproject.toml` version per Decision 9),
-      `build-macos`, `publish`. `publish` runs only when
+      `build-macos`, `sign-macos`, `publish`. `publish` runs only when
       `github.event_name == 'push'` for a tag, checks out with
-      `fetch-depth: 0`, and starts by asking the remote where the tag points:
+      `fetch-depth: 0` and credentials kept (this repo uses
+      `persist-credentials: false` elsewhere; without them `ls-remote` is
+      anonymous), and starts by asking the remote where the tag points:
       `git ls-remote --tags origin "refs/tags/$GITHUB_REF_NAME"` returns the
       tag ref and, for an annotated tag, a peeled
       `refs/tags/$GITHUB_REF_NAME^{}` entry too. Compare the peeled SHA with
@@ -274,23 +292,26 @@ was smoke-tested is what ships, never a second local build.
       publication window cannot be exploited.
       `concurrency: group: release-${{ github.ref_name }}` with
       `cancel-in-progress: false` keeps two runs from publishing one version.
-      macOS signing and notarization read the Apple secrets from a protected
-      `release` environment restricted to `v*` tags, with a required reviewer
-      and "prevent self-review" enabled, so the account that triggered a run
-      cannot approve its own secret access. Keep the roles disjoint: a
-      maintainer allowed to create `v*` tags is not an environment approver.
-      What this buys is narrower than "branch code can never see the
-      secrets": a dispatch never receives them (event guard plus
-      `--skip-sign`), and a tag-push run receives them only for a commit whose
-      tag one maintainer created and a different account approved. On a
-      single-maintainer setup, record the compensating control here (a second
-      approver account, or a written exception) instead of quietly dropping
-      the reviewer. The steps are guarded by
-      `if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')`.
-      The event check is load-bearing: `workflow_dispatch` can target a `v*`
-      tag, which satisfies the ref test on its own. A dispatch always builds
-      with `--skip-sign`, so it never sees the secrets even when dispatched
-      at a tag, and it skips `publish`, because it must not create a release.
+      Signing needs its own job: `environment` exists only at job level, and
+      a `release` environment whose deployment rule allows only `v*` tags
+      fails any job that requests it from a branch ref — which is what a
+      dispatch gives you. So `build-macos` runs on both triggers with no
+      environment and no secrets (it builds, smoke-tests and uploads), and
+      `sign-macos` is guarded by
+      `if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')`,
+      declares `environment: release` (restricted to `v*` tags, required
+      reviewer, "prevent self-review"), downloads the uploaded bytes, and
+      signs, notarizes, staples and builds the DMG around them. Only a
+      signature is added, so the smoke-tested artifact is still what ships.
+      The event guard is load-bearing: `workflow_dispatch` can target a `v*`
+      tag, and without the event test the ref alone would satisfy the
+      condition and request the environment. Keep the roles disjoint: a
+      maintainer allowed to create `v*` tags is not an environment approver,
+      so one account cannot both create the tag and approve its own secret
+      access. On a single-maintainer setup, record the compensating control
+      here (a second approver account, or a written exception). `publish`
+      takes no environment — it holds no Apple secrets — and a dispatch skips
+      it because it must not create a release.
       macOS-only at M2; Phases 3 and 4 append `build-windows` and
       `build-linux` when those platforms land, so no job sits dead before its
       phase. Every action pinned by full SHA with a tag comment (the
@@ -313,16 +334,22 @@ was smoke-tested is what ships, never a second local build.
       `gh attestation verify` line.
 - [ ] `dev-docs/releasing.md` (new durable doc): the tag-to-release runbook,
       the secrets list (names only), rollback (delete draft → delete tag → fix
-      → re-tag; deleting a tag now needs a deliberate bypass of the `v*` tag
-      ruleset, and the runbook says so), and the acceptance checklist from
-      M1–M3. Add it to
-      `REQUIRED_FILES` in `hooks/scripts/check_doc_freshness.py` and to the
-      durable-doc list in `dev-docs/README.md` so the freshness hook covers it.
+      → re-tag; deleting a tag needs a deliberate bypass of the `v*` tag
+      ruleset, and the runbook says so), the acceptance checklist from M1–M3,
+      and the note that `workflow_dispatch` runs only the workflow as it
+      exists on the default branch. It opens with a `Last reviewed:` marker —
+      `REQUIRED_FILES` turns a missing marker into a hard hook error. Add it
+      to `REQUIRED_FILES` in `hooks/scripts/check_doc_freshness.py`, update
+      that hook's error text (it lists the required paths), and add it to the
+      durable-doc list in `dev-docs/README.md`.
 - [ ] Rehearse first: run the workflow with `workflow_dispatch` (the
-      `release.yml` bullet above). That builds the unsigned artifact
-      (`--skip-sign`, no secrets) and skips `publish`. Pushing a tag is what
-      creates the draft release, so a rehearsal tag would not do. Then the
-      first real run at the next version bump; v0.1.0 stays source-only.
+      `release.yml` bullet above). That runs `build-macos` only — no signing
+      job, no `release` environment, no secrets — and skips `publish`.
+      `workflow_dispatch` uses the copy of the workflow on the default branch,
+      so this is available once `release.yml` is merged to `main`. Pushing a
+      tag is what creates the draft release, so a rehearsal tag would not do.
+      Then the first real run at the next version bump; v0.1.0 stays
+      source-only.
 - [ ] Manual acceptance (from M2 on, on a machine without Python): download
       the drafted release asset fresh (the browser sets the quarantine flag),
       open the DMG, drag to Applications, launch, create an archive with a
@@ -385,9 +412,12 @@ was smoke-tested is what ships, never a second local build.
       an AppImage via a pinned `appimagetool`, and also the `.tar.gz`.
       `appimagetool` is
       itself a Type 2 AppImage and will not run inside an unprivileged
-      container without `/dev/fuse`, so extract it first (`./appimagetool-x86_64.AppImage --appimage-extract`) and invoke
-      `ARCH=x86_64 ./squashfs-root/AppRun dist/<version>/AppDir ...` with
-      `APPIMAGE_EXTRACT_AND_RUN=1`. The container needs `file`, `binutils`
+      container without `/dev/fuse`, so extract it first
+      (`./appimagetool-x86_64.AppImage --appimage-extract`) and invoke
+      `ARCH=x86_64 ./squashfs-root/AppRun dist/<version>/AppDir
+      dist/<version>/zipseal-gui-<version>-linux-x86_64.AppImage`. Name the
+      output explicitly: appimagetool otherwise derives it from the AppDir
+      name and drops the version. The container needs `file`, `binutils`
       (PyInstaller shells out to `objdump`/`objcopy`), `libc-bin` (for
       `ldd`), `desktop-file-utils` (`desktop-file-validate`), plus `xvfb` and
       `xdotool` for the smoke test below.
@@ -443,8 +473,12 @@ Each behavior gets a pytest test per repo convention. Packaging tests:
       contains it.
 - [ ] The artifact globs (`*.dmg`, `*.msi`, `*.exe`, `*.AppImage`, `*.tar.gz`)
       are present in `.forbidden-paths` and the output roots (`dist/`, `build/`)
-      are ignored by `.gitignore`; a synthetic untracked artifact under `dist/`
-      fails the forbidden-paths hook when tracked.
+      are ignored by `.gitignore`. Exercise
+      `hooks/scripts/check_forbidden_paths.py` the way
+      `tests/test_check_pins.py` exercises its hook
+      (`importlib.util.spec_from_file_location`), or run its `main()` against a
+      `tmp_path` repo root: a synthetic tracked artifact under `dist/` must be
+      rejected. Never `git add` into the real index from a test.
 - [ ] `packaging/linux/zipseal-gui.desktop` has `Name`, `Exec`, `Icon`,
       `Terminal=false`, sorted `Categories`; `AppRun` is tracked executable.
 - [ ] `packaging/macos/entitlements.plist` parses with `plistlib` and
@@ -456,27 +490,22 @@ Each behavior gets a pytest test per repo convention. Packaging tests:
       "SVG raises TclError, PNG present, icon set from PNG", and "neither
       present, returns False and the launch is unaffected".
 
-CI smoke gates (not pytest): the per-platform launch checks run
-against the artifact the workflow uploads. Windows and Linux fail the job
-when the process does not stay alive. The macOS launch check may be advisory
-when the runner is flaky; that job still gates on `codesign`/`spctl`/`stapler`.
-Manual acceptance of the drafted artifact, on a machine without Python, is
-recorded in this plan with a date for each platform and is the blocking gate
-for publish.
+CI smoke gates (not pytest): the per-platform launch checks run against the
+artifact the workflow uploads; Windows and Linux fail the job, and the macOS
+launch check may be advisory (its job still gates on `codesign`/`spctl`/
+`stapler`). Manual acceptance of the drafted artifact on a machine without
+Python, dated per platform here, is the blocking gate for publish.
 
 ## Secrets to set up (names only)
 
 `APPLE_CERT_P12` (base64 Developer ID Application .p12), `APPLE_CERT_PASSWORD`,
 `APPLE_TEAM_ID`, `APPLE_API_KEY_ID`, `APPLE_API_ISSUER_ID`,
 `APPLE_API_PRIVATE_KEY` (base64 .p8), `KEYCHAIN_PASSWORD` (ephemeral chain).
-All Apple secrets live in the protected `release` environment (tag-only
-deployment rule, required reviewer, self-review prevented); `workflow_dispatch`
-rehearsals run without them. `v*` tag creation is itself restricted to
-maintainers who are not environment approvers, so one account cannot both
-create the tag and unlock the secrets; a single-maintainer setup records the
-exception explicitly. `SIGNPATH_*` only if Phase 3 signing is approved.
-Linux needs no secrets. `dev-docs/releasing.md` documents where each comes
-from and how to rotate it.
+All Apple secrets live in the protected `release` environment (tag-only,
+required reviewer, self-review prevented); rehearsals run without them, and
+`v*` tag creation is limited to maintainers who are not approvers. `SIGNPATH_*`
+only if Phase 3 signing is approved. Linux needs no secrets, and
+`dev-docs/releasing.md` documents origin and rotation.
 
 ## Risks and open questions
 
@@ -511,10 +540,12 @@ from and how to rotate it.
 - **M2**: tagged workflow produces a signed, notarized, stapled DMG as a draft
   release; manual acceptance recorded; maintainer publishes.
 - **M3**: Windows zip and Linux AppImage + tar.gz join the same workflow,
-  smoke-tested in CI, accepted on a machine without Python, `SHA256SUMS` +
-  attestations attached; the Windows signing outcome is recorded per
-  artifact (zip signed, or zip unsigned with the Store MSIX signed
-  separately).
+  smoke-tested in CI and accepted on machines without Python (the M2 Mac for
+  macOS; a clean Windows 11 VM under Parallels/UTM for Windows, where the x64
+  zip runs emulated on Windows-on-ARM; any Linux VM with no system Python for
+  Linux), `SHA256SUMS` + attestations attached; the Windows signing outcome is
+  recorded per artifact (zip signed, or zip unsigned with the Store MSIX
+  signed separately).
 - **M4**: README, `user-docs/`, `AGENTS.md` and `SPEC.md` updated;
   `dev-docs/releasing.md` finalized (created and freshness-hooked in Phase 2);
   PyPI decision recorded.
@@ -522,85 +553,47 @@ from and how to rotate it.
 ## Review changes
 
 - 2026-11-02: An antigravity/gemini-3.8-flash-high review (4 blockers, 6
-  majors, 6 minors) led to these changes: pre-populated macOS entitlements;
-  `ditto` zip before `notarytool`; `security set-key-partition-list` in CI;
-  appimagetool extracted before running in a container (no `/dev/fuse`);
-  `spctl -t open --context context:primary-signature -v` for DMGs; `*.tar.gz`
-  added to the artifact globs; `dev-docs/releasing.md` registered with the
-  doc-freshness hook; phases re-aligned to milestones; the
-  `packaging/run_gui.py` entry point; uniform `zipseal-gui-*` artifact naming;
-  generated icons written to `build/icons/`.
+  majors, 6 minors): pre-populated entitlements, `ditto` before `notarytool`,
+  the keychain fix, extracting appimagetool, `spctl -t open`, `*.tar.gz` in
+  the globs, `releasing.md` in the freshness hook, phases re-aligned to
+  milestones, `run_gui.py`, uniform artifact names, icons in `build/icons/`.
 
-- 2026-11-03: A self-review found Decision 5 missing `*.tar.gz` and Phase 0
-  calling the entitlements file an empty dict against Decision 4; both fixed.
+- 2026-11-03: Two self-reviews: Decision 5 gained `*.tar.gz`; Phase 0 stopped
+  contradicting Decision 4; a glued checkbox and a broken code span were
+  fixed; CI smoke and draft-release acceptance moved from M1 to Phase 2; the
+  Linux container list was corrected; `release.yml` became macOS-only at M2;
+  M4 aligned with `releasing.md`; Phase 3 became two tracks; entitlements
+  softened; PyPI gated; version identification documented; arm64 deferred.
 
-- 2026-11-03: A second self-review fixed two markdown rendering defects (a
-  glued checklist item and a broken code span), moved the CI smoke and the
-  draft-release acceptance out of M1 into Phase 2 (M1 has no CI), corrected
-  the Linux container package list (`binutils`, `libc-bin`, `xvfb`,
-  `xdotool`), made `release.yml` macos-only at M2 with later phases appending
-  their jobs, aligned the M4 milestone with `releasing.md`, reworded Phase 3
-  to pursue SignPath and the Store in parallel (SignPath applied only after
-  the first unsigned release ships), softened the entitlements claim to an
-  empirically verified default, gated PyPI publishing behind an explicit
-  dispatch or environment approval, added how-to-identify-the-version to the
-  troubleshooting docs, and deferred Linux/Windows arm64 to `TODO.md` via the
-  non-goals.
+- 2026-11-04: CodeRabbit (twice) and agy/gemini: the tag check compares the
+  whole tag and skips on dispatch; `workflow_dispatch` cannot publish; the
+  contract matches the gates (CI smoke advisory on macOS only, per-platform
+  manual acceptance); glibc 2.17 is the bootloader floor only; signing paths
+  use `dist/<version>/`; Windows acceptance opens in 7-Zip; Risk 8 measures
+  the real floors.
 
-- 2026-11-04: A CodeRabbit review, then an agy/gemini-3.8-flash-high review
-  of those fixes. The release workflow requires the tag to equal `v` plus
-  the `pyproject.toml` version (no prefix stripping) and skips that check
-  on `workflow_dispatch`. `workflow_dispatch` takes no inputs and cannot
-  publish; only a tag push runs `publish`. TODO.md names the Linux
-  `.tar.gz` and the `uv tool install` CLI contract.
+- 2026-11-10: CodeRabbit, Greptile and Sourcery: entitlements start empty and
+  need a recorded failure; the Apple secrets sit behind a protected
+  environment; `publish` groups per tag and asserts the tag's commit; the
+  acceptance gate names only the platforms a release contains; Store signing
+  is separated from the unsigned zip and SmartScreen guidance outlives
+  signing; M1 expects the Gatekeeper block; versioned runners; Tk preflight;
+  a marked `SPEC.md` note.
 
-- 2026-11-04: A second CodeRabbit review. The release contract now matches
-  the gates: CI smoke is a liveness check and may be advisory on macOS only,
-  and each platform's drafted artifact is accepted on a machine without
-  Python. Decision 1's glibc 2.17 is the bootloader floor; the shipped floor
-  is measured from the bundle. Signing and notarization paths use
-  `dist/<version>/`. The pre-populated Hardened Runtime entitlements stayed
-  at that pass; the 2026-11-10 review below reversed that to least
-  privilege.
+- 2026-11-11: CodeRabbit (two passes): SignPath signs the exe inside the zip
+  and the job verifies it; signing requires the push event as well as a `v*`
+  ref; `publish` checks the remote tag (peeled `^{}` for annotated tags, the
+  tag ref for lightweight ones), passes `--verify-tag`, and relies on a `v*`
+  tag ruleset; tag creation is limited to maintainers who are not approvers,
+  with self-review prevented.
 
-- 2026-11-04: An OpenCode DeepSeek V4.1 Flash review of those gates. Windows
-  acceptance opens the archive in 7-Zip, because Explorer's AES support is
-  unreliable. macOS acceptance runs on a machine without Python. The goal
-  states that only Windows and Linux CI smoke fails the job. Risk 8 measures
-  Python, Tcl/Tk and extension modules. The release-notes glibc floor is
-  Linux-only. Linux acceptance names the AppImage FUSE fallback and 7-Zip
-  or `bsdtar`.
-
-- 2026-11-10: CodeRabbit, Greptile and Sourcery reviews of the current head.
-  Entitlements start empty and are added only for a reproducible failure on
-  the exact signed bundle; least privilege wins over "just in case".
-  Rehearsals run `--skip-sign` and the Apple secrets sit in a protected
-  `release` environment restricted to `v*` tags with a required reviewer and
-  self-review prevented, while tag creation is limited to maintainers who are
-  not approvers. A dispatch therefore never receives the secrets, and a
-  tag-push run needs a maintainer's tag plus another account's approval.
-  `publish` groups per tag and asserts the tag still resolves to
-  `github.sha`. The acceptance gate names only the platforms a release
-  contains (macOS at M2). Windows notes separate Store MSIX signing from the
-  unsigned portable zip and keep SmartScreen guidance until a signed release
-  is observed warning-free. M1 acceptance expects Gatekeeper to block the
-  unsigned build and documents the Open Anyway override. Runners use
-  versioned labels. `build.py` preflights Tk per target. `SPEC.md` gains a
-  marked "planned, not implemented" distribution note so the design doc and
-  the plan agree until Phase 5.
-
-- 2026-11-11: A CodeRabbit review of those fixes. SignPath Authenticode-signs
-  `zipseal-gui.exe` inside the zip rather than the archive, and the Windows
-  job verifies the signature of the exe extracted from the shipped zip.
-  Signing is guarded by the push event as well as a `v*` ref, because a
-  dispatch can target a tag. `publish` compares `git ls-remote` with
-  `GITHUB_SHA`, passes `--verify-tag` to `gh release create`, and relies on a
-  `v*` tag ruleset that forbids updates and deletions; the rollback runbook
-  notes that deleting a protected tag needs a deliberate bypass.
-
-- 2026-11-11 (second pass): CodeRabbit on the tag and environment controls.
-  Tag verification compares the peeled `^{}` SHA for annotated tags and the
-  tag ref's own SHA for lightweight ones. Tag creation is restricted to
-  maintainers who are not `release` environment approvers, self-review is
-  prevented, and the "branch code cannot reach the secrets" claim is
-  replaced with what the controls actually guarantee.
+- 2026-11-11: A Step 5 Preview (NVIDIA) review of the current head: signed
+  and unsigned work is split into `build-macos` and `sign-macos`, because
+  `environment` is job-level only and a `v*` rule fails a branch run;
+  `packaging/` joins basedpyright and ruff's per-file ignores; the keychain
+  recipe is complete; the icon `datas` destination and toolchain are decided;
+  M3 names its acceptance machines; tests exercise hooks without touching the
+  real index; `.python-version` vs the CI matrix is clarified; `ls-remote`
+  credentials and the default-branch requirement are noted; `releasing.md`
+  carries its freshness marker; the review log is condensed to stay near the
+  600-line convention.
