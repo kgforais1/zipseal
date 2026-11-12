@@ -88,9 +88,9 @@ it. The smoke-tested artifact is what ships, never a second local build.
    - **Microsoft Store (MSIX)**: individual registration is free since
      September 2025, and Store MSIX packages are re-signed by Microsoft — the
      only recorded way to zero SmartScreen warnings. Run a time-boxed spike:
-     package the onedir as a full-trust MSIX, submit once, and confirm
-     re-signing removes the warnings. Decide only after it passes
-     certification once.
+     package the onedir as a full-trust MSIX and submit once; decide only
+     after it passes certification and re-signing is confirmed to remove the
+     warnings.
    - **In parallel until one lands**: the zip ships unsigned with documented
      "More info → Run anyway" steps and a note that Windows 11 Smart App
      Control may block unsigned apps outright. No calendar cost, only
@@ -119,14 +119,12 @@ it. The smoke-tested artifact is what ships, never a second local build.
    force-added artifact cannot be committed.
 6. **Release mechanics**: tag `vX.Y.Z` → `release.yml` builds on versioned
    runner images (`macos-15`, `windows-2025`, `ubuntu-24.04`; never `-latest`,
-   so a tag cannot change under the project without a commit) → smoke tests
-   the artifact → writes `SHA256SUMS` → attests each artifact
-   (`actions/attest-build-provenance` v4.x, free on public repos) → creates a
-   **draft** release the maintainer publishes after manual acceptance.
-   `workflow_dispatch` (no inputs) rehearses build and smoke test without
-   drafting; it skips the signing job and never receives the signing secrets
-   (Phase 2). `publish` runs only for a tag push, groups on `release-<tag>`,
-   and asserts the tag still resolves to `github.sha`.
+   so a tag cannot change under the project without a commit) → smoke tests →
+   writes `SHA256SUMS` → attests each artifact (`attest-build-provenance`
+   v4.x, free on public repos) → creates a **draft** release the maintainer
+   publishes after manual acceptance. A `workflow_dispatch` rehearsal skips
+   the signing job and never sees the signing secrets; `publish` is tag-only,
+   grouped per tag, and asserts the tag's commit (Phase 2).
 7. **Icons are generated at build time from `src/zipseal/icon.svg`**
    (nothing raster enters the repo; `*.png` is blocked by design). One pinned
    toolchain, not "or platform tools": `resvg` (checksummed static binary)
@@ -199,11 +197,11 @@ it. The smoke-tested artifact is what ships, never a second local build.
     (`pytest`, `hypothesis`, `basedpyright`, `yaml`) — build-only tools such
     as Pillow and `resvg` never enter the bundle, because the entry point is
     `run_gui.py`.
-  - `macos/entitlements.plist` — empty at first; entitlements are added one
-      at a time only for a reproducible failure on the exact signed bundle,
-      with the failing log recorded in Decision 4.
-  - `windows/version_info.txt` template.
-  - `linux/zipseal-gui.desktop` and `linux/AppRun` for the AppImage.
+  - `macos/entitlements.plist` — empty at first; add one entitlement at a
+      time only for a reproducible failure, with the log recorded per
+      Decision 4.
+  - `windows/version_info.txt`; `linux/zipseal-gui.desktop` and
+      `linux/AppRun` for the AppImage.
   - `icons.py` — SVG → PNG (`resvg`), `.ico` (Pillow, `build` group) and
       `.icns` (`iconutil`, macOS runner) at build time; pinned tools.
       Generated rasters are written to `build/icons/` (never `src/`, since
@@ -235,8 +233,8 @@ it. The smoke-tested artifact is what ships, never a second local build.
       `CFBundleName`/`CFBundleDisplayName` `zipseal`, `CFBundleIconFile`,
       `NSHighResolutionCapable`, `LSApplicationCategoryType`
       (`public.app-category.utilities`), `NSHumanReadableCopyright`, and
-      `LSMinimumSystemVersion` set from what the bundled Python actually
-      supports — verify on the oldest macOS you can, do not guess the floor.
+      `LSMinimumSystemVersion` from what the bundled Python supports — verify
+      on the oldest macOS you can; do not guess the floor.
 - [ ] Make the DMG: `hdiutil create -format UDZO`, `zipseal-gui.app` plus an
       Applications symlink (drag-install).
 - [ ] Manual acceptance (local build — M1 has no CI): open the DMG, drag the
@@ -256,13 +254,14 @@ it. The smoke-tested artifact is what ships, never a second local build.
       create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"`, `security
       unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"`, `security
       list-keychains -d user -s "$KEYCHAIN_PATH" login.keychain` (without the
-      search-list entry `codesign` fails with "no identity found", a
-      different failure from the hang below), then `security
-      set-key-partition-list -S apple-tool:,apple:,codesign: -s -k
-      "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"` (without this, `codesign` pops
-      up a GUI prompt in headless CI and hangs until the job times out).
-      Import the certificate, then sign the downloaded bundle in place —
-      nested Mach-O first, then the outer bundle: `codesign --force --options
+      search-list entry `codesign` fails with "no identity found"), then
+      import the `.p12` (`security import ... -k "$KEYCHAIN_PATH" -P
+      "$APPLE_CERT_PASSWORD" -T /usr/bin/codesign`) and only after that run
+      `security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k
+      "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"` against the imported key
+      (without it `codesign` pops a GUI prompt in headless CI and hangs until
+      the job times out). Then sign the downloaded bundle in place — nested
+      Mach-O first, then the outer bundle: `codesign --force --options
       runtime --timestamp --entitlements packaging/macos/entitlements.plist
       --sign "$IDENTITY" dist/<version>/zipseal-gui.app`. The spec leaves
       `codesign_identity` unset and `build-macos` always passes `--skip-sign`,
@@ -304,8 +303,11 @@ it. The smoke-tested artifact is what ships, never a second local build.
       (build, smoke test, upload), and `sign-macos` is guarded by
       `if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')`,
       declares `environment: release` (restricted to `v*`, required reviewer,
-      self-review prevented), downloads the uploaded bytes and signs,
-      notarizes, staples and builds the DMG around them. Only a signature is
+      self-review prevented), downloads the archived `.app`, extracts it
+      (`ditto -x -k`) so permissions and symlinks survive, and signs,
+      notarizes, staples and builds the DMG around it. `build-macos` archives
+      the bundle before upload (`ditto -c -k --keepParent`), because the
+      artifact store does not preserve the executable bit. Only a signature is
       added, so the smoke-tested artifact is still what ships. The event guard
       is load-bearing: a dispatch can target a `v*` tag, so the ref test alone
       would request the environment. Tag creators are not approvers, so one
@@ -314,9 +316,8 @@ it. The smoke-tested artifact is what ships, never a second local build.
       takes no environment, and a dispatch skips it.
       macOS-only at M2; Phases 3 and 4 append `build-windows`/`sign-windows`
       and `build-linux` when those platforms land, so no job sits dead before
-      its phase. Every action pinned by full SHA with a tag comment (the
-      `check-pins` hook enforces SHA validity; `# tag` comments on workflow
-      actions are repo style convention). Minimal top-level `permissions:`;
+      its phase. Every action pinned by full SHA with a tag comment (repo
+      style; `check-pins` enforces validity). Minimal top-level `permissions:`;
       `contents: write` only in `publish`; `id-token: write` +
       `attestations: write` for provenance.
 - [ ] CI smoke: launch the built app's inner binary, wait, confirm it is
@@ -334,18 +335,20 @@ it. The smoke-tested artifact is what ships, never a second local build.
       the secrets list (names only), rollback (delete draft → delete tag → fix
       → re-tag; deleting a tag needs a deliberate bypass of the `v*` tag
       ruleset, and the runbook says so), the acceptance checklist from M1–M3,
-      and the note that `workflow_dispatch` runs only the workflow as it
-      exists on the default branch. It opens with a `Last reviewed:` marker —
-      `REQUIRED_FILES` turns a missing marker into a hard hook error. Add it
-      to `REQUIRED_FILES` in `hooks/scripts/check_doc_freshness.py`, update
-      that hook's error text (it lists the required paths), and add it to the
-      durable-doc list in `dev-docs/README.md`.
+      and the note that `workflow_dispatch` needs the workflow on the default
+      branch but runs the selected ref's copy. It opens with a `Last reviewed:`
+      marker — `REQUIRED_FILES` turns a missing marker into a hard hook error.
+      Add it to `REQUIRED_FILES` in `hooks/scripts/check_doc_freshness.py`,
+      update the hook's error text (it lists the required paths), and add it
+      to the durable-doc list in `dev-docs/README.md`.
 - [ ] Rehearse first: run the workflow with `workflow_dispatch` (the
       `release.yml` bullet above). That runs `build-macos` only — no signing
       job, no `release` environment, no secrets — and skips `publish`.
-      `workflow_dispatch` uses the copy of the workflow on the default branch,
-      so this is available once `release.yml` is merged to `main`. Pushing a
-      tag is what creates the draft release, so a rehearsal tag would not do.
+      `workflow_dispatch` requires the workflow on the default branch, so this
+      is available once `release.yml` is merged to `main`; a dispatch can still
+      select another ref and runs that ref's copy, so dispatching a branch
+      exercises the branch, not `main`. Pushing a tag is what creates the draft
+      release, so a rehearsal tag would not do.
       Then the first real run at the next version bump; v0.1.0 stays
       source-only.
 - [ ] Manual acceptance (from M2 on, on a machine without Python): download
@@ -587,15 +590,12 @@ only if Phase 3 signing is approved. Linux needs no secrets, and
   tag ruleset; tag creation is limited to maintainers who are not approvers,
   with self-review prevented.
 
-- 2026-11-11: A Step 5 Preview (NVIDIA) review of the current head: signed
-  and unsigned work is split into `build-macos` and `sign-macos`, because
-  `environment` is job-level only and a `v*` rule fails a branch run;
-  `packaging/` joins basedpyright and ruff's per-file ignores; the keychain
-  recipe is complete; the icon `datas` destination and toolchain are decided;
-  M3 names its acceptance machines; tests exercise hooks without touching the
-  real index; `.python-version` vs the CI matrix is clarified; `ls-remote`
-  credentials and the default-branch requirement are noted; `releasing.md`
-  carries its freshness marker; the review log is condensed to stay near the
-  600-line convention. Its second pass fixed the in-place `codesign` step, the
-  Windows build/sign split, a Python-free M3 host, the PNG `datas`, the
-  `stapler validate` gate and the interpreter pin.
+- 2026-11-11: A Step 5 Preview (NVIDIA) review, three passes: split signed
+  and unsigned work into `build-macos`/`sign-macos` (`environment` is
+  job-level only and a `v*` rule fails a branch run) and gave Windows the
+  same `build-windows`/`sign-windows` split; `packaging/` joins basedpyright
+  and ruff's ignores; the keychain imports the `.p12` before the partition
+  list; the `.app` is archived for the build/sign transfer; icon `datas`,
+  toolchain and Python-free M3 hosts are settled; tests never touch the real
+  index; the interpreter pin and `workflow_dispatch` semantics are explicit;
+  `stapler validate` joins the gate; the log is condensed.
