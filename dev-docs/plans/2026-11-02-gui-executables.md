@@ -77,10 +77,15 @@ was smoke-tested is what ships, never a second local build.
    2024, so the premium is pointless. Both free routes are pursued:
    - **SignPath Foundation**: free OV-level signing for qualifying OSS
      projects (SignPath's certificate and HSM; publisher shows as "SignPath
-     Foundation"). Apply with the repository and download URLs, add the required
+     Foundation"). It Authenticode-signs `zipseal-gui.exe` (and the bundled
+     DLLs) before the zip is assembled: signing the archive itself does
+     nothing for SmartScreen, which reads the signature of the executable the
+     user runs. Apply with the repository and download URLs, add the required
      "Code signing policy" section to `README.md` with their exact wording and
      role list, then integrate their GitHub Action (pinned by SHA) with
-     per-release approvals.
+     per-release approvals. Verify the shipped artifact, not the build tree:
+     extract `zipseal-gui.exe` from the final zip and run
+     `signtool verify /pa /v` in CI and again at manual acceptance.
    - **Microsoft Store (MSIX)**: individual registration is free since
      September 2025, and Store MSIX packages are re-signed by Microsoft — the
      only recorded way to get zero SmartScreen warnings. Run a time-boxed spike:
@@ -91,9 +96,10 @@ was smoke-tested is what ships, never a second local build.
      "More info → Run anyway" steps and a note that Windows 11 Smart App
      Control may block unsigned apps outright. No calendar cost, only
      documentation debt. Each route signs a different thing: SignPath signs
-     the downloadable zip itself, while the Store re-signs only the MSIX it
-     distributes, so the portable zip stays unsigned if the Store is the
-     route that lands. "Windows signing resolved" always names the artifact.
+     `zipseal-gui.exe` inside the zip, while the Store re-signs only the MSIX
+     it distributes, so the zip's executable stays unsigned if the Store is
+     the route that lands. "Windows signing resolved" always names the
+     artifact that is actually signed.
 4. **macOS: Developer ID + notarization** (the Apple Developer account is
    already available). Sign the `.app` with hardened runtime and a secure
    timestamp, notarize with `notarytool` using an App Store Connect API key,
@@ -254,18 +260,24 @@ was smoke-tested is what ships, never a second local build.
       equal `v` plus the `pyproject.toml` version per Decision 9),
       `build-macos`, `publish`. `publish` runs only when
       `github.event_name == 'push'` for a tag, checks out with
-      `fetch-depth: 0`, and starts by asserting the tag still resolves to the
-      triggering commit (`git rev-parse "refs/tags/$GITHUB_REF_NAME^{commit}"`
-      equals `GITHUB_SHA`), so a tag moved or deleted mid-run fails instead
-      of shipping artifacts under a label that now points elsewhere.
+      `fetch-depth: 0`, and starts by asking the remote where the tag points
+      (`git ls-remote --tags origin "refs/tags/$GITHUB_REF_NAME"` compared
+      with `GITHUB_SHA`), because the local ref only reflects what was fetched
+      at checkout. It then creates the release with
+      `gh release create --verify-tag`, so a tag moved or deleted after the
+      checkout fails the job instead of shipping artifacts under a label that
+      now points elsewhere. A `v*` repository tag ruleset forbids updates and
+      deletions, closing the window while a release runs.
       `concurrency: group: release-${{ github.ref_name }}` with
       `cancel-in-progress: false` keeps two runs from publishing one version.
       macOS signing and notarization read the Apple secrets from a protected
       `release` environment restricted to `v*` tags with a required reviewer,
-      and are guarded by `if: startsWith(github.ref, 'refs/tags/v')`; a
-      `workflow_dispatch` run builds with `--skip-sign` and never sees them,
-      so branch code cannot make off with the certificate. A dispatch also
-      skips `publish`, because it has no release tag and must not create one.
+      and are guarded by
+      `if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')`.
+      The event check is load-bearing: `workflow_dispatch` can target a `v*`
+      tag, which satisfies the ref test on its own. A dispatch always builds
+      with `--skip-sign`, so it never sees the secrets even when dispatched
+      at a tag, and it skips `publish`, because it must not create a release.
       macOS-only at M2; Phases 3 and 4 append `build-windows` and
       `build-linux` when those platforms land, so no job sits dead before its
       phase. Every action pinned by full SHA with a tag comment (the
@@ -279,14 +291,18 @@ was smoke-tested is what ships, never a second local build.
 - [ ] Publish job: collect artifacts, write `SHA256SUMS` (sha256 over every
       artifact), attest each artifact and the sums with
       `actions/attest-build-provenance`, then
-      `gh release create vX.Y.Z --draft --title … --notes …` attaching
-      everything. Release notes include the resolved Python, PyInstaller
-      version, runner image, and Tk version per artifact, the measured Linux
+      `gh release create vX.Y.Z --draft --verify-tag --title … --notes …`
+      attaching everything. `--verify-tag` refuses to create the tag itself,
+      which would otherwise happen silently from the default branch. Release
+      notes include the resolved Python, PyInstaller version, runner image,
+      and Tk version per artifact, the measured Linux
       glibc floor, the `SHA256SUMS` verification line, and the
       `gh attestation verify` line.
 - [ ] `dev-docs/releasing.md` (new durable doc): the tag-to-release runbook,
       the secrets list (names only), rollback (delete draft → delete tag → fix
-      → re-tag), and the acceptance checklist from M1–M3. Add it to
+      → re-tag; deleting a tag now needs a deliberate bypass of the `v*` tag
+      ruleset, and the runbook says so), and the acceptance checklist from
+      M1–M3. Add it to
       `REQUIRED_FILES` in `hooks/scripts/check_doc_freshness.py` and to the
       durable-doc list in `dev-docs/README.md` so the freshness hook covers it.
 - [ ] Rehearse first: run the workflow with `workflow_dispatch` (the
@@ -325,7 +341,9 @@ was smoke-tested is what ships, never a second local build.
     "Free code signing provided by SignPath.io, certificate by SignPath
     Foundation"), list committer/approver roles, then apply with the
     repository and download URLs. If approved, integrate their GitHub Action,
-    pin it by SHA, and keep per-release approvals in mind.
+    pin it by SHA, keep per-release approvals in mind, and have the Windows
+    job Authenticode-sign `zipseal-gui.exe` before zipping, then fail unless
+    `signtool verify /pa /v` passes on the exe extracted from the final zip.
   - Store MSIX spike: free individual Partner Center account, package the
     onedir as a full-trust MSIX, submit once, confirm Microsoft re-signing
     removes SmartScreen warnings. Decision after the spike; do not commit to
@@ -338,9 +356,9 @@ was smoke-tested is what ships, never a second local build.
     that Windows 11 Smart App Control may block unsigned apps outright, and
     submit any AV false positive to Microsoft's portal.
   - What Store signing covers: the Store re-signs only the MSIX it
-    distributes. If that is the route that lands, the downloadable zip stays
-    unsigned and keeps the guidance above; only SignPath (or a purchased
-    certificate) signs the zip itself.
+    distributes. If that is the route that lands, `zipseal-gui.exe` in the
+    downloadable zip stays unsigned and keeps the guidance above; only
+    SignPath (or a purchased certificate) Authenticode-signs that executable.
 - [ ] Optional, deferred until asked: Inno Setup installer (the portable zip is
       the artifact this plan promises) and a winget manifest PR.
 
@@ -551,3 +569,12 @@ to rotate it.
   versioned labels. `build.py` preflights Tk per target. `SPEC.md` gains a
   marked "planned, not implemented" distribution note so the design doc and
   the plan agree until Phase 5.
+
+- 2026-11-11: A CodeRabbit review of those fixes. SignPath Authenticode-signs
+  `zipseal-gui.exe` inside the zip rather than the archive, and the Windows
+  job verifies the signature of the exe extracted from the shipped zip.
+  Signing is guarded by the push event as well as a `v*` ref, because a
+  dispatch can target a tag. `publish` compares `git ls-remote` with
+  `GITHUB_SHA`, passes `--verify-tag` to `gh release create`, and relies on a
+  `v*` tag ruleset that forbids updates and deletions; the rollback runbook
+  notes that deleting a protected tag needs a deliberate bypass.
