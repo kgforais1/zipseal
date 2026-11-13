@@ -17,6 +17,16 @@ edits and refactors. User-visible changes go in [`CHANGELOG.md`](CHANGELOG.md).
   `tests/test_packaging.py` exercises the hook against a synthetic `dist/`
   artifact in a throwaway repository.
 
+- `packaging/`: the pieces the test list can check without freezing an app:
+  `run_gui.py` (the PyInstaller entry point, guarded so importing it opens no
+  window), `build.py` (CPython 3.13.17 from python-build-standalone
+  `20261021`, a version reader, the Info.plist and
+  Windows version-resource substitution, the `.spec`'s `datas`, and a
+  preflight that refuses any other interpreter), an empty macOS
+  `entitlements.plist`, the Linux `zipseal-gui.desktop` and an executable
+  `AppRun`, and `pyproject.toml`'s `[tool.basedpyright].include` plus the
+  basedpyright hook now covering `packaging/`.
+
 - `latest-deps.yml`: a weekly run (and on demand) that re-resolves uv.lock
   with `uv lock --upgrade` in the runner only, logs which versions moved, and
   runs the fast tests and basedpyright, so an upstream release that breaks

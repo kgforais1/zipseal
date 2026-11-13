@@ -44,5 +44,5 @@ markers = [
 
 [tool.basedpyright]
 typeCheckingMode = "standard"
-include = ["src", "tests"]
+include = ["src", "tests", "packaging"]
 pythonVersion = "3.11"

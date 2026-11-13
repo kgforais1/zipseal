@@ -227,7 +227,7 @@ it. The smoke-tested artifact is what ships, never a second local build.
       launch. Acceptance is the two `tests/test_window_icon.py` cases in the
       test list: the PNG is shown when SVG raises `TclError`, and the default
       icon remains when neither image loads.
-- [ ] Bring `packaging/` under the existing quality gates, or its first
+- [x] Bring `packaging/` under the existing quality gates, or its first
       commit fails `pre-commit run --all-files`: add it to
       `[tool.basedpyright].include` (`pyproject.toml`, today `["src",
       "tests"]`) and the basedpyright hook's `files:` regex, and add
@@ -610,7 +610,7 @@ it. The smoke-tested artifact is what ships, never a second local build.
 
 Each behavior gets a pytest test per repo convention. Packaging tests:
 
-- [ ] `read_version()` returns `pyproject.toml`'s version; a version
+- [x] `read_version()` returns `pyproject.toml`'s version; a version
       substitution render (Info.plist fields, Windows version resource string)
       contains it.
 - [x] The artifact globs (`*.dmg`, `*.msi`, `*.exe`, `*.AppImage`, `*.tar.gz`)
@@ -621,12 +621,12 @@ Each behavior gets a pytest test per repo convention. Packaging tests:
       (`importlib.util.spec_from_file_location`), or run its `main()` against a
       `tmp_path` repo root: a synthetic tracked artifact under `dist/` must be
       rejected. Never `git add` into the real index from a test.
-- [ ] `packaging/linux/zipseal-gui.desktop` has `Name`, `Exec`, `Icon`,
+- [x] `packaging/linux/zipseal-gui.desktop` has `Name`, `Exec`, `Icon`,
       `Terminal=false`, sorted `Categories`; `AppRun` is tracked executable.
-- [ ] `packaging/macos/entitlements.plist` parses with `plistlib` and
+- [x] `packaging/macos/entitlements.plist` parses with `plistlib` and
       contains only keys Decision 4 lists with the failure that required them
       (an empty plist passes).
-- [ ] `collect_data_files()` returns both `("src/zipseal/icon.svg", "zipseal")`
+- [x] `collect_data_files()` returns both `("src/zipseal/icon.svg", "zipseal")`
       and `("build/icons/icon.png", "zipseal")`. No PNG is committed (`*.png`
       is forbidden); if the function requires the file to exist, the test
       creates one under `tmp_path`.
