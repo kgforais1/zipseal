@@ -220,7 +220,7 @@ it. The smoke-tested artifact is what ships, never a second local build.
       `*.png` is blocked by `.forbidden-paths`), and the window-icon PNG is
       bundled with `datas=[("build/icons/icon.png", "zipseal")]`, beside
       `ICON` under `_MEIPASS/zipseal/`, which the PNG-fallback task reads.
-- [ ] `gui_view.set_icon` loads `ICON.with_name("icon.png")` when SVG loading
+- [x] `gui_view.set_icon` loads `ICON.with_name("icon.png")` when SVG loading
       fails. That is the PNG bundled at `_MEIPASS/zipseal/` next to `ICON`.
       Tk 9 still prefers the SVG. If the PNG is missing or unreadable too,
       return False and leave Tk's default icon; a missing icon never fails
@@ -630,7 +630,7 @@ Each behavior gets a pytest test per repo convention. Packaging tests:
       and `("build/icons/icon.png", "zipseal")`. No PNG is committed (`*.png`
       is forbidden); if the function requires the file to exist, the test
       creates one under `tmp_path`.
-- [ ] `tests/test_window_icon.py` replaces
+- [x] `tests/test_window_icon.py` replaces
       `test_set_icon_falls_back_when_svg_is_unreadable`. Monkeypatch
       `gui_view.ICON` (the name that module imported, not `gui.ICON`) at a
       `tmp_path` SVG that has a sibling PNG. Raise `TclError` only for the
