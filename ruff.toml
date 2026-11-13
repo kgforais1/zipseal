@@ -19,6 +19,7 @@ select = [
 "tests/**" = ["S101", "S105", "S106", "S603", "S607"]  # asserts, fixture passwords, running tar
 "scripts/**" = ["S105", "S311", "S603", "S607"]  # sample password, seeded noise, running zipseal
 "hooks/**" = ["S603", "S607"]  # hooks run git
+"packaging/**" = ["S603", "S607"]  # build.py shells out to hdiutil, codesign, appimagetool
 
 [format]
 quote-style = "double"

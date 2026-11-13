@@ -1,7 +1,7 @@
 # Plan: GUI executables for macOS, Windows and Linux
 
 Date: 2026-11-02
-Status: draft
+Status: in-progress
 Linked: TODO.md "Ship `zipseal-gui` as downloadable apps…"; supersedes the
 macOS-only `.app` bullet in `dev-docs/plans/2026-10-10-gui.md` ("Later")
 
@@ -173,10 +173,10 @@ it. The smoke-tested artifact is what ships, never a second local build.
       sibling are both missing. A smoke check asserts the resolved path
       exists in the frozen tree. No cwd or `__file__` use
       elsewhere.
-- [ ] Add a `build` dependency group to `pyproject.toml`
+- [x] Add a `build` dependency group to `pyproject.toml`
       (`pyinstaller==6.22.3` first entry; locks into `uv.lock`, Dependabot
       bumps it). Builds run as `uv run --group build`.
-- [ ] Extend `.gitignore` and `.forbidden-paths` with the artifact globs
+- [x] Extend `.gitignore` and `.forbidden-paths` with the artifact globs
       (`*.dmg`, `*.msi`, `*.exe`, `*.AppImage`, `*.tar.gz`) so even a
       force-added artifact cannot be committed; confirm `dist/` and `build/`
       are in both files' spirit (already ignored; add to `.forbidden-paths`).
@@ -613,7 +613,7 @@ Each behavior gets a pytest test per repo convention. Packaging tests:
 - [ ] `read_version()` returns `pyproject.toml`'s version; a version
       substitution render (Info.plist fields, Windows version resource string)
       contains it.
-- [ ] The artifact globs (`*.dmg`, `*.msi`, `*.exe`, `*.AppImage`, `*.tar.gz`)
+- [x] The artifact globs (`*.dmg`, `*.msi`, `*.exe`, `*.AppImage`, `*.tar.gz`)
       are present in `.forbidden-paths` and the output roots (`dist/`, `build/`)
       are ignored by `.gitignore`. Exercise
       `hooks/scripts/check_forbidden_paths.py` the way

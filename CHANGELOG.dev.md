@@ -7,6 +7,16 @@ edits and refactors. User-visible changes go in [`CHANGELOG.md`](CHANGELOG.md).
 
 ### Added
 
+- A `build` dependency group pinned to `pyinstaller==6.22.3`, locked in
+  `uv.lock`, for the frozen GUI executables; builds run as
+  `uv run --group build` (plan: `dev-docs/plans/2026-11-02-gui-executables.md`).
+- Artifact ignore rules for those executables: `.gitignore` and
+  `.forbidden-paths` gain `*.dmg`, `*.msi`, `*.exe`, `*.AppImage` and
+  `*.tar.gz`, and `.forbidden-paths` also gains `build/` and `dist/`, so a
+  force-added build output cannot be committed.
+  `tests/test_packaging.py` exercises the hook against a synthetic `dist/`
+  artifact in a throwaway repository.
+
 - `latest-deps.yml`: a weekly run (and on demand) that re-resolves uv.lock
   with `uv lock --upgrade` in the runner only, logs which versions moved, and
   runs the fast tests and basedpyright, so an upstream release that breaks
