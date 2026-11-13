@@ -2,7 +2,7 @@
 
 Date: 2026-11-02
 Status: draft
-Linked: TODO.md "GUI executables for macOS, Windows and Linux"; supersedes the
+Linked: TODO.md "Ship `zipseal-gui` as downloadable apps…"; supersedes the
 macOS-only `.app` bullet in `dev-docs/plans/2026-10-10-gui.md` ("Later")
 
 ## Goal
@@ -237,7 +237,7 @@ it. The smoke-tested artifact is what ships, never a second local build.
       `packaging/build.py` with `importlib.util.spec_from_file_location`, as
       `tests/test_check_pins.py` loads its hook, and never add `packaging` to
       pytest's `pythonpath` — it would shadow the PyPI `packaging`
-      distribution that pytest imports.
+      distribution for anything in the pytest process that imports it.
 - [ ] `AGENTS.md` command for a local build; `dev-docs/README.md` unchanged in
       this phase (Phase 2 registers `releasing.md` there).
 
@@ -349,8 +349,11 @@ it. The smoke-tested artifact is what ships, never a second local build.
       `check-test`, `check-audit`, `build-macos`, `sign-macos`, `publish`.
       `ci.yml` runs on pushes to `main` and on pull requests only, so a tag
       runs none of it. The three check jobs re-run those gates on both
-      triggers. `check-hooks` is `uvx --no-build pre-commit==4.7.0 run
-      --all-files --show-diff-on-failure`. `check-audit` is `ci.yml`'s
+      triggers. `check-hooks` is `ci.yml`'s `checks` job copied step for
+      step: checkout with `fetch-depth: 0` and `persist-credentials: false`,
+      `setup-uv` at `version: "0.12.24"`, `uv sync --locked` (the
+      basedpyright hook runs through `uv run`), then `uvx --no-build
+      pre-commit==4.7.0 run --all-files --show-diff-on-failure`. `check-audit` is `ci.yml`'s
       `audit` job unchanged (`pip-audit==2.10.1`). `check-test` is `ci.yml`'s
       `test` job copied step for step: `timeout-minutes: 30`, matrix
       `os: [ubuntu-latest, macos-latest]` × `python: ["3.11", "3.13"]`,
@@ -398,7 +401,11 @@ it. The smoke-tested artifact is what ships, never a second local build.
       declares `environment: release` (restricted to `v*`, required reviewer,
       self-review prevented), downloads the archived `.app`, extracts it
       (`ditto -x -k`) so permissions and symlinks survive, and signs,
-      notarizes, staples and builds the DMG around it. `build-macos` archives
+      notarizes, staples and builds the DMG around it, then uploads only the
+      signed DMG under its own artifact name (`zipseal-gui-macos-dmg`).
+      `build-macos`'s `.app` archive uses a different name, and `publish`
+      downloads by `name:`, so the intermediate never reaches `SHA256SUMS`,
+      the attestation or the release. `build-macos` archives
       the bundle before upload (`ditto -c -k --keepParent`), because the
       artifact store does not preserve the executable bit. Only a signature is
       added, so the smoke-tested artifact is still what ships. The event guard
@@ -582,7 +589,7 @@ it. The smoke-tested artifact is what ships, never a second local build.
       the release page — the frozen window shows no version).
 - [ ] `AGENTS.md`: build command, `packaging/` in the layout, release workflow.
 - [ ] `SPEC.md`: replace the "planned, not implemented" note added with this
-      plan (around line 106) with the artifact table above; the GUI ships
+      plan (`SPEC.md:112`, "Planned, not implemented") with the artifact table above; the GUI ships
       frozen while the CLI stays source-installable.
 - [ ] `CHANGELOG.md` (user-visible) and `CHANGELOG.dev.md` (workflow internals);
       doc-gardening pass; bump `Last reviewed` dates after re-reading.
@@ -629,7 +636,10 @@ Each behavior gets a pytest test per repo convention. Packaging tests:
       `tmp_path` SVG that has a sibling PNG. Raise `TclError` only for the
       SVG format and the PNG loads → the icon is set from the PNG. Both fail
       → returns False, Tk's default icon remains, and launch is unaffected.
-      Patching every `PhotoImage` call does not count as the PNG case.
+      Patching every `PhotoImage` call does not count as the PNG case. Both
+      cases keep `@pytest.mark.gui` and `pytest.importorskip("tkinter")`, like
+      the test they replace, and run with `uv run pytest -m gui
+      tests/test_window_icon.py`.
 
 CI smoke gates (not pytest): the per-platform launch checks run against the
 artifact the workflow uploads; Windows and Linux fail the job, and the macOS
@@ -769,3 +779,11 @@ only if Phase 3 signing is approved. Linux needs no secrets, and
   a red gate never starts signing. Windows smoke extracts the shipped zip.
   The Linux archive is one `zipseal-gui/` directory with the binary at
   `0755`.
+
+- 2026-11-12: Self-review. `check-hooks` copies `ci.yml`'s `checks` job,
+  including `uv sync --locked`, which the basedpyright hook needs.
+  `sign-macos` uploads the signed DMG that `publish` collects.
+  Step 5 Preview (NVIDIA) then confirmed both edits. `publish` downloads
+  shipped artifacts by name. The PNG tests stay `gui`-marked. The `SPEC.md`
+  and `TODO.md` references and the `packaging` shadowing reason were
+  corrected.
