@@ -17,8 +17,9 @@ All notable user-facing changes are documented here. The format follows
   `Custom…` with a clearly labeled `Custom size (MB)` box. The list no longer
   accepts free text.
 - The zipseal window shows the project icon in the macOS Dock, the Windows
-  taskbar and the title bar, when Python's Tk is version 9 or later
-  (uv-managed Pythons are). An older Tk keeps its default icon.
+  taskbar and the title bar. Tk 9 reads the SVG directly; an older Tk uses a
+  sibling PNG when one is present. A window whose icon cannot be loaded at
+  all keeps Tk's default icon instead of failing to open.
 - A project icon (`src/zipseal/icon.svg`) and CI, audit, Python, AES-256 and
   license badges at the top of the README.
 
@@ -39,6 +40,10 @@ All notable user-facing changes are documented here. The format follows
 
 ### Fixed
 
+- The window keeps its icon when Tk uses the PNG fallback. The image used to
+  disappear as soon as it was set, because Tkinter deletes a `PhotoImage`
+  once nothing in Python still refers to it. If Tk cannot apply the icon,
+  the window still opens with the default icon.
 - `Save as…` now opens in the output's folder with only its file name filled
   in. Before, the name field held the whole old path, so a typed name was
   added to it.

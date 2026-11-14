@@ -494,14 +494,32 @@ def _set_app_id() -> None:
 def set_icon(root: tk.Tk) -> bool:
     """Show the zipseal icon in the Dock, taskbar and title bar.
 
-    Tk 9 reads SVG. An older Tk cannot, and then the default icon stays: an icon
-    is never worth failing a launch. Returns whether the icon was set.
+    Tk 9 reads the SVG. An older Tk cannot, and then the sibling PNG is the
+    fallback: in a frozen app it is bundled beside `ICON` under `_MEIPASS/zipseal/`
+    by the build's `datas`, and in a source checkout it is absent. If neither
+    image can be loaded the default icon stays, because an icon is never worth
+    failing a launch. The PhotoImage stays referenced by the window: Tkinter
+    deletes the image when the Python object is collected, and `iconphoto`
+    does not keep it. Returns whether the icon was set.
     """
     try:
         image = tk.PhotoImage(master=root, file=str(ICON), format="svg -scaletoheight 256")
     except tk.TclError:
+        png = ICON.with_name("icon.png")
+        if not png.exists():
+            return False
+        try:
+            image = tk.PhotoImage(master=root, file=str(png))
+        except tk.TclError:
+            return False
+    try:
+        root.iconphoto(True, image)
+    except tk.TclError:
         return False
-    root.iconphoto(True, image)
+    # PhotoImage deletes its Tk image when the Python object is collected.
+    # iconphoto does not keep that object, so the window would lose a PNG
+    # (or SVG) icon as soon as this function returned.
+    root._zipseal_icon_image = image  # type: ignore[attr-defined]
     return True
 
 

@@ -1,7 +1,7 @@
 # Plan: GUI executables for macOS, Windows and Linux
 
 Date: 2026-11-02
-Status: draft
+Status: in-progress
 Linked: TODO.md "Ship `zipseal-gui` as downloadable apps…"; supersedes the
 macOS-only `.app` bullet in `dev-docs/plans/2026-10-10-gui.md` ("Later")
 
@@ -160,11 +160,12 @@ it. The smoke-tested artifact is what ships, never a second local build.
 
 ## Phase 0 — Packaging plumbing
 
-- [ ] Audit the GUI's frozen-run assumptions. Today the only file reference is
+- [x] Audit the GUI's frozen-run assumptions. Today the only file reference is
       `gui.ICON = Path(__file__).with_name("icon.svg")` (`gui.py:168`), loaded
       by `gui_view.set_icon` with Tk's SVG reader. `build.py`'s
-      `collect_data_files()` is what the `.spec` uses for `datas`, and it
-      returns both `("src/zipseal/icon.svg", "zipseal")` and
+      `resolved_data_files()` is what the `.spec` uses for `datas`. It
+      absolutizes `collect_data_files()`, which returns both
+      `("src/zipseal/icon.svg", "zipseal")` and
       `("build/icons/icon.png", "zipseal")` rather than a handwritten PNG
       tuple: a frozen module's
       `__file__` is `sys._MEIPASS/zipseal/gui.py`, so the icon has to land in
@@ -173,10 +174,10 @@ it. The smoke-tested artifact is what ships, never a second local build.
       sibling are both missing. A smoke check asserts the resolved path
       exists in the frozen tree. No cwd or `__file__` use
       elsewhere.
-- [ ] Add a `build` dependency group to `pyproject.toml`
+- [x] Add a `build` dependency group to `pyproject.toml`
       (`pyinstaller==6.22.3` first entry; locks into `uv.lock`, Dependabot
       bumps it). Builds run as `uv run --group build`.
-- [ ] Extend `.gitignore` and `.forbidden-paths` with the artifact globs
+- [x] Extend `.gitignore` and `.forbidden-paths` with the artifact globs
       (`*.dmg`, `*.msi`, `*.exe`, `*.AppImage`, `*.tar.gz`) so even a
       force-added artifact cannot be committed; confirm `dist/` and `build/`
       are in both files' spirit (already ignored; add to `.forbidden-paths`).
@@ -220,25 +221,25 @@ it. The smoke-tested artifact is what ships, never a second local build.
       `*.png` is blocked by `.forbidden-paths`), and the window-icon PNG is
       bundled with `datas=[("build/icons/icon.png", "zipseal")]`, beside
       `ICON` under `_MEIPASS/zipseal/`, which the PNG-fallback task reads.
-- [ ] `gui_view.set_icon` loads `ICON.with_name("icon.png")` when SVG loading
+- [x] `gui_view.set_icon` loads `ICON.with_name("icon.png")` when SVG loading
       fails. That is the PNG bundled at `_MEIPASS/zipseal/` next to `ICON`.
       Tk 9 still prefers the SVG. If the PNG is missing or unreadable too,
       return False and leave Tk's default icon; a missing icon never fails
       launch. Acceptance is the two `tests/test_window_icon.py` cases in the
       test list: the PNG is shown when SVG raises `TclError`, and the default
       icon remains when neither image loads.
-- [ ] Bring `packaging/` under the existing quality gates, or its first
+- [x] Bring `packaging/` under the existing quality gates, or its first
       commit fails `pre-commit run --all-files`: add it to
       `[tool.basedpyright].include` (`pyproject.toml`, today `["src",
       "tests"]`) and the basedpyright hook's `files:` regex, and add
       `"packaging/**" = ["S603", "S607"]` to `ruff.toml` (`build.py` shells
       out to `hdiutil`, `codesign`, `xcrun`, `objcopy`, `appimagetool`).
-- [ ] `tests/test_packaging.py` covering the test list below; load
+- [x] `tests/test_packaging.py` covering the test list below; load
       `packaging/build.py` with `importlib.util.spec_from_file_location`, as
       `tests/test_check_pins.py` loads its hook, and never add `packaging` to
       pytest's `pythonpath` — it would shadow the PyPI `packaging`
       distribution for anything in the pytest process that imports it.
-- [ ] `AGENTS.md` command for a local build; `dev-docs/README.md` unchanged in
+- [x] `AGENTS.md` command for a local build; `dev-docs/README.md` unchanged in
       this phase (Phase 2 registers `releasing.md` there).
 
 ## Phase 1 — macOS app (milestone M1)
@@ -610,10 +611,10 @@ it. The smoke-tested artifact is what ships, never a second local build.
 
 Each behavior gets a pytest test per repo convention. Packaging tests:
 
-- [ ] `read_version()` returns `pyproject.toml`'s version; a version
+- [x] `read_version()` returns `pyproject.toml`'s version; a version
       substitution render (Info.plist fields, Windows version resource string)
       contains it.
-- [ ] The artifact globs (`*.dmg`, `*.msi`, `*.exe`, `*.AppImage`, `*.tar.gz`)
+- [x] The artifact globs (`*.dmg`, `*.msi`, `*.exe`, `*.AppImage`, `*.tar.gz`)
       are present in `.forbidden-paths` and the output roots (`dist/`, `build/`)
       are ignored by `.gitignore`. Exercise
       `hooks/scripts/check_forbidden_paths.py` the way
@@ -621,16 +622,16 @@ Each behavior gets a pytest test per repo convention. Packaging tests:
       (`importlib.util.spec_from_file_location`), or run its `main()` against a
       `tmp_path` repo root: a synthetic tracked artifact under `dist/` must be
       rejected. Never `git add` into the real index from a test.
-- [ ] `packaging/linux/zipseal-gui.desktop` has `Name`, `Exec`, `Icon`,
+- [x] `packaging/linux/zipseal-gui.desktop` has `Name`, `Exec`, `Icon`,
       `Terminal=false`, sorted `Categories`; `AppRun` is tracked executable.
-- [ ] `packaging/macos/entitlements.plist` parses with `plistlib` and
+- [x] `packaging/macos/entitlements.plist` parses with `plistlib` and
       contains only keys Decision 4 lists with the failure that required them
       (an empty plist passes).
-- [ ] `collect_data_files()` returns both `("src/zipseal/icon.svg", "zipseal")`
+- [x] `collect_data_files()` returns both `("src/zipseal/icon.svg", "zipseal")`
       and `("build/icons/icon.png", "zipseal")`. No PNG is committed (`*.png`
       is forbidden); if the function requires the file to exist, the test
       creates one under `tmp_path`.
-- [ ] `tests/test_window_icon.py` replaces
+- [x] `tests/test_window_icon.py` replaces
       `test_set_icon_falls_back_when_svg_is_unreadable`. Monkeypatch
       `gui_view.ICON` (the name that module imported, not `gui.ICON`) at a
       `tmp_path` SVG that has a sibling PNG. Raise `TclError` only for the

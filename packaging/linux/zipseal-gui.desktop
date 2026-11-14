@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Version=1.0
+Name=zipseal
+Comment=Write files and folders into AES-256 zips
+Exec=zipseal-gui
+Icon=zipseal-gui
+Terminal=false
+Categories=Utility;Security;

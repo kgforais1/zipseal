@@ -20,6 +20,14 @@ sample-data/
 *.docx
 *.xlsx
 *.csv
+# Build outputs and installers (artifacts of packaging/build.py):
+*.dmg
+*.msi
+*.exe
+*.AppImage
+*.tar.gz
+build/
+dist/
 # Secrets:
 *.pem
 *.key

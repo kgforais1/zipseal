@@ -7,11 +7,79 @@ edits and refactors. User-visible changes go in [`CHANGELOG.md`](CHANGELOG.md).
 
 ### Added
 
+- A `build` dependency group pinned to `pyinstaller==6.22.3`, locked in
+  `uv.lock`, for the frozen GUI executables; builds run as
+  `uv run --group build` (plan: `dev-docs/plans/2026-11-02-gui-executables.md`).
+- Artifact ignore rules for those executables: `.gitignore` and
+  `.forbidden-paths` gain `*.dmg`, `*.msi`, `*.exe`, `*.AppImage` and
+  `*.tar.gz`, and `.forbidden-paths` also gains `build/` and `dist/`, so a
+  force-added build output cannot be committed.
+  `tests/test_packaging.py` exercises the hook against a synthetic `dist/`
+  artifact in a throwaway repository.
+
+- `packaging/`: the pieces the test list can check without freezing an app:
+  `run_gui.py` (the PyInstaller entry point, guarded so importing it opens no
+  window), `build.py` (CPython 3.13.17 from python-build-standalone
+  `20261021`, a version reader, the Info.plist and
+  Windows version-resource substitution, the `.spec`'s `datas`, and a
+  preflight that refuses any other interpreter), an empty macOS
+  `entitlements.plist`, the Linux `zipseal-gui.desktop` and an executable
+  `AppRun`, and `pyproject.toml`'s `[tool.basedpyright].include` plus the
+  basedpyright hook now covering `packaging/`.
+
+- `packaging/icons.py`: the icon rasters are now generated at build time from
+  `src/zipseal/icon.svg` rather than checked in, so `*.png` stays a forbidden
+  path and no raster enters the repository. The toolchain is one pinned
+  `resvg` release (`v0.50.0`), fetched for the build host into gitignored
+  `build/tools/` and sha256-checked before the archive is extracted or its
+  binary executed: resvg publishes no checksum file with a release, so the
+  three digests (macOS arm64, Windows x64, Linux x86_64) were computed from
+  the downloaded assets. Pillow is the second pinned build tool -
+  `pillow==13.0.0` joins `pyinstaller==6.22.3` in the `build` dependency group
+  and `uv.lock` - and it packs the multi-size `.ico`; macOS `iconutil` builds
+  the `.icns` for a macOS target only. Everything lands in `build/icons/`,
+  where `icon.png` is both the fallback `gui_view.set_icon` reads when Tk
+  cannot load the SVG and the Linux desktop icon. `packaging/build.py`
+  generates those icons after the interpreter check and before the PyInstaller
+  freeze; a missing `build/icons/icon.png` fails there with an explicit
+  message. `--target` has to be the machine's own platform.
+  `tests/test_packaging_icons.py` loads `icons.py` by path, the way
+  `tests/test_packaging.py` loads `build.py`, and covers the checksum
+  mismatch (the asset is deleted and never executed), the `.ico` packing
+  (the output lands under the directory the
+  function was given, never under `src/`) and that no test reaches the network;
+  the `.ico` test needs Pillow, so it runs where the `build` group is synced
+  and skips where it is not. The download speaks https only to GitHub's
+  release hosts and unpacking writes the bare `resvg` binary, so `ruff.toml`
+  does not suppress the fetch (`S310`) or extract (`S202`) checks for
+  `packaging/**`. The release binaries are not static
+  ones: the Linux asset links glibc, provided by the pinned build container,
+  and the macOS asset links libSystem.
+
+- `packaging/zipseal-gui.spec` and `packaging/build.py`'s freeze step: an
+  onedir, windowed PyInstaller build of `packaging/run_gui.py` that bundles the
+  SVG and the generated PNG under `_MEIPASS/zipseal/`, with `pytest`,
+  `hypothesis`, `basedpyright` and `yaml` excluded, UPX left off, and no codesign identity.
+  The spec loads `build.py` by path and reads its target and version from the
+  environment `build.py` sets; only a `macos` target gets a `zipseal-gui.app`
+  bundle. Before freezing, `build.py` opens and destroys a Tk root and fails
+  unless the Tcl and Tk libraries resolve inside `sys.base_prefix`, so a host
+  Tcl/Tk cannot reach the bundle. A missing display says to run under
+  `xvfb-run` instead of looking like a broken Tcl/Tk. The version is checked
+  before icons are generated. PyInstaller writes `dist/<version>.partial` and
+  that replaces `dist/<version>/` only after the freeze succeeds, with
+  `build/pyinstaller` as the work path. `--skip-sign`
+  is required until signing exists. A `tests/test_packaging.py` case builds a
+  fake `_MEIPASS` tree and asserts `gui.ICON` and its PNG sibling resolve
+  inside it, and the freeze and preflight tests stub `subprocess` and
+  `tkinter`, so no window opens and no PyInstaller run happens.
+
 - `latest-deps.yml`: a weekly run (and on demand) that re-resolves uv.lock
   with `uv lock --upgrade` in the runner only, logs which versions moved, and
   runs the fast tests and basedpyright, so an upstream release that breaks
-  zipseal shows up before the next lock refresh. A failing run is the
-  notification, as in `dependency-audit.yml`.
+  zipseal shows up before the next lock refresh. The sync includes the
+  `build` group, because basedpyright covers `packaging/` and Pillow is only
+  there. A failing run is the notification, as in `dependency-audit.yml`.
 - `tests/test_launcher.py` covers `zipseal-gui.command` (uv on and off
   `PATH`, a spaced clone path, a foreign working directory, no uv with
   Return or EOF) and `scripts/set-icon.sh`. `scripts/install.sh` now sets the
@@ -65,6 +133,39 @@ edits and refactors. User-visible changes go in [`CHANGELOG.md`](CHANGELOG.md).
 
 ### Fixed
 
+- `packaging/build.py` checks `--version` before it generates icons or runs
+  PyInstaller, and it only publishes `dist/<version>/` after the freeze
+  succeeds. A version with a slash, `..`, or a non-ASCII digit is rejected.
+  A failed freeze deletes its partial tree instead of replacing a finished
+  app. Moving the previous tree aside, or putting it back when the new tree
+  cannot take its place, exits with `SystemExit` rather than a traceback.
+  Removing the leftover `.previous` tree after a successful publish does not
+  fail the build. The spec calls `resolved_data_files()`, so the paths
+  PyInstaller receives are absolute.
+- A Tk preflight with no display names `xvfb-run`. The Linux container is
+  what provides that display; macOS and Windows do not need it.
+- `gui_view.set_icon` keeps the `PhotoImage` on the window, so a PNG (or SVG)
+  icon is still there after `set_icon` returns.
+- Packaging icon tests live in `tests/test_packaging_icons.py`, so neither
+  that file nor `tests/test_packaging.py` sits over the 600-line soft cap.
+  The network-free icon test no longer fails on a host with no pinned resvg.
+- `packaging/build.py` rejects a `--target` that is not the build machine.
+  PyInstaller freezes the OS it runs on, so a mismatched target stopped
+  before icon generation.
+- Packaging tests that check a created file's mode keep the exact `0o600` and
+  `0o755` bits on POSIX. On Windows they only require the file to be
+  writable, because `chmod` there cannot set those bits.
+- `packaging/icons.py` no longer accepts a path on the command line, and it
+  no longer calls `urlopen` or `extractall`. Those were the Sonar security
+  findings (a CLI path reached the unpack and `resvg`'s arguments) and the
+  CodeFactor finding (an open URL with no scheme check). The download stays
+  on https to GitHub's release hosts, and an archive contributes only its
+  bare `resvg` or `resvg.exe` member.
+- The basedpyright pre-commit hook runs `uv run --group build`, so the
+  type check sees Pillow. A plain `uv sync` still omits the build group.
+- `latest-deps.yml` syncs the `build` group before basedpyright. Both weekly
+  Python jobs typecheck `packaging/`, which imports Pillow, and the
+  typecheck step passes `--no-sync`, so it cannot install that group itself.
 - `dependency-audit.yml` no longer prints advisory text unescaped. A newline in
   a GitHub advisory description used to end the `::error` annotation, and the
   rest of the text was parsed as runner commands.
