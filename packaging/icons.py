@@ -20,7 +20,7 @@ Unpacking writes the single bare `resvg` or `resvg.exe` member; archive paths
 are not extracted.
 
 The checksum check and the `.ico` packing take their inputs as arguments, so
-`tests/test_packaging.py` drives them without a download and without a network.
+`tests/test_packaging_icons.py` drives them without a download and without a network.
 """
 
 from __future__ import annotations

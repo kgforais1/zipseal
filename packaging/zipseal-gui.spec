@@ -29,15 +29,14 @@ _version = os.environ.get(build.BUILD_VERSION_ENV) or build.read_version()
 # An empty value means a bare PyInstaller run: it gets the onedir tree only.
 _target = os.environ.get(build.BUILD_TARGET_ENV, "")
 
-# `collect_data_files()` returns repository-root-relative sources, so they are
-# resolved here rather than against the spec's own directory. Both land under
-# `_MEIPASS/zipseal/` beside the frozen `gui.py`, which is where `gui.ICON` and
-# the `icon.png` fallback look for them. A "." destination would put them at
-# the bundle root and the icon would silently not load.
-_datas = [
-    (str(_repo_root / source), destination)
-    for source, destination in build.collect_data_files()
-]
+# `resolved_data_files()` returns absolute sources. Analysis resolves a
+# relative `datas` path against this spec's directory (`packaging/`), so
+# passing the repo-relative tuples through would look for
+# `packaging/src/zipseal/icon.svg` and stop with "Unable to find". Both files
+# land under `_MEIPASS/zipseal/` beside the frozen `gui.py`, which is where
+# `gui.ICON` and the `icon.png` fallback look for them. A "." destination
+# would put them at the bundle root and the icon would silently not load.
+_datas = build.resolved_data_files()
 
 a = Analysis(
     [str(_spec_dir / "run_gui.py")],

@@ -163,8 +163,9 @@ it. The smoke-tested artifact is what ships, never a second local build.
 - [x] Audit the GUI's frozen-run assumptions. Today the only file reference is
       `gui.ICON = Path(__file__).with_name("icon.svg")` (`gui.py:168`), loaded
       by `gui_view.set_icon` with Tk's SVG reader. `build.py`'s
-      `collect_data_files()` is what the `.spec` uses for `datas`, and it
-      returns both `("src/zipseal/icon.svg", "zipseal")` and
+      `resolved_data_files()` is what the `.spec` uses for `datas`. It
+      absolutizes `collect_data_files()`, which returns both
+      `("src/zipseal/icon.svg", "zipseal")` and
       `("build/icons/icon.png", "zipseal")` rather than a handwritten PNG
       tuple: a frozen module's
       `__file__` is `sys._MEIPASS/zipseal/gui.py`, so the icon has to land in

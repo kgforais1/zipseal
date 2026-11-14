@@ -78,6 +78,7 @@ def test_set_icon_gives_the_window_the_image(monkeypatch: pytest.MonkeyPatch) ->
         assert default is True
         assert isinstance(image, tk.PhotoImage)
         assert image.height() == 256
+        assert root._zipseal_icon_image is image  # type: ignore[attr-defined]
     finally:
         root.destroy()
 
@@ -120,6 +121,7 @@ def test_png_is_the_icon_when_svg_is_unreadable(
         assert [default for default, _ in calls] == [True]
         assert [image for _, image in calls] == [fallback]
         assert fallback.height() == 1
+        assert root._zipseal_icon_image is fallback  # type: ignore[attr-defined]
     finally:
         root.destroy()
 
@@ -160,6 +162,39 @@ def test_a_window_without_a_loadable_icon_still_launches(
         fail_every_load = True
         assert not gui_view.set_icon(root)
         assert calls == []
+        assert root.winfo_exists()
+    finally:
+        root.destroy()
+
+
+@pytest.mark.gui
+def test_iconphoto_failure_leaves_the_default_icon(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """Applying the icon is not allowed to stop the window from opening."""
+    pytest.importorskip("tkinter")
+    import tkinter as tk
+
+    from zipseal import gui_view
+
+    png = tmp_path / "icon.png"
+    _write_png(png, 1, 1)
+    (tmp_path / "icon.svg").write_text("<svg/>", encoding="utf-8")
+    monkeypatch.setattr(gui_view, "ICON", tmp_path / "icon.svg")
+    root = tk.Tk()
+    try:
+        image = tk.PhotoImage(master=root, file=str(png))
+
+        def photo_image(master: tk.Misc, file: str, format: str | None = None) -> tk.PhotoImage:
+            return image
+
+        def fail_iconphoto(*_args: object, **_kwargs: object) -> None:
+            raise tk.TclError("could not set the icon")
+
+        monkeypatch.setattr(gui_view.tk, "PhotoImage", photo_image)
+        monkeypatch.setattr(root, "iconphoto", fail_iconphoto)
+        assert not gui_view.set_icon(root)
+        assert not hasattr(root, "_zipseal_icon_image")
         assert root.winfo_exists()
     finally:
         root.destroy()

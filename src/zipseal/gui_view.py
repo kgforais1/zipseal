@@ -498,7 +498,9 @@ def set_icon(root: tk.Tk) -> bool:
     fallback: in a frozen app it is bundled beside `ICON` under `_MEIPASS/zipseal/`
     by the build's `datas`, and in a source checkout it is absent. If neither
     image can be loaded the default icon stays, because an icon is never worth
-    failing a launch. Returns whether the icon was set.
+    failing a launch. The PhotoImage stays referenced by the window: Tkinter
+    deletes the image when the Python object is collected, and `iconphoto`
+    does not keep it. Returns whether the icon was set.
     """
     try:
         image = tk.PhotoImage(master=root, file=str(ICON), format="svg -scaletoheight 256")
@@ -510,7 +512,14 @@ def set_icon(root: tk.Tk) -> bool:
             image = tk.PhotoImage(master=root, file=str(png))
         except tk.TclError:
             return False
-    root.iconphoto(True, image)
+    try:
+        root.iconphoto(True, image)
+    except tk.TclError:
+        return False
+    # PhotoImage deletes its Tk image when the Python object is collected.
+    # iconphoto does not keep that object, so the window would lose a PNG
+    # (or SVG) icon as soon as this function returned.
+    root._zipseal_icon_image = image  # type: ignore[attr-defined]
     return True
 
 

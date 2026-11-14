@@ -40,6 +40,10 @@ All notable user-facing changes are documented here. The format follows
 
 ### Fixed
 
+- The window keeps its icon when Tk uses the PNG fallback. The image used to
+  disappear as soon as it was set, because Tkinter deletes a `PhotoImage`
+  once nothing in Python still refers to it. If Tk cannot apply the icon,
+  the window still opens with the default icon.
 - `Save as…` now opens in the output's folder with only its file name filled
   in. Before, the name field held the whole old path, so a typed name was
   added to it.

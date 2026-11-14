@@ -17,6 +17,7 @@ import argparse
 import importlib.util
 import os
 import platform
+import shutil
 import subprocess
 import sys
 import tomllib
@@ -79,9 +80,14 @@ def read_version(path: Path = PYPROJECT) -> str:
 
 
 def version_tuple(version: str) -> str:
-    """Render a version as the four numbers the Windows version resource wants."""
+    """Render a version as the four numbers the Windows version resource wants.
+
+    Only ASCII digits count. `str.isdigit` is true for superscripts and other
+    Unicode digits, and `int` then either raises `ValueError` or accepts a
+    character that is not the number in the filename.
+    """
     parts = version.split(".")
-    if not 1 <= len(parts) <= 4 or not all(part.isdigit() for part in parts):
+    if not 1 <= len(parts) <= 4 or not all(part.isascii() and part.isdigit() for part in parts):
         raise SystemExit(f"packaging/build.py: version {version!r} is not one to four numbers")
     numbers = [int(part) for part in parts]
     numbers.extend([0] * (4 - len(numbers)))
@@ -109,13 +115,49 @@ def collect_data_files() -> list[tuple[str, str]]:
     """Return the `datas` tuples the `.spec` bundle beside the frozen modules.
 
     Both live under `_MEIPASS/zipseal/` next to `gui.ICON`: the SVG the window
-    prefers, and the PNG `icons.py` generates as the fallback. The PNG does not
-    exist until a build runs, so nothing here may require it.
+    prefers, and the PNG `icons.py` generates as the fallback. The paths are
+    relative to the repository root. The PNG does not exist until a build
+    runs, so nothing here may require it. `resolved_data_files` is what the
+    spec hands to PyInstaller: a relative source would be looked up under
+    `packaging/`, because Analysis resolves `datas` from the spec directory.
     """
     return [
         ("src/zipseal/icon.svg", APP_NAME),
         ("build/icons/icon.png", APP_NAME),
     ]
+
+
+def resolved_data_files() -> list[tuple[str, str]]:
+    """Return `datas` tuples whose sources are absolute repository paths."""
+    return [
+        (str((REPO_ROOT / source).resolve()), destination)
+        for source, destination in collect_data_files()
+    ]
+
+
+def require_version(version: str) -> str:
+    """Exit unless `version` is one to four numbers and one path component.
+
+    The freeze publishes `dist/<version>/`. A slash or `..` would make
+    `--distpath` point outside `dist/`. The number check is the same one the
+    Windows version resource uses, so a bad version fails here, before icons
+    are generated and before PyInstaller runs.
+    """
+    if (
+        not version
+        or "\0" in version
+        or "/" in version
+        or "\\" in version
+        or version in {".", ".."}
+        or version != Path(version).name
+    ):
+        raise SystemExit(f"packaging/build.py: version {version!r} is not a single path component")
+    version_tuple(version)
+    root = DIST_ROOT.resolve()
+    destination = (root / version).resolve()
+    if destination == root or not destination.is_relative_to(root):
+        raise SystemExit(f"packaging/build.py: version {version!r} would write outside {root}")
+    return version
 
 
 def require_build_python() -> None:
@@ -171,6 +213,17 @@ def require_host_target(target: str) -> None:
         )
 
 
+def _needs_display(exc: BaseException) -> bool:
+    """Return whether `exc` is Tk failing because no display is available.
+
+    The Linux build container has no display of its own. The plan runs that
+    preflight under `xvfb-run`; this process does not start one, because macOS
+    and Windows do not use it and a missing display is not a broken Tcl/Tk.
+    """
+    text = str(exc).casefold()
+    return "no display name" in text or "connect to display" in text
+
+
 def tk_preflight() -> None:
     """Exit unless the build interpreter's own Tcl/Tk can open a Tk root.
 
@@ -189,6 +242,12 @@ def tk_preflight() -> None:
     try:
         root = tkinter.Tk()
     except tkinter.TclError as exc:
+        if _needs_display(exc):
+            raise SystemExit(
+                "packaging/build.py: the Tk preflight needs a display, and this "
+                "machine has none. Linux builds run it under xvfb-run; macOS and "
+                "Windows do not need that"
+            ) from exc
         raise SystemExit(
             f"packaging/build.py: could not open a Tk root for the preflight: {exc}"
         ) from exc
@@ -212,8 +271,25 @@ def tk_preflight() -> None:
             )
 
 
+def staging_dist(version: str) -> Path:
+    """Return the unpublished tree for `version`, under `dist/`."""
+    require_version(version)
+    return DIST_ROOT / f"{version}.partial"
+
+
+def published_dist(version: str) -> Path:
+    """Return `dist/<version>/` after refusing a version that could leave it."""
+    require_version(version)
+    return DIST_ROOT / version
+
+
 def pyinstaller_command(version: str) -> list[str]:
-    """Return the PyInstaller argv that freezes the spec into `dist/<version>/`."""
+    """Return the PyInstaller argv that freezes the spec into a staging tree.
+
+    The published directory is `dist/<version>/`. PyInstaller writes the
+    staging tree, and `run_pyinstaller` moves it into place only after the
+    command succeeds, so a failed freeze cannot replace a finished app.
+    """
     return [
         sys.executable,
         "-m",
@@ -221,7 +297,7 @@ def pyinstaller_command(version: str) -> list[str]:
         "--noconfirm",
         "--clean",
         "--distpath",
-        str(DIST_ROOT / version),
+        str(staging_dist(version)),
         "--workpath",
         str(PYINSTALLER_WORK),
         str(SPEC_PATH),
@@ -236,12 +312,88 @@ def _pyinstaller_error(exc: subprocess.CalledProcessError) -> str:
     return lines[-1] if lines else f"exit status {exc.returncode}"
 
 
-def run_pyinstaller(target: str, version: str) -> Path:
-    """Freeze the spec with PyInstaller, and return the directory it wrote.
+def _dist_child(path: Path) -> Path:
+    """Return `path` when it is a directory directly inside `dist/`.
 
-    The target and version travel in the environment because the spec is
-    PyInstaller's own script, not this module's caller.
+    Cleanup deletes these trees. A path that resolves elsewhere is refused
+    before anything is removed.
     """
+    root = DIST_ROOT.resolve()
+    resolved = path.resolve()
+    if resolved.parent != root:
+        raise SystemExit(f"packaging/build.py: refusing to touch {path}")
+    return path
+
+
+def _remove_tree(path: Path) -> None:
+    """Delete a `dist/` child, whether it is a directory, a file, or a link."""
+    target = _dist_child(path)
+    if target.is_symlink() or target.is_file():
+        target.unlink()
+    elif target.exists():
+        shutil.rmtree(target)
+
+
+def _publish_dist(staging: Path, published: Path) -> None:
+    """Move a finished freeze onto `published`, replacing it only then.
+
+    The previous tree is renamed aside first and removed only after the new
+    tree is in place. If that move fails, the previous tree is put back.
+    """
+    staging = _dist_child(staging)
+    published = _dist_child(published)
+    if not staging.is_dir():
+        raise SystemExit("packaging/build.py: PyInstaller reported success but wrote no output")
+    previous = _dist_child(published.with_name(published.name + ".previous"))
+    try:
+        _remove_tree(previous)
+        if published.exists() or published.is_symlink():
+            published.rename(previous)
+    except OSError as exc:
+        raise SystemExit(
+            f"packaging/build.py: could not move the previous freeze aside: {exc}"
+        ) from exc
+    try:
+        staging.rename(published)
+    except OSError as exc:
+        restore_error: OSError | None = None
+        if previous.exists() and not (published.exists() or published.is_symlink()):
+            try:
+                previous.rename(published)
+            except OSError as restore_exc:
+                restore_error = restore_exc
+        try:
+            _remove_tree(staging)
+        except OSError:
+            pass
+        if restore_error is not None:
+            raise SystemExit(
+                "packaging/build.py: could not publish the freeze, and the previous "
+                f"tree is still at {previous.name}: {restore_error}"
+            ) from exc
+        raise SystemExit(f"packaging/build.py: could not publish the freeze: {exc}") from exc
+    try:
+        _remove_tree(previous)
+    except OSError as exc:
+        print(
+            f"packaging/build.py: froze into {published.name} but could not remove "
+            f"{previous.name}: {exc}",
+            file=sys.stderr,
+        )
+
+
+def run_pyinstaller(target: str, version: str) -> Path:
+    """Freeze the spec with PyInstaller, and return the directory it published.
+
+    PyInstaller writes `dist/<version>.partial`. That tree replaces
+    `dist/<version>/` only after the command succeeds; a failure deletes the
+    partial tree and leaves an earlier complete build where it was. The target
+    and version travel in the environment because the spec is PyInstaller's
+    own script, not this module's caller.
+    """
+    staging = staging_dist(version)
+    published = published_dist(version)
+    _remove_tree(staging)
     environment = os.environ.copy()
     environment[BUILD_TARGET_ENV] = target
     environment[BUILD_VERSION_ENV] = version
@@ -254,20 +406,25 @@ def run_pyinstaller(target: str, version: str) -> Path:
             capture_output=True,
         )
     except OSError as exc:
+        _remove_tree(staging)
         raise SystemExit(f"packaging/build.py: PyInstaller could not run: {exc}") from exc
     except subprocess.CalledProcessError as exc:
+        _remove_tree(staging)
         raise SystemExit(
             f"packaging/build.py: PyInstaller failed: {_pyinstaller_error(exc)}"
         ) from exc
-    return DIST_ROOT / version
+    _publish_dist(staging, published)
+    return published
 
 
 def main(argv: list[str] | None = None) -> None:
     """Resolve the version, check the interpreter, and freeze `zipseal-gui`.
 
-    The icons are generated before the freeze because the spec bundles the
-    window PNG; the Tk preflight then proves the build interpreter's own Tcl/Tk
-    can open a window before PyInstaller copies that tree into the bundle.
+    The version is checked first: it becomes `dist/<version>/`, so a bad one
+    stops before icons are generated. The icons come next because the spec
+    bundles the window PNG; the Tk preflight then proves the build
+    interpreter's own Tcl/Tk can open a window before PyInstaller copies that
+    tree into the bundle.
     """
     parser = argparse.ArgumentParser(
         prog="build.py",
@@ -284,6 +441,7 @@ def main(argv: list[str] | None = None) -> None:
         )
     require_build_python()
     require_host_target(args.target)
+    require_version(args.version)
     load_icons().generate_icons(args.target)
     tk_preflight()
     dist = run_pyinstaller(args.target, args.version)

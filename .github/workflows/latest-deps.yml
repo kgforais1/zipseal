@@ -4,9 +4,11 @@
 # stream-unzip, or the dev tools) cannot break a PR, but it also goes unnoticed
 # until someone refreshes the lock. This job re-resolves the lock with
 # `uv lock --upgrade` in the runner's checkout only (nothing is committed), then
-# runs the fast tests and basedpyright. As in dependency-audit.yml, a failing
-# run is the notification. The "Show what moved" step lists the versions that
-# differ from uv.lock, so the log says which release to suspect.
+# runs the fast tests and basedpyright. The sync includes the build group:
+# basedpyright covers packaging/, which imports Pillow, and Pillow is not in
+# the default dev group. As in dependency-audit.yml, a failing run is the
+# notification. The "Show what moved" step lists the versions that differ
+# from uv.lock, so the log says which release to suspect.
 #
 # The <0.1 caps on stream-zip and stream-unzip still apply: this probes what
 # a fresh `pip install zipseal` gets today, not releases past the caps.
@@ -77,7 +79,9 @@ jobs:
       # --locked holds every step to the lock re-resolved above. --no-build refuses
       # sdists, so no upstream setup script runs; the project itself is therefore
       # not installed but imported from src/ (its entry points are not needed here).
-      - run: uv sync --locked --no-build --no-install-project
+      # --group build installs Pillow. The basedpyright step passes --no-sync, so
+      # it will not add that group itself, and both matrix jobs would miss PIL.
+      - run: uv sync --locked --no-build --no-install-project --group build
       - run: uv run --locked --no-build --no-sync pytest -q
         env:
           PYTHONPATH: src
