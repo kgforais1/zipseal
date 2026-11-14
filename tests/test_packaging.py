@@ -2,9 +2,11 @@
 
 import importlib.util
 import io
+import os
 import platform
 import plistlib
 import subprocess
+import sys
 import tarfile
 import tomllib
 import zipfile
@@ -205,6 +207,145 @@ def test_collect_data_files_returns_both_icons() -> None:
     assert ("build/icons/icon.png", "zipseal") in files
 
 
+def test_frozen_tree_keeps_both_icons_beside_the_frozen_module(tmp_path: Path, monkeypatch) -> None:
+    """A stand-in `sys._MEIPASS` resolves `ICON` and its PNG sibling inside it.
+
+    A frozen module's `__file__` is `_MEIPASS/zipseal/gui.py`, so `gui.ICON` is
+    a sibling of that file. The `datas` destinations therefore have to be
+    `zipseal`; a `"."` destination would put both files at the bundle root and
+    this assertion would fail.
+    """
+    from zipseal import gui
+
+    meipass = tmp_path / "_MEIPASS"
+    for source, destination in collect_data_files():
+        assert destination != "."
+        bundled = meipass / destination / Path(source).name
+        bundled.parent.mkdir(parents=True, exist_ok=True)
+        bundled.write_bytes(b"fixture")
+    monkeypatch.setattr(gui, "ICON", (meipass / "zipseal" / "gui.py").with_name("icon.svg"))
+
+    icon = gui.ICON
+    png = icon.with_name("icon.png")
+    assert icon.is_relative_to(meipass)
+    assert png.is_relative_to(meipass)
+    assert icon.exists()
+    assert png.exists()
+
+
+class _FakeTkApp:
+    def __init__(self, tcl_library: str, tk_library: str) -> None:
+        self._libraries = {"info library": tcl_library, "set tk_library": tk_library}
+
+    def eval(self, expression: str) -> str:
+        return self._libraries[expression]
+
+
+class _FakeTkRoot:
+    def __init__(self, tcl_library: str, tk_library: str) -> None:
+        self.tk = _FakeTkApp(tcl_library, tk_library)
+        self.destroyed = False
+
+    def destroy(self) -> None:
+        self.destroyed = True
+
+
+class _FakeTkinter:
+    """Stand in for the `tkinter` module: no window is opened."""
+
+    class TclError(Exception):
+        pass
+
+    def __init__(self, tcl_library: str, tk_library: str) -> None:
+        self.root = _FakeTkRoot(tcl_library, tk_library)
+
+    def Tk(self) -> _FakeTkRoot:
+        return self.root
+
+
+class _FakeIcons:
+    def __init__(self) -> None:
+        self.generated: list[str] = []
+
+    def generate_icons(self, target: str) -> None:
+        self.generated.append(target)
+
+
+class _RecordingSubprocess:
+    """Stand in for the `subprocess` module: record the command, run nothing."""
+
+    def __init__(self) -> None:
+        self.calls: list[tuple[list[str], dict]] = []
+
+    def run(self, command, **kwargs: object) -> None:
+        self.calls.append(([str(part) for part in command], dict(kwargs)))
+
+
+def _pin_fake_tkinter(monkeypatch, base_prefix: Path, *, inside: bool) -> _FakeTkinter:
+    tcl = base_prefix / "lib" / "tcl9.0"
+    tk = base_prefix / "lib" / "tk9.0"
+    if not inside:
+        tcl = base_prefix.parent / "host" / "lib" / "tcl8.6"
+        tk = base_prefix.parent / "host" / "lib" / "tk8.6"
+    fake = _FakeTkinter(str(tcl), str(tk))
+    monkeypatch.setattr(sys, "base_prefix", str(base_prefix))
+    monkeypatch.setitem(sys.modules, "tkinter", fake)
+    return fake
+
+
+def test_tk_preflight_accepts_libraries_inside_the_build_interpreter(
+    tmp_path: Path, monkeypatch
+) -> None:
+    base_prefix = tmp_path / "python"
+    fake = _pin_fake_tkinter(monkeypatch, base_prefix, inside=True)
+    assert _build.tk_preflight() is None
+    assert fake.root.destroyed
+
+
+def test_tk_preflight_rejects_a_host_tcl_outside_the_build_interpreter(
+    tmp_path: Path, monkeypatch
+) -> None:
+    base_prefix = tmp_path / "python"
+    base_prefix.mkdir()
+    _pin_fake_tkinter(monkeypatch, base_prefix, inside=False)
+    with pytest.raises(SystemExit) as excinfo:
+        _build.tk_preflight()
+    assert "outside the build interpreter" in str(excinfo.value)
+
+
+def test_build_refuses_without_skip_sign() -> None:
+    with pytest.raises(SystemExit) as excinfo:
+        _build.main(["--target", "linux"])
+    assert "--skip-sign" in str(excinfo.value)
+
+
+def test_build_runs_pyinstaller_on_the_spec_into_the_versioned_dist(
+    tmp_path: Path, monkeypatch
+) -> None:
+    version = read_version()
+    base_prefix = tmp_path / "python"
+    _pin_fake_tkinter(monkeypatch, base_prefix, inside=True)
+    monkeypatch.setattr(_build, "require_build_python", lambda: None)
+    icons = _FakeIcons()
+    monkeypatch.setattr(_build, "load_icons", lambda: icons)
+    recorder = _RecordingSubprocess()
+    monkeypatch.setattr(_build, "subprocess", recorder)
+
+    _build.main(["--target", "macos", "--skip-sign", "--version", version])
+
+    assert icons.generated == ["macos"]
+    assert len(recorder.calls) == 1
+    command, kwargs = recorder.calls[0]
+    assert command[:3] == [sys.executable, "-m", "PyInstaller"]
+    assert command[-1] == str(REPO_ROOT / "packaging" / "zipseal-gui.spec")
+    assert str(REPO_ROOT / "dist" / version) in command
+    assert str(REPO_ROOT / "build" / "pyinstaller") in command
+    environment = kwargs["env"]
+    assert isinstance(environment, dict)
+    assert environment[_build.BUILD_TARGET_ENV] == "macos"
+    assert environment[_build.BUILD_VERSION_ENV] == version
+
+
 def test_require_build_python_accepts_the_pinned_interpreter(monkeypatch) -> None:
     monkeypatch.setattr(platform, "python_version", lambda: BUILD_PYTHON)
     assert require_build_python() is None
@@ -353,6 +494,19 @@ def test_download_does_not_follow_a_redirect_off_github(tmp_path: Path, monkeypa
     assert not destination.exists()
 
 
+def _assert_created_mode(path: Path, mode: int) -> None:
+    """Check a created file's mode.
+
+    Windows `chmod` only toggles the read-only flag, so an exact `0o600` or
+    `0o755` comparison fails there after a successful write. POSIX keeps the
+    exact bits. On Windows the file must still be writable.
+    """
+    if platform.system() == "Windows":
+        assert os.access(path, os.W_OK)
+        return
+    assert (path.stat().st_mode & 0o777) == mode
+
+
 def test_download_writes_the_body_after_the_asset_redirect(tmp_path: Path, monkeypatch) -> None:
     def redirect_then_body(url: str) -> tuple[int, str | None, bytes]:
         if url.startswith("https://github.com/"):
@@ -363,7 +517,7 @@ def test_download_writes_the_body_after_the_asset_redirect(tmp_path: Path, monke
     destination = tmp_path / "tools" / "resvg-linux-x86_64.tar.gz"
     written = _icons.download_asset("resvg-linux-x86_64.tar.gz", destination)
     assert written.read_bytes() == b"pinned-bytes"
-    assert (written.stat().st_mode & 0o777) == 0o600
+    _assert_created_mode(written, 0o600)
     assert not written.with_name(written.name + ".partial").exists()
 
 
@@ -388,7 +542,7 @@ def test_extract_writes_only_the_bare_zip_member(tmp_path: Path) -> None:
     binary = _icons.extract_binary(archive, tools)
     assert binary.read_bytes() == b"real"
     assert binary.name == "resvg"
-    assert (binary.stat().st_mode & 0o777) == 0o755
+    _assert_created_mode(binary, 0o755)
     assert binary.is_relative_to(tools)
     assert not (tools / "README").exists()
     assert not (tmp_path / "escaped").exists()

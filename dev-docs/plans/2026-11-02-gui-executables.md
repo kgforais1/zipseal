@@ -160,7 +160,7 @@ it. The smoke-tested artifact is what ships, never a second local build.
 
 ## Phase 0 — Packaging plumbing
 
-- [ ] Audit the GUI's frozen-run assumptions. Today the only file reference is
+- [x] Audit the GUI's frozen-run assumptions. Today the only file reference is
       `gui.ICON = Path(__file__).with_name("icon.svg")` (`gui.py:168`), loaded
       by `gui_view.set_icon` with Tk's SVG reader. `build.py`'s
       `collect_data_files()` is what the `.spec` uses for `datas`, and it
@@ -233,12 +233,12 @@ it. The smoke-tested artifact is what ships, never a second local build.
       "tests"]`) and the basedpyright hook's `files:` regex, and add
       `"packaging/**" = ["S603", "S607"]` to `ruff.toml` (`build.py` shells
       out to `hdiutil`, `codesign`, `xcrun`, `objcopy`, `appimagetool`).
-- [ ] `tests/test_packaging.py` covering the test list below; load
+- [x] `tests/test_packaging.py` covering the test list below; load
       `packaging/build.py` with `importlib.util.spec_from_file_location`, as
       `tests/test_check_pins.py` loads its hook, and never add `packaging` to
       pytest's `pythonpath` — it would shadow the PyPI `packaging`
       distribution for anything in the pytest process that imports it.
-- [ ] `AGENTS.md` command for a local build; `dev-docs/README.md` unchanged in
+- [x] `AGENTS.md` command for a local build; `dev-docs/README.md` unchanged in
       this phase (Phase 2 registers `releasing.md` there).
 
 ## Phase 1 — macOS app (milestone M1)

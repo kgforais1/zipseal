@@ -55,6 +55,21 @@ edits and refactors. User-visible changes go in [`CHANGELOG.md`](CHANGELOG.md).
   ones: the Linux asset links glibc, provided by the pinned build container,
   and the macOS asset links libSystem.
 
+- `packaging/zipseal-gui.spec` and `packaging/build.py`'s freeze step: an
+  onedir, windowed PyInstaller build of `packaging/run_gui.py` that bundles the
+  SVG and the generated PNG under `_MEIPASS/zipseal/`, with `pytest`,
+  `hypothesis`, `basedpyright` and `yaml` excluded, UPX left off, and no codesign identity.
+  The spec loads `build.py` by path and reads its target and version from the
+  environment `build.py` sets; only a `macos` target gets a `zipseal-gui.app`
+  bundle. Before freezing, `build.py` opens and destroys a Tk root and fails
+  unless the Tcl and Tk libraries resolve inside `sys.base_prefix`, so a host
+  Tcl/Tk cannot reach the bundle; it then runs PyInstaller into
+  `dist/<version>/` with `build/pyinstaller` as the work path. `--skip-sign`
+  is required until signing exists. A `tests/test_packaging.py` case builds a
+  fake `_MEIPASS` tree and asserts `gui.ICON` and its PNG sibling resolve
+  inside it, and the freeze and preflight tests stub `subprocess` and
+  `tkinter`, so no window opens and no PyInstaller run happens.
+
 - `latest-deps.yml`: a weekly run (and on demand) that re-resolves uv.lock
   with `uv lock --upgrade` in the runner only, logs which versions moved, and
   runs the fast tests and basedpyright, so an upstream release that breaks
@@ -113,6 +128,9 @@ edits and refactors. User-visible changes go in [`CHANGELOG.md`](CHANGELOG.md).
 
 ### Fixed
 
+- Packaging tests that check a created file's mode keep the exact `0o600` and
+  `0o755` bits on POSIX. On Windows they only require the file to be
+  writable, because `chmod` there cannot set those bits.
 - `packaging/icons.py` no longer accepts a path on the command line, and it
   no longer calls `urlopen` or `extractall`. Those were the Sonar security
   findings (a CLI path reached the unpack and `resvg`'s arguments) and the
