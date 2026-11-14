@@ -48,8 +48,10 @@ edits and refactors. User-visible changes go in [`CHANGELOG.md`](CHANGELOG.md).
   executed), the `.ico` packing (the output lands under the directory the
   function was given, never under `src/`) and that no test reaches the network;
   the `.ico` test needs Pillow, so it runs where the `build` group is synced
-  and skips where it is not. `ruff.toml` lets `packaging/**` fetch (`S310`)
-  and unpack (`S202`) that pinned archive. The release binaries are not static
+  and skips where it is not. The download speaks https only to GitHub's
+  release hosts and unpacking writes the bare `resvg` binary, so `ruff.toml`
+  does not suppress the fetch (`S310`) or extract (`S202`) checks for
+  `packaging/**`. The release binaries are not static
   ones: the Linux asset links glibc, provided by the pinned build container,
   and the macOS asset links libSystem.
 
@@ -111,6 +113,12 @@ edits and refactors. User-visible changes go in [`CHANGELOG.md`](CHANGELOG.md).
 
 ### Fixed
 
+- `packaging/icons.py` no longer accepts a path on the command line, and it
+  no longer calls `urlopen` or `extractall`. Those were the Sonar security
+  findings (a CLI path reached the unpack and `resvg`'s arguments) and the
+  CodeFactor finding (an open URL with no scheme check). The download stays
+  on https to GitHub's release hosts, and an archive contributes only its
+  bare `resvg` or `resvg.exe` member.
 - The basedpyright pre-commit hook runs `uv run --group build`, so the
   type check sees Pillow. A plain `uv sync` still omits the build group.
 - `dependency-audit.yml` no longer prints advisory text unescaped. A newline in
