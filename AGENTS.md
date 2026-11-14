@@ -38,7 +38,8 @@ uv run zipseal-gui             # open the window (needs a display)
 uv run pytest                  # fast tests (the gui and slow suites are deselected)
 uv run pytest -m slow          # Zip64 / 4 GiB tests
 uv run pytest -m gui           # tests that need a real Tk display
-# Local frozen-GUI build (writes gitignored dist/<version>/):
+# Local frozen-GUI build. --target must be this machine (macos here).
+# Writes gitignored dist/<version>/.
 uv python install 3.13.17
 uv run --python 3.13.17 --group build python packaging/build.py --target macos --skip-sign
 pre-commit run --all-files     # lint, format, secret scan, file-size policy

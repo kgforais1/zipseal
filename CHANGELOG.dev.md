@@ -39,10 +39,10 @@ edits and refactors. User-visible changes go in [`CHANGELOG.md`](CHANGELOG.md).
   and `uv.lock` - and it packs the multi-size `.ico`; macOS `iconutil` builds
   the `.icns` for a macOS target only. Everything lands in `build/icons/`,
   where `icon.png` is both the fallback `gui_view.set_icon` reads when Tk
-  cannot load the SVG and the Linux desktop icon. `packaging/build.py` now
-  generates the icons for `--target` after the interpreter check and before it
-  exits non-zero, because the freeze itself is still unimplemented; a missing
-  `build/icons/icon.png` fails there with an explicit message.
+  cannot load the SVG and the Linux desktop icon. `packaging/build.py`
+  generates those icons after the interpreter check and before the PyInstaller
+  freeze; a missing `build/icons/icon.png` fails there with an explicit
+  message. `--target` has to be the machine's own platform.
   `tests/test_packaging.py` loads `icons.py` by path, the way it loads
   `build.py`, and covers the checksum mismatch (the asset is deleted and never
   executed), the `.ico` packing (the output lands under the directory the
@@ -128,6 +128,9 @@ edits and refactors. User-visible changes go in [`CHANGELOG.md`](CHANGELOG.md).
 
 ### Fixed
 
+- `packaging/build.py` rejects a `--target` that is not the build machine.
+  PyInstaller freezes the OS it runs on, so a mismatched target stopped
+  before icon generation.
 - Packaging tests that check a created file's mode keep the exact `0o600` and
   `0o755` bits on POSIX. On Windows they only require the file to be
   writable, because `chmod` there cannot set those bits.

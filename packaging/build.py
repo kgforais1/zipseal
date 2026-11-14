@@ -41,6 +41,11 @@ GUI_NAME = "zipseal-gui"
 
 TARGETS = ("macos", "windows", "linux")
 
+# icons.host_key() reports platform.system().lower(): darwin, windows, linux.
+# The build targets use macos for Darwin. PyInstaller freezes the host OS, so
+# a different --target would label that host binary as another platform.
+_HOST_TARGETS = {"darwin": "macos", "windows": "windows", "linux": "linux"}
+
 # python-build-standalone release 20261021 (published 2026-10-21), the newest
 # CPython 3.13 `uv python install` offers. The assets are
 # cpython-3.13.17+20261021-<triple>-install_only.tar.gz for
@@ -141,6 +146,29 @@ def load_icons() -> ModuleType:
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module
+
+
+def host_target() -> str:
+    """Return the `--target` name for the machine running this build.
+
+    The system name comes from `icons.host_key`, which is how the pinned
+    resvg asset is chosen. `darwin` is the `macos` target.
+    """
+    system, _machine = load_icons().host_key()
+    try:
+        return _HOST_TARGETS[system]
+    except KeyError:
+        raise SystemExit(f"packaging/build.py: no build target for this host ({system})") from None
+
+
+def require_host_target(target: str) -> None:
+    """Exit when `--target` is not the platform PyInstaller would freeze."""
+    host = host_target()
+    if target != host:
+        raise SystemExit(
+            f"packaging/build.py: --target {target} does not match this build "
+            f"host ({host}); PyInstaller freezes only the platform it runs on"
+        )
 
 
 def tk_preflight() -> None:
@@ -255,6 +283,7 @@ def main(argv: list[str] | None = None) -> None:
             "let the separate sign job sign the frozen app"
         )
     require_build_python()
+    require_host_target(args.target)
     load_icons().generate_icons(args.target)
     tk_preflight()
     dist = run_pyinstaller(args.target, args.version)

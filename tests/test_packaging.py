@@ -326,6 +326,7 @@ def test_build_runs_pyinstaller_on_the_spec_into_the_versioned_dist(
     base_prefix = tmp_path / "python"
     _pin_fake_tkinter(monkeypatch, base_prefix, inside=True)
     monkeypatch.setattr(_build, "require_build_python", lambda: None)
+    monkeypatch.setattr(_build, "host_target", lambda: "macos")
     icons = _FakeIcons()
     monkeypatch.setattr(_build, "load_icons", lambda: icons)
     recorder = _RecordingSubprocess()
@@ -344,6 +345,35 @@ def test_build_runs_pyinstaller_on_the_spec_into_the_versioned_dist(
     assert isinstance(environment, dict)
     assert environment[_build.BUILD_TARGET_ENV] == "macos"
     assert environment[_build.BUILD_VERSION_ENV] == version
+
+
+def test_host_target_maps_darwin_through_icons_host_key(monkeypatch) -> None:
+    """The resvg host key says darwin; the build target for that machine is macos."""
+
+    class _Icons:
+        def host_key(self) -> tuple[str, str]:
+            return ("darwin", "arm64")
+
+    monkeypatch.setattr(_build, "load_icons", lambda: _Icons())
+    assert _build.host_target() == "macos"
+
+
+def test_build_rejects_a_target_for_another_platform(monkeypatch) -> None:
+    """A mismatched target stops before icons or PyInstaller."""
+    monkeypatch.setattr(_build, "require_build_python", lambda: None)
+    monkeypatch.setattr(_build, "host_target", lambda: "linux")
+    icons = _FakeIcons()
+    monkeypatch.setattr(_build, "load_icons", lambda: icons)
+    recorder = _RecordingSubprocess()
+    monkeypatch.setattr(_build, "subprocess", recorder)
+
+    with pytest.raises(SystemExit) as excinfo:
+        _build.main(["--target", "macos", "--skip-sign"])
+
+    assert "does not match" in str(excinfo.value)
+    assert "linux" in str(excinfo.value)
+    assert icons.generated == []
+    assert recorder.calls == []
 
 
 def test_require_build_python_accepts_the_pinned_interpreter(monkeypatch) -> None:
