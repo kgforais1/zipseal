@@ -61,7 +61,9 @@ repos:
 
       - id: basedpyright
         name: "python: basedpyright"
-        entry: uv run basedpyright
+        # Pillow is in the build group. `uv run` alone syncs dev, so CI's
+        # hook cannot resolve `import PIL` unless this command adds build.
+        entry: uv run --group build basedpyright
         language: system
         files: '^(src|tests|packaging)/.*\.py$'
         pass_filenames: false

@@ -111,6 +111,8 @@ edits and refactors. User-visible changes go in [`CHANGELOG.md`](CHANGELOG.md).
 
 ### Fixed
 
+- The basedpyright pre-commit hook runs `uv run --group build`, so the
+  type check sees Pillow. A plain `uv sync` still omits the build group.
 - `dependency-audit.yml` no longer prints advisory text unescaped. A newline in
   a GitHub advisory description used to end the `::error` annotation, and the
   rest of the text was parsed as runner commands.
