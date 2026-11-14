@@ -27,6 +27,32 @@ edits and refactors. User-visible changes go in [`CHANGELOG.md`](CHANGELOG.md).
   `AppRun`, and `pyproject.toml`'s `[tool.basedpyright].include` plus the
   basedpyright hook now covering `packaging/`.
 
+- `packaging/icons.py`: the icon rasters are now generated at build time from
+  `src/zipseal/icon.svg` rather than checked in, so `*.png` stays a forbidden
+  path and no raster enters the repository. The toolchain is one pinned
+  `resvg` release (`v0.50.0`), fetched for the build host into gitignored
+  `build/tools/` and sha256-checked before the archive is extracted or its
+  binary executed: resvg publishes no checksum file with a release, so the
+  three digests (macOS arm64, Windows x64, Linux x86_64) were computed from
+  the downloaded assets. Pillow is the second pinned build tool -
+  `pillow==13.0.0` joins `pyinstaller==6.22.3` in the `build` dependency group
+  and `uv.lock` - and it packs the multi-size `.ico`; macOS `iconutil` builds
+  the `.icns` for a macOS target only. Everything lands in `build/icons/`,
+  where `icon.png` is both the fallback `gui_view.set_icon` reads when Tk
+  cannot load the SVG and the Linux desktop icon. `packaging/build.py` now
+  generates the icons for `--target` after the interpreter check and before it
+  exits non-zero, because the freeze itself is still unimplemented; a missing
+  `build/icons/icon.png` fails there with an explicit message.
+  `tests/test_packaging.py` loads `icons.py` by path, the way it loads
+  `build.py`, and covers the checksum mismatch (the asset is deleted and never
+  executed), the `.ico` packing (the output lands under the directory the
+  function was given, never under `src/`) and that no test reaches the network;
+  the `.ico` test needs Pillow, so it runs where the `build` group is synced
+  and skips where it is not. `ruff.toml` lets `packaging/**` fetch (`S310`)
+  and unpack (`S202`) that pinned archive. The release binaries are not static
+  ones: the Linux asset links glibc, provided by the pinned build container,
+  and the macOS asset links libSystem.
+
 - `latest-deps.yml`: a weekly run (and on demand) that re-resolves uv.lock
   with `uv lock --upgrade` in the runner only, logs which versions moved, and
   runs the fast tests and basedpyright, so an upstream release that breaks

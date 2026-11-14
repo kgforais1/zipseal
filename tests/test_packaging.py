@@ -3,7 +3,6 @@
 import importlib.util
 import platform
 import plistlib
-import stat
 import subprocess
 import tomllib
 from pathlib import Path
@@ -41,6 +40,15 @@ def _load_build():
     return module
 
 
+def _load_icons():
+    path = REPO_ROOT / "packaging" / "icons.py"
+    spec = importlib.util.spec_from_file_location("packaging_icons", path)
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
 _guard = _load_guard()
 read_patterns = _guard.read_patterns
 glob_to_regex = _guard.glob_to_regex
@@ -54,6 +62,8 @@ render_info_plist = _build.render_info_plist
 version_tuple = _build.version_tuple
 render_windows_version_info = _build.render_windows_version_info
 require_build_python = _build.require_build_python
+
+_icons = _load_icons()
 
 
 def _forbidden_patterns() -> list[str]:
@@ -167,11 +177,17 @@ def test_linux_desktop_entry_has_required_keys() -> None:
     ]
 
 
-def test_apprun_is_executable() -> None:
-    mode = (REPO_ROOT / "packaging" / "linux" / "AppRun").stat().st_mode
-    assert mode & stat.S_IXUSR
-    assert mode & stat.S_IXGRP
-    assert mode & stat.S_IXOTH
+def test_apprun_is_tracked_executable() -> None:
+    """The index mode is what a checkout restores, not the working-tree bits."""
+    completed = subprocess.run(
+        ["git", "-C", str(REPO_ROOT), "ls-files", "-s", "--", "packaging/linux/AppRun"],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    mode, _blob, _stage, path = completed.stdout.split(maxsplit=3)
+    assert path.strip() == "packaging/linux/AppRun"
+    assert mode == "100755"
 
 
 def test_macos_entitlements_plist_is_empty() -> None:
@@ -196,3 +212,86 @@ def test_require_build_python_rejects_any_other_interpreter(monkeypatch) -> None
     with pytest.raises(SystemExit) as excinfo:
         require_build_python()
     assert BUILD_PYTHON in str(excinfo.value)
+
+
+class _NoExecution:
+    """Stand in for the `subprocess` module: any call fails the test."""
+
+    def __init__(self) -> None:
+        self.commands: list[list[str]] = []
+
+    def run(self, command, *args: object, **kwargs: object) -> None:
+        self.commands.append([str(part) for part in command])
+        raise AssertionError("a checksum mismatch must never execute the asset")
+
+
+class _NoNetwork:
+    """Stand in for `urllib.request`: a fetch inside a test fails the test."""
+
+    @staticmethod
+    def urlopen(*args: object, **kwargs: object) -> None:
+        raise AssertionError("a packaging icon test must not touch the network")
+
+
+def test_checksum_mismatch_rejects_the_binary_without_running_it(tmp_path, monkeypatch) -> None:
+    tools = tmp_path / "build" / "tools"
+    tools.mkdir(parents=True)
+    archive = tools / "resvg-macos-aarch64.zip"
+    archive.write_bytes(b"a tiny fixture, not the resvg release archive")
+    subprocess_module = _NoExecution()
+    monkeypatch.setattr(_icons, "subprocess", subprocess_module)
+    with pytest.raises(SystemExit) as excinfo:
+        _icons.verify_asset(archive, "0" * 64)
+    assert "resvg-macos-aarch64.zip" in str(excinfo.value)
+    assert not archive.exists()
+    assert subprocess_module.commands == []
+
+
+def test_matching_checksum_accepts_the_archive(tmp_path: Path) -> None:
+    archive = tmp_path / "resvg-linux-x86_64.tar.gz"
+    archive.write_bytes(b"fixture archive bytes")
+    digest = _icons.sha256_file(archive)
+    assert _icons.verify_asset(archive, digest) == archive
+    assert archive.exists()
+
+
+def test_the_icon_helpers_run_without_the_network(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.setattr(_icons.urllib, "request", _NoNetwork())
+    archive = tmp_path / "resvg-win-x86_64.zip"
+    archive.write_bytes(b"fixture archive bytes")
+    assert _icons.verify_asset(archive, _icons.sha256_file(archive)) == archive
+    assert _icons.host_asset() in _icons.RESVG_ASSETS.values()
+    assert _icons.RESVG_URL.endswith(f"v{_icons.RESVG_VERSION}")
+
+
+def test_pinned_resvg_assets_are_sha256_digests() -> None:
+    for (_system, _machine), (asset, digest) in _icons.RESVG_ASSETS.items():
+        assert asset.startswith("resvg-")
+        assert asset.endswith(".zip") or asset.endswith(".tar.gz")
+        assert len(digest) == 64
+        assert digest == digest.lower()
+        assert all(character in "0123456789abcdef" for character in digest)
+
+
+def test_pack_ico_writes_the_ico_under_the_directory_it_is_given(tmp_path: Path) -> None:
+    pytest.importorskip("PIL", reason="Pillow is in the build dependency group, not the test group")
+    from PIL import Image
+
+    icons_dir = tmp_path / "build" / "icons"
+    icons_dir.mkdir(parents=True)
+    source = icons_dir / "icon-256.png"
+    Image.new("RGBA", (256, 256), (0, 0, 0, 0)).save(source)
+    ico = _icons.pack_ico([source], icons_dir / "icon.ico")
+    assert ico == icons_dir / "icon.ico"
+    assert ico.is_relative_to(tmp_path)
+    assert not list((REPO_ROOT / "src").rglob("*.ico"))
+    assert not list((REPO_ROOT / "src").rglob("*.png"))
+    with Image.open(ico) as packed:
+        assert packed.format == "ICO"
+    directory = ico.read_bytes()
+    assert directory[:4] == b"\x00\x00\x01\x00"
+    entries = int.from_bytes(directory[4:6], "little")
+    assert entries == len(_icons.ICO_SIZES)
+    # A directory entry stores 0 for 256, the one size that does not fit a byte.
+    widths = {directory[6 + index * 16] for index in range(entries)}
+    assert widths == {0 if size == 256 else size for size in _icons.ICO_SIZES}

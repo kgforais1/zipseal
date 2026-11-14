@@ -2,7 +2,8 @@
 
 `pyproject.toml`'s `build` dependency group provides PyInstaller, and this
 module is the single entry point that resolves the version, checks the
-interpreter and drives the freeze for one target (plan: GUI executables).
+interpreter, generates the icons and drives the freeze for one target (plan:
+GUI executables).
 
 The interpreter is pinned to one python-build-standalone release. PyInstaller
 has to resolve Tcl/Tk inside the extracted distribution, so freezing on
@@ -13,9 +14,11 @@ is 3.12 - would bundle a Tk tree the pin was never verified against.
 from __future__ import annotations
 
 import argparse
+import importlib.util
 import platform
 import tomllib
 from pathlib import Path
+from types import ModuleType
 
 PACKAGING_DIR = Path(__file__).resolve().parent
 REPO_ROOT = PACKAGING_DIR.parent
@@ -112,11 +115,27 @@ def require_build_python() -> None:
         )
 
 
-def main(argv: list[str] | None = None) -> None:
-    """Resolve the version and check the interpreter for one target.
+def load_icons() -> ModuleType:
+    """Load `packaging/icons.py` by path, the way the tests load this module.
 
-    Exits non-zero: icon generation, the freeze and the post-build packaging
-    steps are not implemented yet.
+    Neither file is a package member and `packaging/` must never sit on
+    `sys.path`: it would shadow the PyPI `packaging` distribution for anything
+    in this process that imports it.
+    """
+    path = PACKAGING_DIR / "icons.py"
+    spec = importlib.util.spec_from_file_location("packaging_icons", path)
+    if spec is None or spec.loader is None:
+        raise SystemExit(f"packaging/build.py: cannot load {path}")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def main(argv: list[str] | None = None) -> None:
+    """Resolve the version, check the interpreter and generate the icons.
+
+    Exits non-zero: the freeze and the post-build packaging steps are not
+    implemented yet, so nothing here may report success.
     """
     parser = argparse.ArgumentParser(
         prog="build.py",
@@ -127,9 +146,11 @@ def main(argv: list[str] | None = None) -> None:
     parser.add_argument("--version", default=read_version())
     args = parser.parse_args(argv)
     require_build_python()
+    load_icons().generate_icons(args.target)
     raise SystemExit(
-        "packaging/build.py: icon generation and freezing are not implemented yet "
-        f"(target {args.target}, version {args.version})."
+        "packaging/build.py: icon generation completed for target "
+        f"{args.target} (version {args.version}); the freeze and the packaging "
+        "steps are not implemented yet."
     )
 
 
