@@ -562,7 +562,10 @@ def make_macos_dmg(directory: Path, version: str) -> Path:
         raise SystemExit("packaging/build.py: the macOS freeze wrote no zipseal-gui.app")
     destination = directory / f"zipseal-gui-{version}-macos-arm64.dmg"
     staging = directory / ".dmg-staging"
-    _clear_entry(directory, staging.name)
+    try:
+        _clear_entry(directory, staging.name)
+    except OSError as exc:
+        raise SystemExit(f"packaging/build.py: could not clear {staging.name}: {exc}") from exc
     image_ok = False
     try:
         try:

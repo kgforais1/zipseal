@@ -140,6 +140,9 @@ edits and refactors. User-visible changes go in [`CHANGELOG.md`](CHANGELOG.md).
 
 ### Fixed
 
+- A macOS freeze that cannot remove a leftover `.dmg-staging` exits with
+  `SystemExit` instead of a traceback. Packaging tests that drive `main`
+  stub an arm64 machine, so Linux CI still reaches PyInstaller.
 - The macOS freeze unlinks a symlink planted at the disk image path before
   `hdiutil` runs, so `hdiutil -ov` cannot write through to the link's target;
   a staging copy failure is a `SystemExit` that deletes the partial tree and

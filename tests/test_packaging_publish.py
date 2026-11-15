@@ -66,6 +66,7 @@ def _ready_main(monkeypatch, tmp_path: Path, runner: _FreezeSubprocess) -> _Fake
     """Stub the checks around the freeze and point its `dist/` at `tmp_path`."""
     monkeypatch.setattr(_build, "require_build_python", lambda: None)
     monkeypatch.setattr(_build, "host_target", lambda: "macos")
+    monkeypatch.setattr(_build.platform, "machine", lambda: "arm64")
     monkeypatch.setattr(_build, "DIST_ROOT", tmp_path / "dist")
     monkeypatch.setattr(_build, "tk_preflight", lambda: None)
     icons = _FakeIcons()
@@ -329,6 +330,30 @@ def test_a_staging_cleanup_failure_after_a_good_image_does_not_publish(
     assert "could not be removed" in str(excinfo.value)
     assert (published / "kept").read_text(encoding="utf-8") == "complete"
     assert not (published / image_name).exists()
+    assert not (tmp_path / "dist" / f"{version}.partial").exists()
+
+
+def test_a_stuck_dmg_staging_directory_is_a_clean_failure(tmp_path: Path, monkeypatch) -> None:
+    """A `.dmg-staging` that cannot be removed is a `SystemExit`, not a traceback."""
+    version = _build.read_version()
+    runner = _FreezeSubprocess()
+    _ready_main(monkeypatch, tmp_path, runner)
+    real_clear = _build._clear_entry
+
+    def fail_initial(directory: Path, name: str) -> None:
+        if name == ".dmg-staging":
+            raise OSError("device busy")
+        real_clear(directory, name)
+
+    monkeypatch.setattr(_build, "_clear_entry", fail_initial)
+    published = tmp_path / "dist" / version
+    published.mkdir(parents=True)
+    (published / "kept").write_text("complete", encoding="utf-8")
+
+    with pytest.raises(SystemExit, match="could not clear"):
+        _build.main(["--target", "macos", "--skip-sign", "--version", version])
+
+    assert (published / "kept").read_text(encoding="utf-8") == "complete"
     assert not (tmp_path / "dist" / f"{version}.partial").exists()
 
 

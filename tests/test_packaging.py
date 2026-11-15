@@ -359,6 +359,7 @@ def _ready_to_freeze(monkeypatch, tmp_path: Path, recorder: _RecordingSubprocess
     _pin_fake_tkinter(monkeypatch, base_prefix, inside=True)
     monkeypatch.setattr(_build, "require_build_python", lambda: None)
     monkeypatch.setattr(_build, "host_target", lambda: "macos")
+    monkeypatch.setattr(_build.platform, "machine", lambda: "arm64")
     monkeypatch.setattr(_build, "DIST_ROOT", tmp_path / "dist")
     icons = _FakeIcons()
     monkeypatch.setattr(_build, "load_icons", lambda: icons)
