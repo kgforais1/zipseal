@@ -382,21 +382,60 @@ def test_build_runs_pyinstaller_on_the_spec_into_the_versioned_dist(
     assert icons.generated == ["macos"]
     assert len(recorder.calls) == 2
     command, kwargs = recorder.calls[0]
-    assert recorder.calls[1][0][0] == "/usr/bin/hdiutil"
-    assert command[:3] == [sys.executable, "-m", "PyInstaller"]
-    assert command[-1] == str(REPO_ROOT / "packaging" / "zipseal-gui.spec")
     staging = tmp_path / "dist" / f"{version}.partial"
     published = tmp_path / "dist" / version
+    dmg_name = f"zipseal-gui-{version}-macos-arm64.dmg"
+    assert recorder.calls[1][0] == [
+        "/usr/bin/hdiutil",
+        "create",
+        "-volname",
+        "zipseal-gui",
+        "-srcfolder",
+        str(staging / ".dmg-staging"),
+        "-ov",
+        "-format",
+        "UDZO",
+        str(staging / dmg_name),
+    ]
+    assert command[:3] == [sys.executable, "-m", "PyInstaller"]
+    assert command[-1] == str(REPO_ROOT / "packaging" / "zipseal-gui.spec")
     assert command[command.index("--distpath") + 1] == str(staging)
     assert str(REPO_ROOT / "build" / "pyinstaller") in command
     assert not staging.exists()
     assert (published / "zipseal-gui").is_dir()
-    assert (published / f"zipseal-gui-{version}-macos-arm64.dmg").is_file()
+    assert (published / dmg_name).is_file()
     assert not previous.exists()
     environment = kwargs["env"]
     assert isinstance(environment, dict)
     assert environment[_build.BUILD_TARGET_ENV] == "macos"
     assert environment[_build.BUILD_VERSION_ENV] == version
+
+
+def test_a_failed_disk_image_keeps_the_published_tree(monkeypatch, tmp_path: Path) -> None:
+    """hdiutil failing deletes the partial tree and leaves the last good app."""
+    version = read_version()
+
+    class _DmgFails(_StagingSubprocess):
+        def run(self, command, **kwargs: object) -> None:
+            argv = [str(part) for part in command]
+            if argv and argv[0].endswith("hdiutil"):
+                self.calls.append((argv, dict(kwargs)))
+                Path(argv[-1]).mkdir(parents=True)
+                raise subprocess.CalledProcessError(1, command, stderr=b"hdiutil exploded\n")
+            super().run(command, **kwargs)
+
+    _ready_to_freeze(monkeypatch, tmp_path, _DmgFails())
+    monkeypatch.setattr(_build.platform, "machine", lambda: "arm64")
+    published = tmp_path / "dist" / version
+    published.mkdir(parents=True)
+    (published / "kept").write_text("complete", encoding="utf-8")
+
+    with pytest.raises(SystemExit, match="hdiutil exploded"):
+        _build.main(["--target", "macos", "--skip-sign", "--version", version])
+
+    assert (published / "kept").read_text(encoding="utf-8") == "complete"
+    assert not (tmp_path / "dist" / f"{version}.partial").exists()
+    assert not (published / f"zipseal-gui-{version}-macos-arm64.dmg").exists()
 
 
 def test_host_target_maps_darwin_through_icons_host_key(monkeypatch) -> None:

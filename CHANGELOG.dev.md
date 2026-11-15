@@ -140,6 +140,12 @@ edits and refactors. User-visible changes go in [`CHANGELOG.md`](CHANGELOG.md).
 
 ### Fixed
 
+- A macOS disk image is written into `dist/<version>.partial`, and that tree
+  replaces `dist/<version>/` only after `hdiutil` succeeds. A failed image
+  deletes the partial tree and leaves the previous freeze in place. The image
+  is refused when its directory is not named `<version>` or `<version>.partial`.
+  A leftover `.dmg-staging` entry, or a disk image that is not a file, is
+  removed as a file, directory, or symlink without following the link.
 - `packaging/build.py` checks `--version` before it generates icons or runs
   PyInstaller, and it only publishes `dist/<version>/` after the freeze
   succeeds. A version with a slash, `..`, or a non-ASCII digit is rejected.

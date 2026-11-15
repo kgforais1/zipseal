@@ -6,6 +6,7 @@
 
 import importlib.util
 import os
+import subprocess
 from pathlib import Path
 
 import pytest
@@ -103,15 +104,24 @@ def test_macos_dmg_packs_the_app_and_an_applications_link(tmp_path: Path, monkey
 
     monkeypatch.setattr(_build.subprocess, "run", run)
     image = _build.make_macos_dmg(published, "0.1.0")
+    source = published / ".dmg-staging"
     command = recorded["command"]
-    assert isinstance(command, list)
-    assert command[0] == "/usr/bin/hdiutil"
-    assert command[command.index("-format") + 1] == "UDZO"
+    assert command == [
+        "/usr/bin/hdiutil",
+        "create",
+        "-volname",
+        "zipseal-gui",
+        "-srcfolder",
+        str(source),
+        "-ov",
+        "-format",
+        "UDZO",
+        str(image),
+    ]
     assert image.name == "zipseal-gui-0.1.0-macos-arm64.dmg"
     assert image.read_bytes() == b"dmg"
-    source = recorded["source"]
-    assert isinstance(source, Path)
-    assert source.name == ".dmg-staging"
+    recorded_source = recorded["source"]
+    assert recorded_source == source
     assert not source.exists()
 
 
@@ -125,3 +135,68 @@ def test_macos_dmg_refuses_a_non_arm64_machine(tmp_path: Path, monkeypatch) -> N
     (published / "zipseal-gui.app").mkdir(parents=True)
     with pytest.raises(SystemExit, match="arm64"):
         _build.make_macos_dmg(published, "0.1.0")
+
+
+def test_macos_dmg_refuses_a_directory_named_for_another_version(
+    tmp_path: Path, monkeypatch
+) -> None:
+    """The image name and the directory it is written into name the same version."""
+    root = tmp_path / "dist"
+    root.mkdir()
+    monkeypatch.setattr(_build, "DIST_ROOT", root)
+    monkeypatch.setattr(_build.platform, "machine", lambda: "arm64")
+    published = root / "0.1.0"
+    (published / "zipseal-gui.app").mkdir(parents=True)
+    with pytest.raises(SystemExit, match="does not match"):
+        _build.make_macos_dmg(published, "0.2.0")
+    assert not list(published.glob("*.dmg"))
+
+
+def test_macos_dmg_replaces_a_staging_symlink_without_following_it(
+    tmp_path: Path, monkeypatch
+) -> None:
+    """A leftover `.dmg-staging` link is removed; the directory it names stays."""
+    root = tmp_path / "dist"
+    root.mkdir()
+    monkeypatch.setattr(_build, "DIST_ROOT", root)
+    monkeypatch.setattr(_build.platform, "machine", lambda: "arm64")
+    published = root / "0.1.0"
+    (published / "zipseal-gui.app" / "Contents").mkdir(parents=True)
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    (outside / "kept").write_text("stay", encoding="utf-8")
+    try:
+        (published / ".dmg-staging").symlink_to(outside, target_is_directory=True)
+    except OSError:
+        pytest.skip("this host cannot create a directory symlink")
+
+    def run(command, **kwargs: object) -> None:
+        Path(command[-1]).write_bytes(b"dmg")
+
+    monkeypatch.setattr(_build.subprocess, "run", run)
+    _build.make_macos_dmg(published, "0.1.0")
+    assert (outside / "kept").read_text(encoding="utf-8") == "stay"
+    assert not (published / ".dmg-staging").exists()
+
+
+def test_macos_dmg_removes_a_directory_left_where_the_image_should_be(
+    tmp_path: Path, monkeypatch
+) -> None:
+    """A failed hdiutil that left a directory does not hide the hdiutil error."""
+    root = tmp_path / "dist"
+    root.mkdir()
+    monkeypatch.setattr(_build, "DIST_ROOT", root)
+    monkeypatch.setattr(_build.platform, "machine", lambda: "arm64")
+    published = root / "0.1.0"
+    (published / "zipseal-gui.app" / "Contents").mkdir(parents=True)
+
+    def run(command, **kwargs: object) -> None:
+        Path(command[-1]).mkdir()
+        raise subprocess.CalledProcessError(1, command, stderr=b"hdiutil exploded\n")
+
+    monkeypatch.setattr(_build.subprocess, "run", run)
+    destination = published / "zipseal-gui-0.1.0-macos-arm64.dmg"
+    with pytest.raises(SystemExit, match="hdiutil exploded"):
+        _build.make_macos_dmg(published, "0.1.0")
+    assert not destination.exists()
+    assert (published / "zipseal-gui.app").is_dir()

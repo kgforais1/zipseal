@@ -260,7 +260,9 @@ it. The smoke-tested artifact is what ships, never a second local build.
       `LC_BUILD_VERSION` minos measured 2026-11-15. This box stays open until
       someone launches the app on macOS 11.
 - [x] Make the DMG: `hdiutil create -format UDZO`, `zipseal-gui.app` plus an
-      Applications symlink (drag-install).
+      Applications symlink (drag-install). The image is written into
+      `dist/<version>.partial` and that tree replaces `dist/<version>/` only
+      after `hdiutil` succeeds.
 - [ ] Manual acceptance (local build — M1 has no CI): open the DMG, drag the
       app to Applications, then set a synthetic `com.apple.quarantine` xattr
       on the installed copy so the Gatekeeper path is exercised. The unsigned
