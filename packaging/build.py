@@ -362,30 +362,30 @@ def _present_backups(published: Path) -> list[tuple[int, Path]]:
     return found
 
 
-def _newest_backup(published: Path) -> Path | None:
-    """Return the backup moved aside most recently, or None when there is none.
+def _highest_backup(published: Path) -> Path | None:
+    """Return the highest backup suffix, or None when there is none.
 
-    Recency is the directory mtime, which publish sets when it moves a tree
-    aside. The suffix is only a tie-break: a newer `.previous` can sit beside
-    an older `.previous-2`.
+    `_aside_path` always chooses a generation above every backup still
+    present, so the highest suffix is the tree last moved aside. Directory
+    mtime is not the order: a kill during publish, or a later touch, would
+    otherwise make an older leftover look newer.
     """
     found = _present_backups(published)
     if not found:
         return None
-    _generation, path = max(found, key=lambda item: (item[1].lstat().st_mtime_ns, item[0]))
-    return path
+    return found[-1][1]
 
 
 def _recover_published(published: Path) -> None:
-    """Put the newest backup back when `dist/<version>/` is missing.
+    """Put the highest backup suffix back when `dist/<version>/` is missing.
 
     An interrupted publish leaves the last good tree beside the version
-    directory. The next run restores that tree, not an older suffix that
-    happens to sort later, before anything is deleted.
+    directory. That tree has the highest suffix. The next run restores it
+    before anything is deleted.
     """
     if _present(published):
         return
-    chosen = _newest_backup(published)
+    chosen = _highest_backup(published)
     if chosen is None:
         return
     backup = _dist_child(chosen)
@@ -427,21 +427,7 @@ def _publish_dist(staging: Path, published: Path) -> None:
     try:
         if _present(published):
             published.rename(aside)
-            # The mtime is the publication order recovery reads. Rename keeps
-            # the tree's old time, which can be older than a leftover backup.
-            os.utime(aside, None)
     except OSError as exc:
-        stamp_error: OSError | None = None
-        if _present(aside) and not _present(published):
-            try:
-                aside.rename(published)
-            except OSError as restore_exc:
-                stamp_error = restore_exc
-        if stamp_error is not None:
-            raise SystemExit(
-                f"packaging/build.py: could not stamp {aside.name}, and the previous "
-                f"tree is still at {aside.name}: {stamp_error}"
-            ) from exc
         raise SystemExit(
             f"packaging/build.py: could not move the previous freeze aside: {exc}"
         ) from exc

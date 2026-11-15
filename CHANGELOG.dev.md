@@ -143,10 +143,8 @@ edits and refactors. User-visible changes go in [`CHANGELOG.md`](CHANGELOG.md).
   next run restores it when `dist/<version>/` is missing, and does not delete
   it first. A backup that cannot be removed gets the next suffix above any
   backup still present, so a missing older `.previous` is not reused. Recovery
-  restores the backup with the newest publication time, so a newer `.previous`
-  wins over an older `.previous-2`. Publish records that time when it moves
-  the tree aside. If that fails and the tree cannot be moved back, the error
-  names the backup that still holds it. Removing the backup after a
+  restores that highest suffix, so a touched or older `.previous` cannot beat
+  a later `.previous-N`. Removing the backup after a
   successful publish does not fail the build. The PyInstaller and resvg
   `subprocess.run` calls are argument lists, and each carries a `nosemgrep`
   for OpenGrep's dangerous-subprocess rule so that false positive does not
