@@ -141,8 +141,12 @@ edits and refactors. User-visible changes go in [`CHANGELOG.md`](CHANGELOG.md).
   cannot take its place, exits with `SystemExit` rather than a traceback.
   An interrupted publish leaves that tree at `dist/<version>.previous`; the
   next run restores it when `dist/<version>/` is missing, and does not delete
-  it first. A backup that cannot be removed gets a later `.previous-N` name
-  so it does not block the next publish. Removing the backup after a
+  it first. A backup that cannot be removed gets the next suffix above any
+  backup still present, so a missing older `.previous` is not reused. Recovery
+  restores the backup with the newest publication time, so a newer `.previous`
+  wins over an older `.previous-2`. Publish records that time when it moves
+  the tree aside. If that fails and the tree cannot be moved back, the error
+  names the backup that still holds it. Removing the backup after a
   successful publish does not fail the build. The PyInstaller and resvg
   `subprocess.run` calls are argument lists, and each carries a `nosemgrep`
   for OpenGrep's dangerous-subprocess rule so that false positive does not
@@ -152,8 +156,9 @@ edits and refactors. User-visible changes go in [`CHANGELOG.md`](CHANGELOG.md).
   what provides that display; macOS and Windows do not need it.
 - `gui_view.set_icon` keeps the `PhotoImage` on the window, so a PNG (or SVG)
   icon is still there after `set_icon` returns.
-- Packaging icon tests live in `tests/test_packaging_icons.py`, so neither
-  that file nor `tests/test_packaging.py` sits over the 600-line soft cap.
+- Packaging icon tests live in `tests/test_packaging_icons.py`, and the
+  backup-order cases live in `tests/test_packaging_publish.py`. Each of those
+  files, and `tests/test_packaging.py`, stays under the 600-line soft cap.
   The network-free icon test no longer fails on a host with no pinned resvg.
 - `packaging/build.py` rejects a `--target` that is not the build machine.
   PyInstaller freezes the OS it runs on, so a mismatched target stopped

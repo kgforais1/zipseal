@@ -339,32 +339,56 @@ def _present(path: Path) -> bool:
     return path.exists() or path.is_symlink()
 
 
-def _backup_names(version_name: str) -> tuple[str, ...]:
-    """Return the sibling names a publish may use to hold the previous tree.
+# `<version>.previous` is generation 1. Later backups are `<version>.previous-N`.
+# A name is never reused while a higher suffix remains, so a hole under an
+# older backup cannot be filled with a newer tree.
+_MAX_BACKUP_GENERATION = 99
 
-    `<version>.previous` is the usual name. A later build uses `<version>.previous-N`
-    when that name is still occupied, so a backup that could not be deleted does
-    not stop the next publish.
+
+def _backup_name(version_name: str, generation: int) -> str:
+    """Return the dist sibling that holds backup `generation` of `version_name`."""
+    if generation == 1:
+        return f"{version_name}.previous"
+    return f"{version_name}.previous-{generation}"
+
+
+def _present_backups(published: Path) -> list[tuple[int, Path]]:
+    """Return existing backups of `published`, lowest suffix first."""
+    found: list[tuple[int, Path]] = []
+    for generation in range(1, _MAX_BACKUP_GENERATION + 1):
+        candidate = published.with_name(_backup_name(published.name, generation))
+        if _present(candidate):
+            found.append((generation, candidate))
+    return found
+
+
+def _newest_backup(published: Path) -> Path | None:
+    """Return the backup moved aside most recently, or None when there is none.
+
+    Recency is the directory mtime, which publish sets when it moves a tree
+    aside. The suffix is only a tie-break: a newer `.previous` can sit beside
+    an older `.previous-2`.
     """
-    return (f"{version_name}.previous", *(f"{version_name}.previous-{n}" for n in range(2, 100)))
+    found = _present_backups(published)
+    if not found:
+        return None
+    _generation, path = max(found, key=lambda item: (item[1].lstat().st_mtime_ns, item[0]))
+    return path
 
 
 def _recover_published(published: Path) -> None:
     """Put the newest backup back when `dist/<version>/` is missing.
 
     An interrupted publish leaves the last good tree beside the version
-    directory. The next run restores it before anything is deleted.
+    directory. The next run restores that tree, not an older suffix that
+    happens to sort later, before anything is deleted.
     """
     if _present(published):
         return
-    found = [
-        published.with_name(name)
-        for name in _backup_names(published.name)
-        if _present(published.with_name(name))
-    ]
-    if not found:
+    chosen = _newest_backup(published)
+    if chosen is None:
         return
-    backup = _dist_child(found[-1])
+    backup = _dist_child(chosen)
     try:
         backup.rename(published)
     except OSError as exc:
@@ -374,12 +398,16 @@ def _recover_published(published: Path) -> None:
 
 
 def _aside_path(published: Path) -> Path:
-    """Return a free `dist/` sibling that can hold the tree about to be replaced."""
-    for name in _backup_names(published.name):
-        candidate = published.with_name(name)
-        if not _present(candidate):
-            return _dist_child(candidate)
-    raise SystemExit(f"packaging/build.py: no free backup name beside {published.name}")
+    """Return a free dist sibling above every backup suffix that still exists.
+
+    A missing older `.previous` is not reused while `.previous-N` remains.
+    The new name is therefore newer than every leftover backup.
+    """
+    found = _present_backups(published)
+    generation = found[-1][0] + 1 if found else 1
+    if generation > _MAX_BACKUP_GENERATION:
+        raise SystemExit(f"packaging/build.py: no free backup name beside {published.name}")
+    return _dist_child(published.with_name(_backup_name(published.name, generation)))
 
 
 def _publish_dist(staging: Path, published: Path) -> None:
@@ -399,7 +427,21 @@ def _publish_dist(staging: Path, published: Path) -> None:
     try:
         if _present(published):
             published.rename(aside)
+            # The mtime is the publication order recovery reads. Rename keeps
+            # the tree's old time, which can be older than a leftover backup.
+            os.utime(aside, None)
     except OSError as exc:
+        stamp_error: OSError | None = None
+        if _present(aside) and not _present(published):
+            try:
+                aside.rename(published)
+            except OSError as restore_exc:
+                stamp_error = restore_exc
+        if stamp_error is not None:
+            raise SystemExit(
+                f"packaging/build.py: could not stamp {aside.name}, and the previous "
+                f"tree is still at {aside.name}: {stamp_error}"
+            ) from exc
         raise SystemExit(
             f"packaging/build.py: could not move the previous freeze aside: {exc}"
         ) from exc
