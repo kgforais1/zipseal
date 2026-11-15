@@ -263,7 +263,7 @@ it. The smoke-tested artifact is what ships, never a second local build.
       Applications symlink (drag-install). The image is written into
       `dist/<version>.partial` and that tree replaces `dist/<version>/` only
       after `hdiutil` succeeds.
-- [ ] Manual acceptance (local build — M1 has no CI): open the DMG, drag the
+- [x] Manual acceptance (local build — M1 has no CI): open the DMG, drag the
       app to Applications, then set a synthetic `com.apple.quarantine` xattr
       on the installed copy so the Gatekeeper path is exercised. The unsigned
       build is expected to be refused; confirm the block, then launch anyway
@@ -271,7 +271,10 @@ it. The smoke-tested artifact is what ships, never a second local build.
       Privacy & Security → "Open Anyway"; older macOS: Control-click the app
       → Open) and finish the check: create an archive with a generated
       password and open it in Finder and 7-Zip. Record the date, macOS
-      version and the override path used. The download-from-the-draft-release
+      version and the override path used. Done 2026-11-15 on macOS 26
+      (darwin 25.6.0): the quarantined Applications copy was refused, launched
+      with Privacy & Security → Open Anyway, and that copy created an archive
+      which was opened. The download-from-the-draft-release
       variant runs from M2 on (the last bullet of Phase 2).
 
 ## Phase 2 — macOS signing, notarization & release pipeline (milestone M2)
