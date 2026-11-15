@@ -139,8 +139,14 @@ edits and refactors. User-visible changes go in [`CHANGELOG.md`](CHANGELOG.md).
   A failed freeze deletes its partial tree instead of replacing a finished
   app. Moving the previous tree aside, or putting it back when the new tree
   cannot take its place, exits with `SystemExit` rather than a traceback.
-  Removing the leftover `.previous` tree after a successful publish does not
-  fail the build. The spec calls `resolved_data_files()`, so the paths
+  An interrupted publish leaves that tree at `dist/<version>.previous`; the
+  next run restores it when `dist/<version>/` is missing, and does not delete
+  it first. A backup that cannot be removed gets a later `.previous-N` name
+  so it does not block the next publish. Removing the backup after a
+  successful publish does not fail the build. The PyInstaller and resvg
+  `subprocess.run` calls are argument lists, and each carries a `nosemgrep`
+  for OpenGrep's dangerous-subprocess rule so that false positive does not
+  fail the Sourcery check. The spec calls `resolved_data_files()`, so the paths
   PyInstaller receives are absolute.
 - A Tk preflight with no display names `xvfb-run`. The Linux container is
   what provides that display; macOS and Windows do not need it.

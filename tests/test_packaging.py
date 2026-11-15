@@ -446,13 +446,16 @@ def test_remove_tree_refuses_a_path_outside_dist(tmp_path: Path, monkeypatch) ->
     outside.mkdir()
     (outside / "kept").write_text("stay", encoding="utf-8")
     link = root / "linked"
-    link.symlink_to(outside, target_is_directory=True)
-
     with pytest.raises(SystemExit, match="refusing to touch"):
         _build._remove_tree(root / ".." / "escape")
+    assert (outside / "kept").read_text(encoding="utf-8") == "stay"
+    try:
+        link.symlink_to(outside, target_is_directory=True)
+    except OSError:
+        pytest.skip("this host cannot create a directory symlink")
+
     with pytest.raises(SystemExit, match="refusing to touch"):
         _build._remove_tree(link)
-
     assert (outside / "kept").read_text(encoding="utf-8") == "stay"
 
 
@@ -484,6 +487,44 @@ def test_publish_restores_the_previous_tree_when_the_new_one_cannot_move(
     assert (published / "kept").read_text(encoding="utf-8") == "complete"
     assert not staging.exists()
     assert not (root / "0.1.0.previous").exists()
+
+
+def test_a_failed_freeze_restores_an_interrupted_publish(monkeypatch, tmp_path: Path) -> None:
+    """The next run puts `.previous` back when the version directory is missing."""
+    version = read_version()
+
+    class _Failing(_RecordingSubprocess):
+        def run(self, command, **kwargs: object) -> None:
+            super().run(command, **kwargs)
+            raise subprocess.CalledProcessError(1, command, stderr=b"analysis failed\n")
+
+    _ready_to_freeze(monkeypatch, tmp_path, _Failing())
+    backup = tmp_path / "dist" / f"{version}.previous"
+    backup.mkdir(parents=True)
+    (backup / "kept").write_text("complete", encoding="utf-8")
+    with pytest.raises(SystemExit, match="analysis failed"):
+        _build.main(["--target", "macos", "--skip-sign", "--version", version])
+    assert (tmp_path / "dist" / version / "kept").read_text(encoding="utf-8") == "complete"
+    assert not backup.exists()
+
+
+def test_a_stuck_backup_does_not_block_the_next_publish(tmp_path: Path, monkeypatch) -> None:
+    """A leftover `.previous` stays put, and the new tree still replaces the app."""
+    root = tmp_path / "dist"
+    root.mkdir()
+    monkeypatch.setattr(_build, "DIST_ROOT", root)
+    stuck = root / "0.1.0.previous"
+    stuck.mkdir()
+    (stuck / "old").write_text("stuck", encoding="utf-8")
+    published = root / "0.1.0"
+    published.mkdir()
+    staging = root / "0.1.0.partial"
+    staging.mkdir()
+    (staging / "new").write_text("fresh", encoding="utf-8")
+    _build._publish_dist(staging, published)
+    assert (published / "new").read_text(encoding="utf-8") == "fresh"
+    assert (stuck / "old").read_text(encoding="utf-8") == "stuck"
+    assert not (root / "0.1.0.previous-2").exists()
 
 
 def test_build_rejects_a_version_that_escapes_dist(monkeypatch, tmp_path: Path) -> None:

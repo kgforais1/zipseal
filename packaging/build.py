@@ -334,21 +334,71 @@ def _remove_tree(path: Path) -> None:
         shutil.rmtree(target)
 
 
+def _present(path: Path) -> bool:
+    """Return whether `path` is a file, directory, or symlink."""
+    return path.exists() or path.is_symlink()
+
+
+def _backup_names(version_name: str) -> tuple[str, ...]:
+    """Return the sibling names a publish may use to hold the previous tree.
+
+    `<version>.previous` is the usual name. A later build uses `<version>.previous-N`
+    when that name is still occupied, so a backup that could not be deleted does
+    not stop the next publish.
+    """
+    return (f"{version_name}.previous", *(f"{version_name}.previous-{n}" for n in range(2, 100)))
+
+
+def _recover_published(published: Path) -> None:
+    """Put the newest backup back when `dist/<version>/` is missing.
+
+    An interrupted publish leaves the last good tree beside the version
+    directory. The next run restores it before anything is deleted.
+    """
+    if _present(published):
+        return
+    found = [
+        published.with_name(name)
+        for name in _backup_names(published.name)
+        if _present(published.with_name(name))
+    ]
+    if not found:
+        return
+    backup = _dist_child(found[-1])
+    try:
+        backup.rename(published)
+    except OSError as exc:
+        raise SystemExit(
+            f"packaging/build.py: could not restore {backup.name} onto {published.name}: {exc}"
+        ) from exc
+
+
+def _aside_path(published: Path) -> Path:
+    """Return a free `dist/` sibling that can hold the tree about to be replaced."""
+    for name in _backup_names(published.name):
+        candidate = published.with_name(name)
+        if not _present(candidate):
+            return _dist_child(candidate)
+    raise SystemExit(f"packaging/build.py: no free backup name beside {published.name}")
+
+
 def _publish_dist(staging: Path, published: Path) -> None:
     """Move a finished freeze onto `published`, replacing it only then.
 
-    The previous tree is renamed aside first and removed only after the new
-    tree is in place. If that move fails, the previous tree is put back.
+    The current tree is renamed aside first and removed only after the new
+    tree is in place. If that move fails, the aside tree is put back. A backup
+    left behind by an earlier cleanup is not deleted first: when the version
+    directory is missing, that backup is the last good app and is restored.
     """
     staging = _dist_child(staging)
     published = _dist_child(published)
     if not staging.is_dir():
         raise SystemExit("packaging/build.py: PyInstaller reported success but wrote no output")
-    previous = _dist_child(published.with_name(published.name + ".previous"))
+    _recover_published(published)
+    aside = _aside_path(published)
     try:
-        _remove_tree(previous)
-        if published.exists() or published.is_symlink():
-            published.rename(previous)
+        if _present(published):
+            published.rename(aside)
     except OSError as exc:
         raise SystemExit(
             f"packaging/build.py: could not move the previous freeze aside: {exc}"
@@ -357,9 +407,9 @@ def _publish_dist(staging: Path, published: Path) -> None:
         staging.rename(published)
     except OSError as exc:
         restore_error: OSError | None = None
-        if previous.exists() and not (published.exists() or published.is_symlink()):
+        if _present(aside) and not _present(published):
             try:
-                previous.rename(published)
+                aside.rename(published)
             except OSError as restore_exc:
                 restore_error = restore_exc
         try:
@@ -369,15 +419,15 @@ def _publish_dist(staging: Path, published: Path) -> None:
         if restore_error is not None:
             raise SystemExit(
                 "packaging/build.py: could not publish the freeze, and the previous "
-                f"tree is still at {previous.name}: {restore_error}"
+                f"tree is still at {aside.name}: {restore_error}"
             ) from exc
         raise SystemExit(f"packaging/build.py: could not publish the freeze: {exc}") from exc
     try:
-        _remove_tree(previous)
+        _remove_tree(aside)
     except OSError as exc:
         print(
             f"packaging/build.py: froze into {published.name} but could not remove "
-            f"{previous.name}: {exc}",
+            f"{aside.name}: {exc}",
             file=sys.stderr,
         )
 
@@ -393,11 +443,13 @@ def run_pyinstaller(target: str, version: str) -> Path:
     """
     staging = staging_dist(version)
     published = published_dist(version)
+    _recover_published(published)
     _remove_tree(staging)
     environment = os.environ.copy()
     environment[BUILD_TARGET_ENV] = target
     environment[BUILD_VERSION_ENV] = version
     try:
+        # nosemgrep: python.lang.security.audit.dangerous-subprocess-use-audit
         subprocess.run(
             pyinstaller_command(version),
             cwd=REPO_ROOT,

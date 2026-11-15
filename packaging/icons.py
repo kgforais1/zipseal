@@ -403,6 +403,7 @@ def path_argument(path: Path) -> str:
 def run(command: list[str], what: str) -> None:
     """Run a build tool, reporting a failure as one line with its output."""
     try:
+        # nosemgrep: python.lang.security.audit.dangerous-subprocess-use-audit
         subprocess.run(command, check=True, capture_output=True)
     except OSError as exc:
         raise SystemExit(f"packaging/icons.py: {what} could not run: {exc}") from exc
