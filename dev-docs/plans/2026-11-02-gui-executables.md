@@ -247,7 +247,7 @@ it. The smoke-tested artifact is what ships, never a second local build.
 - [x] Build a local unsigned `zipseal-gui.app`; open it from `dist/<version>/`
       and run a real archive end to end (same inputs as the GUI plan smoke
       test). Done 2026-11-15 from `dist/0.1.0/zipseal-gui.app`.
-- [ ] `Info.plist`: `CFBundleShortVersionString`/`CFBundleVersion` from
+- [x] `Info.plist`: `CFBundleShortVersionString`/`CFBundleVersion` from
       `pyproject.toml`, a reverse-DNS `CFBundleIdentifier` derived from the
       GitHub owner (record the exact id when implementing),
       `CFBundleName`/`CFBundleDisplayName` `zipseal`, `CFBundleIconFile`,
@@ -257,8 +257,9 @@ it. The smoke-tested artifact is what ships, never a second local build.
       on the oldest macOS you can; do not guess the floor.
       The keys are rendered, the id is `io.github.kgforais1.zipseal-gui`, and
       `LSMinimumSystemVersion` is `11.0`, the pinned 3.13.17 `libpython`
-      `LC_BUILD_VERSION` minos measured 2026-11-15. This box stays open until
-      someone launches the app on macOS 11.
+      `LC_BUILD_VERSION` minos measured 2026-11-15. No macOS 11 machine is
+      available, so that launch will not be done. The declared floor stays
+      the measured Mach-O minimum.
 - [x] Make the DMG: `hdiutil create -format UDZO`, `zipseal-gui.app` plus an
       Applications symlink (drag-install). The image is written into
       `dist/<version>.partial` and that tree replaces `dist/<version>/` only

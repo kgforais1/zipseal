@@ -42,7 +42,8 @@ GUI_NAME = "zipseal-gui"
 # Reverse-DNS id from the GitHub owner. The `.spec` passes this to BUNDLE.
 BUNDLE_ID = "io.github.kgforais1.zipseal-gui"
 # LC_BUILD_VERSION minos of the pinned 3.13.17 libpython, measured 2026-11-15.
-# Not a launch on macOS 11. The binary refuses to load below this.
+# No macOS 11 machine is available, so this floor is not launch-verified.
+# The binary refuses to load below it.
 MACOS_MINIMUM_SYSTEM_VERSION = "11.0"
 MACOS_ICNS = REPO_ROOT / "build" / "icons" / "icon.icns"
 
