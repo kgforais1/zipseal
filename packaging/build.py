@@ -532,6 +532,15 @@ def run_pyinstaller(target: str, version: str) -> Path:
     return staging
 
 
+def _require_arm64() -> None:
+    """Exit unless this Mac can write the arm64-only disk image."""
+    machine = platform.machine()
+    if machine != "arm64":
+        raise SystemExit(
+            f"packaging/build.py: the macOS disk image is arm64 only; this machine is {machine}"
+        )
+
+
 def make_macos_dmg(directory: Path, version: str) -> Path:
     """Write an arm64 UDZO image of the `.app` plus an `/Applications` symlink.
 
@@ -541,11 +550,7 @@ def make_macos_dmg(directory: Path, version: str) -> Path:
     refused before anything is written.
     """
     require_version(version)
-    if platform.machine() != "arm64":
-        raise SystemExit(
-            "packaging/build.py: the macOS disk image is arm64 only; "
-            f"this machine is {platform.machine()}"
-        )
+    _require_arm64()
     directory = _dist_child(directory)
     if directory.name not in {version, f"{version}.partial"}:
         raise SystemExit(
@@ -557,10 +562,28 @@ def make_macos_dmg(directory: Path, version: str) -> Path:
     destination = directory / f"zipseal-gui-{version}-macos-arm64.dmg"
     staging = directory / ".dmg-staging"
     _clear_entry(directory, staging.name)
-    staging.mkdir()
+    image_ok = False
     try:
-        shutil.copytree(app, staging / app.name, symlinks=True)
-        (staging / "Applications").symlink_to("/Applications")
+        try:
+            staging.mkdir()
+            shutil.copytree(app, staging / app.name, symlinks=True)
+            (staging / "Applications").symlink_to("/Applications")
+        except OSError as exc:
+            # `shutil.Error` subclasses `OSError`, so this covers a failed copy too.
+            raise SystemExit(
+                f"packaging/build.py: could not stage the disk image contents: {exc}"
+            ) from exc
+        if destination.is_symlink():
+            # A planted link would make `hdiutil -ov` write through to its target.
+            # Unlink the link itself; a regular file is left for `hdiutil` to
+            # overwrite, and a leftover directory still fails below with the
+            # `hdiutil` error, not a cleanup error.
+            try:
+                destination.unlink()
+            except OSError as exc:
+                raise SystemExit(
+                    f"packaging/build.py: could not remove {destination.name}: {exc}"
+                ) from exc
         try:
             # nosemgrep: python.lang.security.audit.dangerous-subprocess-use-audit
             subprocess.run(
@@ -579,6 +602,7 @@ def make_macos_dmg(directory: Path, version: str) -> Path:
                 check=True,
                 capture_output=True,
             )
+            image_ok = True
         except (OSError, subprocess.CalledProcessError) as exc:
             try:
                 _clear_entry(directory, destination.name)
@@ -593,8 +617,13 @@ def make_macos_dmg(directory: Path, version: str) -> Path:
     finally:
         try:
             _clear_entry(directory, staging.name)
-        except OSError:
-            pass
+        except OSError as exc:
+            if image_ok:
+                raise SystemExit(
+                    f"packaging/build.py: hdiutil wrote {destination.name} but "
+                    f"{staging.name} could not be removed: {exc}"
+                ) from exc
+            # The staging or `hdiutil` error is the one already being raised.
     if not destination.is_file():
         try:
             _clear_entry(directory, destination.name)
@@ -629,6 +658,11 @@ def main(argv: list[str] | None = None) -> None:
     require_build_python()
     require_host_target(args.target)
     require_version(args.version)
+    if args.target == "macos":
+        # The image writer is arm64-only. Refuse before icons and PyInstaller
+        # so an Intel Mac stops here; `make_macos_dmg` keeps its own check for
+        # direct callers.
+        _require_arm64()
     load_icons().generate_icons(args.target)
     tk_preflight()
     staging = run_pyinstaller(args.target, args.version)

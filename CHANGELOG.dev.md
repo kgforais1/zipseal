@@ -140,6 +140,13 @@ edits and refactors. User-visible changes go in [`CHANGELOG.md`](CHANGELOG.md).
 
 ### Fixed
 
+- The macOS freeze unlinks a symlink planted at the disk image path before
+  `hdiutil` runs, so `hdiutil -ov` cannot write through to the link's target;
+  a staging copy failure is a `SystemExit` that deletes the partial tree and
+  keeps the published app; a `.dmg-staging` cleanup failure after a good image
+  fails the build instead of publishing; and a non-arm64 Mac is refused before
+  icons or PyInstaller with the same arm64 message `make_macos_dmg` uses.
+
 - A macOS disk image is written into `dist/<version>.partial`, and that tree
   replaces `dist/<version>/` only after `hdiutil` succeeds. A failed image
   deletes the partial tree and leaves the previous freeze in place. The image

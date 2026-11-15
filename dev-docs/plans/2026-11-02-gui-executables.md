@@ -244,9 +244,9 @@ it. The smoke-tested artifact is what ships, never a second local build.
 
 ## Phase 1 — macOS app (milestone M1)
 
-- [ ] Build a local unsigned `zipseal-gui.app`; open it from `dist/<version>/`
+- [x] Build a local unsigned `zipseal-gui.app`; open it from `dist/<version>/`
       and run a real archive end to end (same inputs as the GUI plan smoke
-      test).
+      test). Done 2026-11-15 from `dist/0.1.0/zipseal-gui.app`.
 - [ ] `Info.plist`: `CFBundleShortVersionString`/`CFBundleVersion` from
       `pyproject.toml`, a reverse-DNS `CFBundleIdentifier` derived from the
       GitHub owner (record the exact id when implementing),
