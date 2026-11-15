@@ -41,6 +41,7 @@ uv run pytest -m gui           # tests that need a real Tk display
 # Local frozen-GUI build. --target must be this machine (macos here).
 # A bad --version stops first. PyInstaller writes dist/<version>.partial
 # and that replaces dist/<version>/ only after the freeze succeeds.
+# A macOS build also writes dist/<version>/zipseal-gui-<version>-macos-arm64.dmg.
 # Linux has no display of its own: run the same command under xvfb-run.
 uv python install 3.13.17
 uv run --python 3.13.17 --group build python packaging/build.py --target macos --skip-sign

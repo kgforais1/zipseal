@@ -7,6 +7,13 @@ edits and refactors. User-visible changes go in [`CHANGELOG.md`](CHANGELOG.md).
 
 ### Added
 
+- A macOS freeze writes `dist/<version>/zipseal-gui-<version>-macos-arm64.dmg`
+  (`hdiutil create -format UDZO`) containing `zipseal-gui.app` and an
+  Applications symlink. `Info.plist` now includes the bundle id
+  `io.github.kgforais1.zipseal-gui`, the generated `icon.icns`, the utilities
+  category, the copyright line, high-resolution mode, and
+  `LSMinimumSystemVersion` `11.0` (the pinned Python's Mach-O minimum, not a
+  launch on macOS 11).
 - A `build` dependency group pinned to `pyinstaller==6.22.3`, locked in
   `uv.lock`, for the frozen GUI executables; builds run as
   `uv run --group build` (plan: `dev-docs/plans/2026-11-02-gui-executables.md`).

@@ -143,7 +143,14 @@ def test_version_reaches_every_platform_resource() -> None:
     plist = render_info_plist(version)
     assert plist["CFBundleShortVersionString"] == version
     assert plist["CFBundleVersion"] == version
-    assert "@VERSION" not in "".join(plist.values())
+    assert plist["CFBundleIdentifier"] == "io.github.kgforais1.zipseal-gui"
+    assert plist["CFBundleIconFile"] == "icon.icns"
+    assert plist["LSApplicationCategoryType"] == "public.app-category.utilities"
+    assert plist["NSHumanReadableCopyright"] == "Copyright (c) 2026 kgrizz-git"
+    assert plist["LSMinimumSystemVersion"] == "11.0"
+    assert plist["NSHighResolutionCapable"] is True
+    text = "".join(value for value in plist.values() if isinstance(value, str))
+    assert "@VERSION" not in text
     resource = render_windows_version_info(version)
     assert f"'{version}'" in resource
     assert version_tuple(version) in resource
@@ -207,6 +214,8 @@ def test_resolved_data_files_are_absolute_and_the_spec_uses_them() -> None:
     assert (root / "src" / "zipseal" / "icon.svg").exists()
     spec = (REPO_ROOT / "packaging" / "zipseal-gui.spec").read_text(encoding="utf-8")
     assert "build.resolved_data_files()" in spec
+    assert "build.MACOS_ICNS" in spec
+    assert "build.BUNDLE_ID" in spec
 
 
 def test_frozen_tree_keeps_both_icons_beside_the_frozen_module(tmp_path: Path, monkeypatch) -> None:
@@ -296,8 +305,14 @@ class _StagingSubprocess(_RecordingSubprocess):
 
     def run(self, command, **kwargs: object) -> None:
         super().run(command, **kwargs)
+        argv = [str(part) for part in command]
+        if argv and argv[0].endswith("hdiutil"):
+            Path(argv[-1]).parent.mkdir(parents=True, exist_ok=True)
+            Path(argv[-1]).write_bytes(b"dmg")
+            return
         distpath = Path(command[command.index("--distpath") + 1])
         (distpath / "zipseal-gui").mkdir(parents=True)
+        (distpath / "zipseal-gui.app" / "Contents").mkdir(parents=True)
 
 
 def _pin_fake_tkinter(monkeypatch, base_prefix: Path, *, inside: bool) -> _FakeTkinter:
@@ -357,6 +372,7 @@ def test_build_runs_pyinstaller_on_the_spec_into_the_versioned_dist(
     version = read_version()
     recorder = _StagingSubprocess()
     icons = _ready_to_freeze(monkeypatch, tmp_path, recorder)
+    monkeypatch.setattr(_build.platform, "machine", lambda: "arm64")
     previous = tmp_path / "dist" / version / "kept"
     previous.parent.mkdir(parents=True)
     previous.write_text("complete", encoding="utf-8")
@@ -364,8 +380,9 @@ def test_build_runs_pyinstaller_on_the_spec_into_the_versioned_dist(
     _build.main(["--target", "macos", "--skip-sign", "--version", version])
 
     assert icons.generated == ["macos"]
-    assert len(recorder.calls) == 1
+    assert len(recorder.calls) == 2
     command, kwargs = recorder.calls[0]
+    assert recorder.calls[1][0][0] == "/usr/bin/hdiutil"
     assert command[:3] == [sys.executable, "-m", "PyInstaller"]
     assert command[-1] == str(REPO_ROOT / "packaging" / "zipseal-gui.spec")
     staging = tmp_path / "dist" / f"{version}.partial"
@@ -374,6 +391,7 @@ def test_build_runs_pyinstaller_on_the_spec_into_the_versioned_dist(
     assert str(REPO_ROOT / "build" / "pyinstaller") in command
     assert not staging.exists()
     assert (published / "zipseal-gui").is_dir()
+    assert (published / f"zipseal-gui-{version}-macos-arm64.dmg").is_file()
     assert not previous.exists()
     environment = kwargs["env"]
     assert isinstance(environment, dict)

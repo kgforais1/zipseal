@@ -39,6 +39,12 @@ BUILD_VERSION_ENV = "ZIPSEAL_BUILD_VERSION"
 
 APP_NAME = "zipseal"
 GUI_NAME = "zipseal-gui"
+# Reverse-DNS id from the GitHub owner. The `.spec` passes this to BUNDLE.
+BUNDLE_ID = "io.github.kgforais1.zipseal-gui"
+# LC_BUILD_VERSION minos of the pinned 3.13.17 libpython, measured 2026-11-15.
+# Not a launch on macOS 11. The binary refuses to load below this.
+MACOS_MINIMUM_SYSTEM_VERSION = "11.0"
+MACOS_ICNS = REPO_ROOT / "build" / "icons" / "icon.icns"
 
 TARGETS = ("macos", "windows", "linux")
 
@@ -61,9 +67,15 @@ VERSION_NUMBERS_PLACEHOLDER = "@VERSION_TUPLE@"
 INFO_PLIST_TEMPLATE = {
     "CFBundleName": APP_NAME,
     "CFBundleDisplayName": APP_NAME,
+    "CFBundleIdentifier": BUNDLE_ID,
     "CFBundleShortVersionString": VERSION_PLACEHOLDER,
     "CFBundleVersion": VERSION_PLACEHOLDER,
+    "CFBundleIconFile": "icon.icns",
+    "LSApplicationCategoryType": "public.app-category.utilities",
+    "NSHumanReadableCopyright": "Copyright (c) 2026 kgrizz-git",
+    "LSMinimumSystemVersion": MACOS_MINIMUM_SYSTEM_VERSION,
 }
+INFO_PLIST_BOOLS = {"NSHighResolutionCapable": True}
 
 
 def read_version(path: Path = PYPROJECT) -> str:
@@ -100,9 +112,13 @@ def substitute_version(template: str, version: str) -> str:
     return filled.replace(VERSION_NUMBERS_PLACEHOLDER, version_tuple(version))
 
 
-def render_info_plist(version: str) -> dict[str, str]:
+def render_info_plist(version: str) -> dict[str, str | bool]:
     """Return the macOS Info.plist fields the `.spec` fills per version."""
-    return {key: substitute_version(value, version) for key, value in INFO_PLIST_TEMPLATE.items()}
+    rendered: dict[str, str | bool] = {
+        key: substitute_version(value, version) for key, value in INFO_PLIST_TEMPLATE.items()
+    }
+    rendered.update(INFO_PLIST_BOOLS)
+    return rendered
 
 
 def render_windows_version_info(version: str) -> str:
@@ -497,6 +513,59 @@ def run_pyinstaller(target: str, version: str) -> Path:
     return published
 
 
+def make_macos_dmg(published: Path, version: str) -> Path:
+    """Write an arm64 UDZO image of the `.app` plus an `/Applications` symlink."""
+    require_version(version)
+    if platform.machine() != "arm64":
+        raise SystemExit(
+            "packaging/build.py: the macOS disk image is arm64 only; "
+            f"this machine is {platform.machine()}"
+        )
+    published = _dist_child(published)
+    app = published / "zipseal-gui.app"
+    if not app.is_dir():
+        raise SystemExit("packaging/build.py: the macOS freeze wrote no zipseal-gui.app")
+    destination = published / f"zipseal-gui-{version}-macos-arm64.dmg"
+    staging = published / ".dmg-staging"
+    if _present(staging):
+        shutil.rmtree(staging)
+    staging.mkdir()
+    try:
+        shutil.copytree(app, staging / app.name, symlinks=True)
+        (staging / "Applications").symlink_to("/Applications")
+        try:
+            # nosemgrep: python.lang.security.audit.dangerous-subprocess-use-audit
+            subprocess.run(
+                [
+                    "/usr/bin/hdiutil",
+                    "create",
+                    "-volname",
+                    "zipseal-gui",
+                    "-srcfolder",
+                    str(staging),
+                    "-ov",
+                    "-format",
+                    "UDZO",
+                    str(destination),
+                ],
+                check=True,
+                capture_output=True,
+            )
+        except OSError as exc:
+            destination.unlink(missing_ok=True)
+            raise SystemExit(f"packaging/build.py: could not run hdiutil: {exc}") from exc
+        except subprocess.CalledProcessError as exc:
+            destination.unlink(missing_ok=True)
+            raise SystemExit(
+                f"packaging/build.py: hdiutil failed: {_pyinstaller_error(exc)}"
+            ) from exc
+    finally:
+        shutil.rmtree(staging, ignore_errors=True)
+    if not destination.is_file():
+        raise SystemExit("packaging/build.py: hdiutil reported success but wrote no disk image")
+    return destination
+
+
 def main(argv: list[str] | None = None) -> None:
     """Resolve the version, check the interpreter, and freeze `zipseal-gui`.
 
@@ -525,6 +594,9 @@ def main(argv: list[str] | None = None) -> None:
     load_icons().generate_icons(args.target)
     tk_preflight()
     dist = run_pyinstaller(args.target, args.version)
+    if args.target == "macos":
+        image = make_macos_dmg(dist, args.version)
+        print(f"packaging/build.py: wrote {image}")
     print(f"packaging/build.py: froze {args.target} {args.version} into {dist}")
 
 

@@ -80,14 +80,20 @@ coll = COLLECT(
     name="zipseal-gui",
 )
 
-# A reverse-DNS bundle identifier derived from the GitHub owner (kgforais1).
-# Phase 1 adds the remaining Info.plist keys; this phase fills only the version
-# and name fields `build.render_info_plist` renders.
+# `build.BUNDLE_ID` is the reverse-DNS id from the GitHub owner. The icon has
+# to be the generated `.icns`: without `icon=`, PyInstaller writes its generic
+# `icon-windowed.icns` and the Dock icon is not zipseal's.
 if _target == "macos":
+    if not build.MACOS_ICNS.is_file():
+        raise SystemExit(
+            f"zipseal-gui.spec: {build.MACOS_ICNS} is missing; build.py generates it "
+            "before PyInstaller runs"
+        )
     app = BUNDLE(
         coll,
         name="zipseal-gui.app",
-        bundle_identifier="io.github.kgforais1.zipseal-gui",
+        icon=str(build.MACOS_ICNS),
+        bundle_identifier=build.BUNDLE_ID,
         version=_version,
         info_plist=build.render_info_plist(_version),
     )

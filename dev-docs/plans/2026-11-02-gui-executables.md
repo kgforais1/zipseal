@@ -255,7 +255,11 @@ it. The smoke-tested artifact is what ships, never a second local build.
       (`public.app-category.utilities`), `NSHumanReadableCopyright`, and
       `LSMinimumSystemVersion` from what the bundled Python supports — verify
       on the oldest macOS you can; do not guess the floor.
-- [ ] Make the DMG: `hdiutil create -format UDZO`, `zipseal-gui.app` plus an
+      The keys are rendered, the id is `io.github.kgforais1.zipseal-gui`, and
+      `LSMinimumSystemVersion` is `11.0`, the pinned 3.13.17 `libpython`
+      `LC_BUILD_VERSION` minos measured 2026-11-15. This box stays open until
+      someone launches the app on macOS 11.
+- [x] Make the DMG: `hdiutil create -format UDZO`, `zipseal-gui.app` plus an
       Applications symlink (drag-install).
 - [ ] Manual acceptance (local build — M1 has no CI): open the DMG, drag the
       app to Applications, then set a synthetic `com.apple.quarantine` xattr

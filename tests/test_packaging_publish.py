@@ -80,3 +80,48 @@ def test_a_failed_aside_rename_keeps_the_app_in_place(tmp_path: Path, monkeypatc
         _build._publish_dist(staging, published)
     assert (published / "kept").read_text(encoding="utf-8") == "complete"
     assert not (root / "0.1.0.previous").exists()
+
+
+def test_macos_dmg_packs_the_app_and_an_applications_link(tmp_path: Path, monkeypatch) -> None:
+    """The disk image command is arm64-only and wraps the app plus /Applications."""
+    root = tmp_path / "dist"
+    root.mkdir()
+    monkeypatch.setattr(_build, "DIST_ROOT", root)
+    monkeypatch.setattr(_build.platform, "machine", lambda: "arm64")
+    published = root / "0.1.0"
+    app = published / "zipseal-gui.app"
+    (app / "Contents").mkdir(parents=True)
+    recorded: dict[str, object] = {}
+
+    def run(command, **kwargs: object) -> None:
+        source = Path(command[command.index("-srcfolder") + 1])
+        recorded["command"] = [str(part) for part in command]
+        recorded["source"] = source
+        assert (source / "zipseal-gui.app" / "Contents").is_dir()
+        assert (source / "Applications").readlink() == Path("/Applications")
+        Path(command[-1]).write_bytes(b"dmg")
+
+    monkeypatch.setattr(_build.subprocess, "run", run)
+    image = _build.make_macos_dmg(published, "0.1.0")
+    command = recorded["command"]
+    assert isinstance(command, list)
+    assert command[0] == "/usr/bin/hdiutil"
+    assert command[command.index("-format") + 1] == "UDZO"
+    assert image.name == "zipseal-gui-0.1.0-macos-arm64.dmg"
+    assert image.read_bytes() == b"dmg"
+    source = recorded["source"]
+    assert isinstance(source, Path)
+    assert source.name == ".dmg-staging"
+    assert not source.exists()
+
+
+def test_macos_dmg_refuses_a_non_arm64_machine(tmp_path: Path, monkeypatch) -> None:
+    """An Intel Mac does not get an image named as if it were arm64."""
+    root = tmp_path / "dist"
+    root.mkdir()
+    monkeypatch.setattr(_build, "DIST_ROOT", root)
+    monkeypatch.setattr(_build.platform, "machine", lambda: "x86_64")
+    published = root / "0.1.0"
+    (published / "zipseal-gui.app").mkdir(parents=True)
+    with pytest.raises(SystemExit, match="arm64"):
+        _build.make_macos_dmg(published, "0.1.0")
