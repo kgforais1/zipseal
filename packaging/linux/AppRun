@@ -1,0 +1,14 @@
+#!/bin/sh
+# AppImage entry point.
+#
+# The AppDir holds the PyInstaller onedir tree one level down, so AppRun sits
+# beside it and execs the binary inside it:
+#   AppDir/AppRun                (this file)
+#   AppDir/zipseal-gui.desktop
+#   AppDir/zipseal-gui.png       (the icon icons.py renders)
+#   AppDir/zipseal-gui/zipseal-gui
+#   AppDir/zipseal-gui/_internal/
+set -eu
+
+here=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+exec "$here/zipseal-gui/zipseal-gui" "$@"

@@ -18,6 +18,13 @@
 *.temp
 *.partial
 sample-data/
+# Frozen GUI apps. build/ and dist/ below cover the output trees; these
+# extensions also catch an artifact left outside them.
+*.dmg
+*.msi
+*.exe
+*.AppImage
+*.tar.gz
 
 # ── Python ───────────────────────────────────────────────────────────────────
 __pycache__/

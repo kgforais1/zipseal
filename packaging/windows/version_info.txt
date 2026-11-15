@@ -1,0 +1,38 @@
+# UTF-8
+#
+# Windows version resource for the frozen zipseal-gui.exe.
+#
+# PyInstaller's versioninfo loader evaluates this file as a VSVersionInfo(...)
+# expression and EXE(version=...) embeds the result in the executable.
+# packaging/build.py fills the @VERSION@ and @VERSION_TUPLE@ tokens from the
+# version it resolved before freezing.
+
+VSVersionInfo(
+  ffi=FixedFileInfo(
+    filevers=(@VERSION_TUPLE@),
+    prodvers=(@VERSION_TUPLE@),
+    mask=0x3f,
+    flags=0x0,
+    OS=0x40004,
+    fileType=0x1,
+    subtype=0x0,
+    date=(0, 0)
+    ),
+  kids=[
+    StringFileInfo(
+      [
+      StringTable(
+        '040904B0',
+        [StringStruct('Comments', 'zipseal-gui'),
+        StringStruct('CompanyName', 'zipseal'),
+        StringStruct('FileDescription', 'zipseal-gui'),
+        StringStruct('FileVersion', '@VERSION@'),
+        StringStruct('InternalName', 'zipseal-gui'),
+        StringStruct('LegalCopyright', 'MIT'),
+        StringStruct('OriginalFilename', 'zipseal-gui.exe'),
+        StringStruct('ProductName', 'zipseal'),
+        StringStruct('ProductVersion', '@VERSION@')])
+      ]),
+    VarFileInfo([VarStruct('Translation', [0x0409, 1200])])
+  ]
+)

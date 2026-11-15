@@ -19,6 +19,10 @@ select = [
 "tests/**" = ["S101", "S105", "S106", "S603", "S607"]  # asserts, fixture passwords, running tar
 "scripts/**" = ["S105", "S311", "S603", "S607"]  # sample password, seeded noise, running zipseal
 "hooks/**" = ["S603", "S607"]  # hooks run git
+# The build runs pinned tools by path (resvg, iconutil, and later hdiutil,
+# codesign and appimagetool). The download and the unpack are checked in
+# icons.py, so the urlopen and tar-extract suppressions are not used.
+"packaging/**" = ["S603", "S607"]
 
 [format]
 quote-style = "double"
