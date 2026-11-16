@@ -280,11 +280,17 @@ it. The smoke-tested artifact is what ships, never a second local build.
 
 ## Phase 2 — macOS signing, notarization & release pipeline (milestone M2)
 
-- [ ] Create the `release` environment and two `v*` tag rulesets before any
+- [x] Create the `release` environment and two `v*` tag rulesets before any
       signing secret is stored. Deployment branches and tags are `v*` only.
-      The required reviewer is the second GitHub account, Prevent self-review
-      is on, and Allow administrators to bypass is off. A bypass list covers
-      every rule in its ruleset, so creation and immutability are separate.
+      Created 2026-11-15/2026-11-16 under `kgforais1`'s fine-grained PAT via
+      `.context/gh-pat.sh`; see `dev-docs/releasing.md` for the exact calls and
+      for the live state (the owner subsequently changed the required reviewer
+      list and `prevent_self_review` in the UI; both accounts are the
+      maintainer's). No Apple secret has been stored yet. The two rulesets are
+      as specified: creation limited to the tag-pushing account, immutability
+      with an empty bypass list.
+      The control is the two-account split: tag pushes are created by
+      `kgrizz-git`, the `release` environment's reviewer is the owner.
       The creation ruleset targets `v*` with Restrict creations, and its only
       bypass is the tag-pushing account. The immutability ruleset targets
       `v*` with Restrict updates and Restrict deletions, and its bypass list
@@ -298,18 +304,13 @@ it. The smoke-tested artifact is what ships, never a second local build.
       immutability for every `v*` tag. This repository is not an
       organization, so the add and the remove are written by hand into the
       release's rollback note. The tag-pushing account, the only creation
-      bypass, then pushes the replacement tag. `dev-docs/releasing.md` names
-      both accounts. Record the exact
-      settings and the account names for both rulesets in
-      `dev-docs/releasing.md`. Until this exists, the approval split below
-      does not hold: a missing environment fails `sign-macos` opaquely, and
-      a missing immutability ruleset leaves `publish`'s `--verify-tag` with
-      nothing behind it.
-      Blocked 2026-11-15: the authenticated GitHub account `kgrizz-git` has
-      push, not admin, and environment/ruleset creation returns HTTP 403
-      ("Must have admin rights to Repository"). `kgforais1` (owner) must run
-      the calls recorded in `dev-docs/releasing.md`; the account split there is
-      tag-pushing `kgrizz-git`, reviewer/ruleset-editing `kgforais1`.
+      bypass, then pushes the replacement tag. `dev-docs/releasing.md` records
+      the exact settings and both account names (created 2026-11-15:
+      `kgrizz-git` has only push, not admin, so the calls ran under a
+      `kgforais1` fine-grained PAT). Note: the owner later changed the
+      environment's required reviewers and `prevent_self_review` in the UI
+      (both accounts are theirs); that state is recorded in
+      `dev-docs/releasing.md` rather than assumed to be the intended split.
 - [ ] CI signing path (tag pushes only, inside `sign-macos`): `security
       create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"`, `security
       unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"`, `security
@@ -454,7 +455,7 @@ it. The smoke-tested artifact is what ships, never a second local build.
       notes include the resolved Python, PyInstaller, runner image and Tk
       version per artifact, the measured Linux glibc floor, and the
       `SHA256SUMS` / `gh attestation verify` lines.
-- [ ] `dev-docs/releasing.md` (new durable doc): the tag-to-release runbook,
+- [x] `dev-docs/releasing.md` (new durable doc): the tag-to-release runbook,
       the secrets list (names only), rollback (delete draft → delete tag → fix
       → re-tag; the ruleset-edit account adds itself to the immutability
       bypass list, deletes the tag, and removes that entry in the same
@@ -803,3 +804,18 @@ only if Phase 3 signing is approved. Linux needs no secrets, and
   shipped artifacts by name. The PNG tests stay `gui`-marked. The `SPEC.md`
   and `TODO.md` references and the `packaging` shadowing reason were
   corrected.
+
+- 2026-11-16: Muse Spark 1.3 and Step 5 Preview reviews of the Phase 2 draft
+  (both CHANGES REQUESTED). Fixes applied: job-level `actions` scope on the
+  artifact jobs (upload/download needs it), macOS bash 3.2 compatibility in
+  the nested-signing loops (`find -d` + `read -d ''`, `mapfile` removed), a
+  corrected Developer-ID guard (`|| true` and the identity list printed), the
+  DMG-mounted app re-validated (`stapler`/`codesign`/`spctl`), `build-info.json`
+  checksummed and attached to the release, the `.p12`/`.p8` deleted after use,
+  ephemeral-keychain search list restored on exit, `publish` pinned to
+  `ubuntu-24.04`, and `git ls-remote` passed both `ref` and `ref^{}`. The
+  environment/rulesets exist (created under a `kgforais1` PAT; `kgrizz-git`
+  lacks admin); the maintainer then edited the environment in the UI, so the
+  two-account split is currently a convention, recorded in
+  `dev-docs/releasing.md`. `publish`'s tags stay tag-push activated; the
+  draft-only release path is unchanged.

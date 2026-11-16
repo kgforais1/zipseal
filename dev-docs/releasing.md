@@ -1,6 +1,6 @@
 # Releasing zipseal-gui
 
-Last reviewed: 2026-11-15
+Last reviewed: 2026-11-16
 
 The operator's runbook for the frozen GUI apps. The design and the phase order
 are in
@@ -14,22 +14,42 @@ as a downloaded app.
 | Role | Account |
 |---|---|
 | Pushes `v*` tags; the only bypass of the creation ruleset | `kgrizz-git` |
-| Required `release` reviewer; edits the rulesets; does not push tags | `kgforais1` |
+| Required `release` reviewer; edits the rulesets | `kgforais1` |
 
-The split is the control. The tag-pushing account cannot approve its own access
-to the Apple secrets, and the reviewer cannot move or delete a tag. If either
-side changes, update this table and the rulesets together.
+The repository owner is also the tag-pushing account's operator: both accounts
+belong to the same person. The plan's split is therefore a two-account
+*convention* — the tag-pushing account cannot self-approve under
+`prevent_self_review` when self-review prevention is on — not a second-person
+control. As of 2026-11-16 the owner changed the required reviewer list and
+turned `prevent_self_review` off in the UI, so that convention is currently
+suspended; `can_admins_bypass` is likewise on. All three settings are recorded
+here, not assumed. The `v-tag-immutability` ruleset (empty bypass list) is the
+remaining structural control: it blocks an accidental or malicious tag move
+regardless of account.
 
 ## Repository protections
 
 ### `release` environment
 
-- Deployment branches/tags: custom policy, `v*` only.
-- Required reviewer: `kgforais1` (User).
-- Prevent self-review: on.
-- Allow administrators to bypass: off.
+**Live state as of 2026-11-16** (created 2026-11-16T04:28:29Z):
+
+- Deployment branches/tags: custom policy, `v*` only (tags and branches, as
+  GitHub implements the policy on names; recorded as tag-targeted by the
+  `sign-macos` `if:` guard as well).
+- Required reviewers: **`kgforais1` and `kgrizz-git`** — the repository owner
+  changed the required reviewer list in the UI, with both accounts being the
+  same person's. The intended split (owner reviews; tag-pushing account cannot
+  self-approve) therefore does not currently hold as the plan specifies; it
+  is equivalent to a single person holding both roles.
+- Prevent self-review: **off** (same UI change; see above).
+- Allow administrators to bypass: **on**. The environments REST API has no
+  body parameter for this (`wait_timer`, `prevent_self_review`, `reviewers`,
+  `deployment_branch_policy` only), so it cannot be verified or set from a
+  script. To turn it off: Settings → Environments → `release` → uncheck
+  "Allow administrators to bypass".
 - Wait timer: 0.
-- Secrets: the list below.
+- Secrets: none stored yet. Add them no earlier than when the M2 acceptance is
+  actually due; do not store placeholder or throwaway values.
 
 `environment` is job-level, so only `sign-macos` requests it. `build-macos` runs
 on both triggers with no environment and no secrets; a `workflow_dispatch`
@@ -49,8 +69,16 @@ active. See [Rollback](#rollback) for the temporary-bypass procedure.
 
 ### How these were created
 
-`kgrizz-git` has push but not admin, so the environment and rulesets are created
-by `kgforais1` (the repository owner). The exact calls:
+`kgrizz-git` has push but not admin, so the environment and rulesets were
+created with a fine-grained PAT owned by `kgforais1` (the owner): repository
+access limited to `kgforais1/zipseal`, `Administration: Read and write`. The
+token lives in a gitignored `.env.gh.PAT` and is used per-command via
+`.context/gh-pat.sh` (`GH_TOKEN=... gh ...`); it is never committed. The
+required reviewer list and self-review flag were subsequently changed by the
+owner in the UI (both accounts are the same person's), which is why the live
+state above is the source of truth, not the calls.
+
+The API calls that produced the baseline state:
 
 ```sh
 # Environment: custom v* deployment policy, reviewer, no self-review.
@@ -93,6 +121,21 @@ The reviewer `id` is `kgforais1`'s user id and the bypass `actor_id` is
 `kgrizz-git`'s. Re-read both with `gh api users/<login> --jq .id` before
 creating them; the ids are stable, but a typo here fails the approval split.
 
+Verification commands (run read-only):
+
+```sh
+gh api repos/kgforais1/zipseal/environments/release \
+  --jq '{can_admins_bypass, reviewers: [.protection_rules[] | select(.type=="required_reviewers") | .reviewers[].reviewer.login], prevent_self_review: [.protection_rules[] | select(.type=="required_reviewers") | .prevent_self_review]}'
+gh api repos/kgforais1/zipseal/environments/release/deployment-branch-policies
+gh api repos/kgforais1/zipseal/rulesets --jq '.[] | {id, name, target, enforcement}'
+```
+
+Creation-time checklist: confirm the numeric reviewer/bypass ids resolve to the
+intended logins; confirm the `v*` deployment-branch policy is accepted for the
+environment; confirm both rulesets show `enforcement: active`; do **not** store
+any Apple secret until the acceptance at the end of this phase has actually
+passed on a drafted release.
+
 ## Secrets
 
 Names only. Values live in the `release` environment, which is limited to `v*`
@@ -112,6 +155,16 @@ Origin: the certificate and API key come from the Apple Developer account that
 already exists for this project. Rotation: re-export the `.p12` and `.p8`,
 base64 them, and replace the environment secrets; no repository change is
 needed. Never put a secret value in this file, a workflow, a log or a test.
+
+**Known exception, recorded deliberately.** `security` has no stdin mechanism
+for the keychain password or the `.p12` import password, and the plan prescribes
+those exact commands, so `KEYCHAIN_PASSWORD` and `APPLE_CERT_PASSWORD` travel in
+argv inside the (job-scoped, ephemeral-runner-scoped) `sign-macos` steps. This
+is a deliberate tension with AGENTS.md's "never put a password in argv": the
+values are not printed to the log, the runner is destroyed afterwards, and the
+alternative (an expect-like wrapper or a passwordless keychain) would weaken
+hardening rather than help. If a stdin path appears in a future `security`,
+switch to it.
 
 ## Tag to release
 
@@ -170,11 +223,15 @@ an archive with a generated password, open it.
 | Job | Image | Since |
 |---|---|---|
 | `build-macos`, `sign-macos` | `macos-15` | 2026-11-15 |
-| `check-*`, `publish` | `ubuntu-latest` | 2026-11-15 |
+| `publish` | `ubuntu-24.04` (pinned; not `-latest`) | 2026-11-16 |
+| `check-hooks`, `check-audit` | `ubuntu-latest` (copied step for step from `ci.yml`) | 2026-11-15 |
+| `check-test` | matrix `ubuntu-latest` and `macos-latest`, Python 3.11/3.13 (copied from `ci.yml`) | 2026-11-15 |
 
-Labels are versioned, never `-latest`, so a tag cannot change under the project
-without a commit. Bumping a label, or the Linux container digest when Phase 4
-lands, is its own commit and is recorded here with the previous value.
+Only the build/sign/publish images are versioned labels per Decision 6 (a tag
+must not change under the project without a commit); the check jobs copy
+`ci.yml`'s test runners step for step, which is what the plan's Phase 2
+specifies, so their `-latest` labels move with `ci.yml`. Bumping any of these
+labels is its own commit and is recorded here with the previous value.
 
 ## Dispatch rehearsal
 

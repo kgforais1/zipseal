@@ -106,14 +106,17 @@ edits and refactors. User-visible changes go in [`CHANGELOG.md`](CHANGELOG.md).
   real Tk window (deselected by default, run with `-m gui`).
 
 - `release.yml` and `dev-docs/releasing.md`: the Phase 2 tag-to-release
-  pipeline draft, macOS-only at M2. A `v*` tag re-runs ci.yml's gates, builds an
+  pipeline, macOS-only at M2. A `v*` tag re-runs ci.yml's gates, builds an
   unsigned `.app`, signs/notarizes/staples it in a separate `release`-environment
-  job, then publishes a draft release with `SHA256SUMS` and build provenance.
-  `dev-docs/releasing.md` records the account split (`kgrizz-git` pushes tags,
-  `kgforais1` reviews), the `v*` environment and rulesets, the secret names, the
-  rollback procedure and the acceptance checklist; `check-doc-freshness` now
-  requires its `Last reviewed` marker. The plan's Phase 0 `packaging/` box is
-  ticked, and its Phase 2 first bullet carries the admin-permission blocker.
+  job, then publishes a draft release with `SHA256SUMS`, build provenance and
+  the build info. `dev-docs/releasing.md` records the account split (`kgrizz-git`
+  pushes tags, `kgforais1` reviews — both the maintainer's, with the
+  environment's live settings recorded after a UI edit), the `v*` environment
+  and rulesets, the secret names, the rollback procedure and the acceptance
+  checklist; `check-doc-freshness` now requires its `Last reviewed` marker.
+  The plan's Phase 0 `packaging/` box is ticked, Phase 2's environment/ruleset
+  box is ticked (no Apple secrets stored yet), and the review changes are
+  logged in the plan.
 
 ### Changed
 

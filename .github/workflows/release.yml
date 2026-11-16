@@ -36,8 +36,10 @@ concurrency:
   cancel-in-progress: false
 
 env:
+  # packaging/build.py pins the same interpreter; keep both strings equal if
+  # you bump one (check_pins forces a literal version: for setup-uv, so the
+  # pin cannot come from this block).
   BUILD_PYTHON: "3.13.17"
-  UV_VERSION: "0.12.24"
 
 jobs:
   check-hooks:
@@ -120,6 +122,9 @@ jobs:
     needs: [check-hooks, check-test, check-audit]
     runs-on: macos-15
     timeout-minutes: 30
+    permissions:
+      contents: read
+      actions: write
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
@@ -132,17 +137,17 @@ jobs:
         run: |
           version=$(python3 -c 'import tomllib; print(tomllib.load(open("pyproject.toml", "rb"))["project"]["version"])')
           echo "version=$version" >> "$GITHUB_OUTPUT"
-      - run: uv python install 3.13.17
+      - run: uv python install ${{ env.BUILD_PYTHON }}
       - name: Freeze the app (unsigned)
-        run: uv run --python 3.13.17 --group build python packaging/build.py --target macos --skip-sign
+        run: uv run --python ${{ env.BUILD_PYTHON }} --group build python packaging/build.py --target macos --skip-sign
       - name: Record build info
         run: |
-          tk=$(uv run --python 3.13.17 --group build python -c 'import tkinter; print(tkinter.TkVersion)')
-          pyinstaller=$(uv run --python 3.13.17 --group build python -c 'import PyInstaller; print(PyInstaller.__version__)')
+          tk=$(uv run --python ${{ env.BUILD_PYTHON }} --group build python -c 'import tkinter; print(tkinter.TkVersion)')
+          pyinstaller=$(uv run --python ${{ env.BUILD_PYTHON }} --group build python -c 'import PyInstaller; print(PyInstaller.__version__)')
           cat > "dist/${{ steps.version.outputs.version }}/build-info.json" <<JSON
           {
             "artifact": "zipseal-gui-${{ steps.version.outputs.version }}-macos-arm64.dmg",
-            "python": "3.13.17",
+            "python": "${{ env.BUILD_PYTHON }}",
             "pyinstaller": "$pyinstaller",
             "runner": "macos-15",
             "tk": "$tk"
@@ -150,8 +155,9 @@ jobs:
           JSON
       # Advisory: the runner has no interactive window server, and the plan's
       # contract lets this check be advisory because the job still gates on
-      # codesign/spctl/stapler and the manual acceptance. The smoke-tested
-      # artifact is the one sign-macos uploads.
+      # codesign/spctl/stapler and the manual acceptance. The smoke test runs
+      # on the unsigned build; only a signature is added afterwards, so the
+      # artifact sign-macos uploads is otherwise the same tree.
       - name: Smoke test the built app
         continue-on-error: true
         run: |
@@ -186,6 +192,9 @@ jobs:
     runs-on: macos-15
     environment: release
     timeout-minutes: 45
+    permissions:
+      contents: read
+      actions: write
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
@@ -222,14 +231,16 @@ jobs:
           # Without the search-list entry codesign fails with "no identity found".
           security list-keychains -d user -s "$keychain" login.keychain
           security import "$RUNNER_TEMP/cert.p12" -k "$keychain" -P "$APPLE_CERT_PASSWORD" -T /usr/bin/codesign
+          rm "$RUNNER_TEMP/cert.p12"
           # Without the partition list codesign pops a GUI prompt in headless CI
           # and hangs until the job times out.
           security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" "$keychain"
       - name: Resolve the Developer ID identity
         run: |
+          security find-identity -v -p codesigning "$KEYCHAIN_PATH"
           identity=$(security find-identity -v -p codesigning "$KEYCHAIN_PATH" \
             | grep 'Developer ID Application' | head -1 \
-            | sed -E 's/.*"([^"]+)".*/\1/')
+            | sed -E 's/.*"([^"]+)".*/\1/' || true)
           if [ -z "$identity" ]; then
             echo "::error::no Developer ID Application identity in the keychain"
             exit 1
@@ -239,36 +250,36 @@ jobs:
       - name: Sign nested Mach-O, frameworks and the app
         env:
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        # bash 3.2 (the macOS runner default) has no mapfile; avoid it and
+        # tolerate filenames with spaces/newlines via -print0/-d ''.
         run: |
           app="dist/${{ steps.version.outputs.version }}/zipseal-gui.app"
           # Deepest first, so a framework's contents are sealed before the
           # framework. `file` describes object files as "Mach-O ... object";
           # codesign refuses those ("code object is not supported at all").
-          mapfile -t paths < <(find "$app" -type f \
-            | awk -F/ '{print NF "\t" $0}' | sort -rn | cut -f2-)
-          for path in "${paths[@]}"; do
-            description=$(file "$path")
-            case "$description" in
-              *"Mach-O"*"object"*) continue ;;
-              *"Mach-O"*) ;;
-              *) continue ;;
-            esac
-            echo "signing $path"
-            codesign --force --options runtime --timestamp --sign "$IDENTITY" "$path"
-          done
-          mapfile -t frameworks < <(find "$app" -type d -name '*.framework' \
-            | awk -F/ '{print NF "\t" $0}' | sort -rn | cut -f2-)
-          for framework in "${frameworks[@]}"; do
-            echo "signing $framework"
-            codesign --force --options runtime --timestamp --sign "$IDENTITY" "$framework"
-          done
+          find -d "$app" -type f -print0 \
+            | while IFS= read -r -d '' path; do
+                description=$(file "$path")
+                case "$description" in
+                  *"Mach-O"*"object"*) continue ;;
+                  *"Mach-O"*) ;;
+                  *) continue ;;
+                esac
+                echo "signing $path ($description)"
+                codesign --force --options runtime --timestamp --sign "$IDENTITY" "$path"
+              done
+          find -d "$app" -type d -name '*.framework' -print0 \
+            | while IFS= read -r -d '' framework; do
+                echo "signing $framework"
+                codesign --force --options runtime --timestamp --sign "$IDENTITY" "$framework"
+              done
           codesign --force --options runtime --timestamp \
             --entitlements packaging/macos/entitlements.plist \
             --sign "$IDENTITY" "$app"
           codesign --verify --deep --strict "$app"
           info=$(codesign -dv --verbose=4 "$app" 2>&1)
           printf '%s\n' "$info" | grep -q 'Authority=Developer ID Application:'
-          printf '%s\n' "$info" | grep -Eq "(APPLE_TEAM_ID|TeamIdentifier)=$APPLE_TEAM_ID"
+          printf '%s\n' "$info" | grep -q "TeamIdentifier=$APPLE_TEAM_ID"
           printf '%s\n' "$info" | grep -q 'flags=0x10000(runtime)'
       - name: Notarize and staple the app
         env:
@@ -284,6 +295,7 @@ jobs:
             --key-id "$APPLE_API_KEY_ID" \
             --issuer "$APPLE_API_ISSUER_ID"
           xcrun stapler staple "$app"
+          rm "$RUNNER_TEMP/AuthKey.p8"
       - name: Build, sign, notarize and staple the DMG
         env:
           APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
@@ -313,32 +325,47 @@ jobs:
             --key-id "$APPLE_API_KEY_ID" \
             --issuer "$APPLE_API_ISSUER_ID"
           xcrun stapler staple "$dmg"
+          rm "$RUNNER_TEMP/AuthKey.p8"
       - name: Gate on the signatures
+        # Validate the app the user actually runs, not only the pre-image.
+        # hdiutil drops custom xattrs, so check the shipped bytes.
         run: |
+          set -e
           app="dist/${{ steps.version.outputs.version }}/zipseal-gui.app"
           dmg="dist/${{ steps.version.outputs.version }}/zipseal-gui-${{ steps.version.outputs.version }}-macos-arm64.dmg"
+          mountpoint="$RUNNER_TEMP/dmg-mounted"
           xcrun stapler validate "$app"
           xcrun stapler validate "$dmg"
           spctl --assess -t exec -v "$app"
           spctl --assess -t open --context context:primary-signature -v "$dmg"
+          hdiutil attach -nobrowse -readonly -mountpoint "$mountpoint" "$dmg"
+          trap 'hdiutil detach "$mountpoint" || true' EXIT
+          xcrun stapler validate "$mountpoint/zipseal-gui.app"
+          codesign --verify --deep --strict "$mountpoint/zipseal-gui.app"
+          spctl --assess -t exec -v "$mountpoint/zipseal-gui.app"
+          hdiutil detach "$mountpoint"
+          trap - EXIT
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9  # v7.0.2
         with:
           name: zipseal-gui-macos-dmg
           path: dist/${{ steps.version.outputs.version }}/zipseal-gui-${{ steps.version.outputs.version }}-macos-arm64.dmg
       - name: Delete the ephemeral keychain
         if: always()
-        run: security delete-keychain "$KEYCHAIN_PATH" 2>/dev/null || true
+        run: |
+          security list-keychains -d user -s login.keychain 2>/dev/null || true
+          security delete-keychain "$KEYCHAIN_PATH" 2>/dev/null || true
 
   publish:
     name: Publish the draft release
     if: github.event_name == 'push'
     needs: [check-hooks, check-test, check-audit, sign-macos]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     permissions:
       contents: write
       id-token: write
       attestations: write
+      actions: read
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
@@ -354,8 +381,10 @@ jobs:
 
           ref_name, sha = sys.argv[1], sys.argv[2]
           ref = "refs/tags/" + ref_name
+          # Ask for both refs explicitly: an exact-ref pattern never emits the
+          # "^{}" peeled line (only a glob or no pattern does).
           out = subprocess.check_output(
-              ["git", "ls-remote", "--tags", "origin", ref], text=True
+              ["git", "ls-remote", "--tags", "origin", ref, ref + "^{}"], text=True
           )
           entries = [line.split("\t") for line in out.splitlines() if "\t" in line]
           tag_shas = [entry[0] for entry in entries if entry[1] == ref]
@@ -378,7 +407,7 @@ jobs:
       - name: Write SHA256SUMS
         run: |
           cd artifacts
-          sha256sum zipseal-gui-*.dmg > SHA256SUMS
+          sha256sum zipseal-gui-*.dmg build-info.json > SHA256SUMS
           cat SHA256SUMS
       - name: Attest the artifact
         uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8  # v4.2.2
@@ -425,4 +454,5 @@ jobs:
             --title "zipseal-gui $version" \
             --notes-file "$notes" \
             artifacts/zipseal-gui-*.dmg \
+            artifacts/build-info.json \
             artifacts/SHA256SUMS
