@@ -280,8 +280,13 @@ it. The smoke-tested artifact is what ships, never a second local build.
 
 ## Phase 2 — macOS signing, notarization & release pipeline (milestone M2)
 
-- [x] Create the `release` environment and two `v*` tag rulesets before any
-      signing secret is stored. Deployment branches and tags are `v*` only.
+- [ ] Create the `release` environment and two `v*` tag rulesets before any
+      signing secret is stored. Blocked 2026-11-16: the environment exists, but
+      the maintainer changed its required reviewers and `prevent_self_review`
+      in the UI (both accounts are theirs), so the separate tag-pushing and
+      reviewer-account control does not hold; obtain explicit acceptance of a
+      single-account control or restore the UI settings.
+      Note: Deployment branches and tags are `v*` only.
       Created 2026-11-15/2026-11-16 under `kgforais1`'s fine-grained PAT via
       `.context/gh-pat.sh`; see `dev-docs/releasing.md` for the exact calls and
       for the live state (the owner subsequently changed the required reviewer
@@ -368,8 +373,10 @@ it. The smoke-tested artifact is what ships, never a second local build.
       runs none of it. The three check jobs re-run those gates on both
       triggers. `check-hooks` is `ci.yml`'s `checks` job copied step for
       step: checkout with `fetch-depth: 0` and `persist-credentials: false`,
-      `setup-uv` at `version: "0.12.24"`, `uv sync --locked` (the
-      basedpyright hook runs through `uv run`), then `uvx --no-build
+      `setup-uv` at `version: "0.12.24"`, `uv sync --locked --no-build
+      --no-install-project` (the basedpyright hook runs through `uv run` and
+      needs only the source tree; SonarCloud S8541/S8544 forbid raw
+      `uv sync --locked`/`uv run`), then `uvx --no-build
       pre-commit==4.7.0 run --all-files --show-diff-on-failure`. `check-audit` is `ci.yml`'s
       `audit` job unchanged (`pip-audit==2.10.1`). `check-test` is `ci.yml`'s
       `test` job copied step for step: `timeout-minutes: 30`, matrix
@@ -378,8 +385,11 @@ it. The smoke-tested artifact is what ships, never a second local build.
       `setup-uv` at `version: "0.12.24"` with
       `python-version: ${{ matrix.python }}`, Linux
       `sudo apt-get update && sudo apt-get install -y 7zip libarchive-tools`,
-      macOS `brew install sevenzip`, then `uv sync --locked` and
-      `uv run pytest -q` (the fast suite — `addopts` drops `slow` and `gui`).
+      macOS `brew install sevenzip`, then `uv sync --locked --no-build
+      --no-install-project`, and
+      `PYTHONPATH=src uv run --locked --no-build --no-sync pytest -q` (the
+      fast suite — `addopts` drops `slow` and `gui`; zipseal is imported from
+      `src/`, not installed).
       Those are the test runners `ci.yml` uses, separate from the versioned
       build images in Decision 6. On a tag push `check-hooks` also requires
       the tag to equal `v` plus the `pyproject.toml` version (Decision 9).
@@ -819,3 +829,17 @@ only if Phase 3 signing is approved. Linux needs no secrets, and
   two-account split is currently a convention, recorded in
   `dev-docs/releasing.md`. `publish`'s tags stay tag-push activated; the
   draft-only release path is unchanged.
+
+- 2026-11-16 (round 2): SonarCloud (S8541/S8544) and CodeRabbit findings applied
+  to the same PR. The gate jobs sync with `--locked --no-build
+  --no-install-project` (zipseal imported from `src/`, not installed as a
+  wheel) so no PEP 517 backend runs. The ephemeral keychain idle lock is raised
+  with `security set-keychain-settings -lut 3600` so it survives notarization.
+  The environment now carries both `v*` deployment policies (`branch` and
+  `tag`); a branch policy alone does not match tag refs. The plan's
+  environment/ruleset box stays unticked: the separate tag-pushing and
+  reviewer-account control does not hold after the maintainer's UI change, and
+  it needs a deliberate decision (restore the settings, or explicit acceptance
+  of a single-account control). The secret-storage prerequisite is recorded as
+  "after protection review, before the first tag", not blocked on a draft
+  acceptance, because `sign-macos` itself needs the secrets.

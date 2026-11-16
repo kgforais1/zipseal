@@ -54,7 +54,9 @@ jobs:
       - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884  # v10.3.0
         with:
           version: "0.12.24"
-      - run: uv sync --locked
+      # --no-build: no PEP 517 backend runs; --no-install-project: the gates do
+      # not import zipseal, they only inspect source (src/ and packaging/).
+      - run: uv sync --locked --no-build --no-install-project
       - run: uvx --no-build pre-commit==4.7.0 run --all-files --show-diff-on-failure
       # Decision 9: compare the whole tag. Stripping a prefix would accept a tag
       # the rule rejects (`vv0.1.0` via lstrip, `0.1.0` via removeprefix).
@@ -100,8 +102,12 @@ jobs:
       - name: Install 7-Zip (macOS)
         if: runner.os == 'macOS'
         run: brew install sevenzip
-      - run: uv sync --locked
-      - run: uv run pytest -q
+      # Same reason: no build backend runs; zipseal is imported from src/
+      # instead of being installed as a wheel.
+      - run: uv sync --locked --no-build --no-install-project
+      - run: uv run --locked --no-build --no-sync pytest -q
+        env:
+          PYTHONPATH: src
 
   check-audit:
     name: Dependency audit
@@ -227,6 +233,8 @@ jobs:
           echo "KEYCHAIN_PATH=$keychain" >> "$GITHUB_ENV"
           printf '%s' "$APPLE_CERT_P12" | base64 --decode > "$RUNNER_TEMP/cert.p12"
           security create-keychain -p "$KEYCHAIN_PASSWORD" "$keychain"
+          # Five minutes idle would lock it before DMG signing; give it an hour.
+          security set-keychain-settings -lut 3600 "$keychain"
           security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$keychain"
           # Without the search-list entry codesign fails with "no identity found".
           security list-keychains -d user -s "$keychain" login.keychain

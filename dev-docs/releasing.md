@@ -33,9 +33,9 @@ regardless of account.
 
 **Live state as of 2026-11-16** (created 2026-11-16T04:28:29Z):
 
-- Deployment branches/tags: custom policy, `v*` only (tags and branches, as
-  GitHub implements the policy on names; recorded as tag-targeted by the
-  `sign-macos` `if:` guard as well).
+- Deployment policies: custom `v*` policy of type `branch` (created 2026-11-16)
+  followed by a custom `v*` policy of type `tag` (added the same day; a
+  branch-only policy does not apply to tags).
 - Required reviewers: **`kgforais1` and `kgrizz-git`** — the repository owner
   changed the required reviewer list in the UI, with both accounts being the
   same person's. The intended split (owner reviews; tag-pushing account cannot
@@ -91,7 +91,9 @@ gh api --method PUT repos/kgforais1/zipseal/environments/release --input - <<'JS
 }
 JSON
 gh api --method POST repos/kgforais1/zipseal/environments/release/deployment-branch-policies \
-  -f name='v*'
+  -f name='v*' -f type=branch
+gh api --method POST repos/kgforais1/zipseal/environments/release/deployment-branch-policies \
+  -f name='v*' -f type=tag
 
 # Creation ruleset: only the tag-pushing account may bypass.
 gh api --method POST repos/kgforais1/zipseal/rulesets --input - <<'JSON'
@@ -131,10 +133,13 @@ gh api repos/kgforais1/zipseal/rulesets --jq '.[] | {id, name, target, enforceme
 ```
 
 Creation-time checklist: confirm the numeric reviewer/bypass ids resolve to the
-intended logins; confirm the `v*` deployment-branch policy is accepted for the
-environment; confirm both rulesets show `enforcement: active`; do **not** store
-any Apple secret until the acceptance at the end of this phase has actually
-passed on a drafted release.
+intended logins; confirm the `v*` deployment policies include a `branch` and a
+`tag` policy (a branch-only policy does not apply to tags); confirm both
+rulesets show `enforcement: active`. Store the signing secrets only after the
+protection review above has passed (and after changing or accepting the
+environment's reviewer/self-review settings deliberately) — they are needed to
+create the first draft release. Validate the downloaded artifact before
+publishing the draft, as part of the acceptance checklist below.
 
 ## Secrets
 
