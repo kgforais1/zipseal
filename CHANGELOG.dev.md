@@ -7,6 +7,13 @@ edits and refactors. User-visible changes go in [`CHANGELOG.md`](CHANGELOG.md).
 
 ### Added
 
+- A macOS freeze writes `dist/<version>/zipseal-gui-<version>-macos-arm64.dmg`
+  (`hdiutil create -format UDZO`) containing `zipseal-gui.app` and an
+  Applications symlink. `Info.plist` now includes the bundle id
+  `io.github.kgforais1.zipseal-gui`, the generated `icon.icns`, the utilities
+  category, the copyright line, high-resolution mode, and
+  `LSMinimumSystemVersion` `11.0` (the pinned Python's Mach-O minimum; no
+  macOS 11 machine is available, so that launch will not be done).
 - A `build` dependency group pinned to `pyinstaller==6.22.3`, locked in
   `uv.lock`, for the frozen GUI executables; builds run as
   `uv run --group build` (plan: `dev-docs/plans/2026-11-02-gui-executables.md`).
@@ -133,6 +140,22 @@ edits and refactors. User-visible changes go in [`CHANGELOG.md`](CHANGELOG.md).
 
 ### Fixed
 
+- A macOS freeze that cannot remove a leftover `.dmg-staging` exits with
+  `SystemExit` instead of a traceback. Packaging tests that drive `main`
+  stub an arm64 machine, so Linux CI still reaches PyInstaller.
+- The macOS freeze unlinks a symlink planted at the disk image path before
+  `hdiutil` runs, so `hdiutil -ov` cannot write through to the link's target;
+  a staging copy failure is a `SystemExit` that deletes the partial tree and
+  keeps the published app; a `.dmg-staging` cleanup failure after a good image
+  fails the build instead of publishing; and a non-arm64 Mac is refused before
+  icons or PyInstaller with the same arm64 message `make_macos_dmg` uses.
+
+- A macOS disk image is written into `dist/<version>.partial`, and that tree
+  replaces `dist/<version>/` only after `hdiutil` succeeds. A failed image
+  deletes the partial tree and leaves the previous freeze in place. The image
+  is refused when its directory is not named `<version>` or `<version>.partial`.
+  A leftover `.dmg-staging` entry, or a disk image that is not a file, is
+  removed as a file, directory, or symlink without following the link.
 - `packaging/build.py` checks `--version` before it generates icons or runs
   PyInstaller, and it only publishes `dist/<version>/` after the freeze
   succeeds. A version with a slash, `..`, or a non-ASCII digit is rejected.

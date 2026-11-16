@@ -39,6 +39,13 @@ BUILD_VERSION_ENV = "ZIPSEAL_BUILD_VERSION"
 
 APP_NAME = "zipseal"
 GUI_NAME = "zipseal-gui"
+# Reverse-DNS id from the GitHub owner. The `.spec` passes this to BUNDLE.
+BUNDLE_ID = "io.github.kgforais1.zipseal-gui"
+# LC_BUILD_VERSION minos of the pinned 3.13.17 libpython, measured 2026-11-15.
+# No macOS 11 machine is available, so this floor is not launch-verified.
+# The binary refuses to load below it.
+MACOS_MINIMUM_SYSTEM_VERSION = "11.0"
+MACOS_ICNS = REPO_ROOT / "build" / "icons" / "icon.icns"
 
 TARGETS = ("macos", "windows", "linux")
 
@@ -61,9 +68,15 @@ VERSION_NUMBERS_PLACEHOLDER = "@VERSION_TUPLE@"
 INFO_PLIST_TEMPLATE = {
     "CFBundleName": APP_NAME,
     "CFBundleDisplayName": APP_NAME,
+    "CFBundleIdentifier": BUNDLE_ID,
     "CFBundleShortVersionString": VERSION_PLACEHOLDER,
     "CFBundleVersion": VERSION_PLACEHOLDER,
+    "CFBundleIconFile": "icon.icns",
+    "LSApplicationCategoryType": "public.app-category.utilities",
+    "NSHumanReadableCopyright": "Copyright (c) 2026 kgrizz-git",
+    "LSMinimumSystemVersion": MACOS_MINIMUM_SYSTEM_VERSION,
 }
+INFO_PLIST_BOOLS = {"NSHighResolutionCapable": True}
 
 
 def read_version(path: Path = PYPROJECT) -> str:
@@ -100,9 +113,13 @@ def substitute_version(template: str, version: str) -> str:
     return filled.replace(VERSION_NUMBERS_PLACEHOLDER, version_tuple(version))
 
 
-def render_info_plist(version: str) -> dict[str, str]:
+def render_info_plist(version: str) -> dict[str, str | bool]:
     """Return the macOS Info.plist fields the `.spec` fills per version."""
-    return {key: substitute_version(value, version) for key, value in INFO_PLIST_TEMPLATE.items()}
+    rendered: dict[str, str | bool] = {
+        key: substitute_version(value, version) for key, value in INFO_PLIST_TEMPLATE.items()
+    }
+    rendered.update(INFO_PLIST_BOOLS)
+    return rendered
 
 
 def render_windows_version_info(version: str) -> str:
@@ -286,9 +303,10 @@ def published_dist(version: str) -> Path:
 def pyinstaller_command(version: str) -> list[str]:
     """Return the PyInstaller argv that freezes the spec into a staging tree.
 
-    The published directory is `dist/<version>/`. PyInstaller writes the
-    staging tree, and `run_pyinstaller` moves it into place only after the
-    command succeeds, so a failed freeze cannot replace a finished app.
+    The published directory is `dist/<version>/`. PyInstaller writes
+    `dist/<version>.partial`. On macOS the disk image is written into that
+    same tree. `main` moves it onto `dist/<version>/` only after both succeed,
+    so a failed freeze or a failed image cannot replace a finished app.
     """
     return [
         sys.executable,
@@ -327,10 +345,29 @@ def _dist_child(path: Path) -> Path:
 
 def _remove_tree(path: Path) -> None:
     """Delete a `dist/` child, whether it is a directory, a file, or a link."""
-    target = _dist_child(path)
+    _delete_entry(_dist_child(path))
+
+
+def _clear_entry(parent: Path, name: str) -> None:
+    """Remove one entry inside a `dist/` child without following a symlink.
+
+    `parent` is `dist/<version>` or `dist/<version>.partial`. The entry name
+    has to be a single path component. A symlink is unlinked, including a
+    symlink to a directory, so its target stays. A missing entry is fine.
+    """
+    parent = _dist_child(parent)
+    if not name or name in {".", ".."} or name != Path(name).name or "\0" in name:
+        raise SystemExit(f"packaging/build.py: refusing to remove {name!r} from {parent}")
+    _delete_entry(parent / name)
+
+
+def _delete_entry(target: Path) -> None:
+    """Delete `target` as a symlink, a file, or a directory. Missing is fine."""
+    if not _present(target):
+        return
     if target.is_symlink() or target.is_file():
         target.unlink()
-    elif target.exists():
+    else:
         shutil.rmtree(target)
 
 
@@ -461,13 +498,13 @@ def _publish_dist(staging: Path, published: Path) -> None:
 
 
 def run_pyinstaller(target: str, version: str) -> Path:
-    """Freeze the spec with PyInstaller, and return the directory it published.
+    """Freeze the spec into `dist/<version>.partial` and return that directory.
 
-    PyInstaller writes `dist/<version>.partial`. That tree replaces
-    `dist/<version>/` only after the command succeeds; a failure deletes the
-    partial tree and leaves an earlier complete build where it was. The target
-    and version travel in the environment because the spec is PyInstaller's
-    own script, not this module's caller.
+    A failure deletes the partial tree and leaves an earlier complete build
+    where it was. This does not publish: `main` writes the macOS disk image
+    into the partial tree first, then moves the tree onto `dist/<version>/`.
+    The target and version travel in the environment because the spec is
+    PyInstaller's own script, not this module's caller.
     """
     staging = staging_dist(version)
     published = published_dist(version)
@@ -493,8 +530,111 @@ def run_pyinstaller(target: str, version: str) -> Path:
         raise SystemExit(
             f"packaging/build.py: PyInstaller failed: {_pyinstaller_error(exc)}"
         ) from exc
-    _publish_dist(staging, published)
-    return published
+    return staging
+
+
+def _require_arm64() -> None:
+    """Exit unless this Mac can write the arm64-only disk image."""
+    machine = platform.machine()
+    if machine != "arm64":
+        raise SystemExit(
+            f"packaging/build.py: the macOS disk image is arm64 only; this machine is {machine}"
+        )
+
+
+def make_macos_dmg(directory: Path, version: str) -> Path:
+    """Write an arm64 UDZO image of the `.app` plus an `/Applications` symlink.
+
+    `directory` is `dist/<version>.partial` while a build is still unpublished,
+    or `dist/<version>` for a tree that is already there. The image file is
+    named from `version`, so a directory named for a different version is
+    refused before anything is written.
+    """
+    require_version(version)
+    _require_arm64()
+    directory = _dist_child(directory)
+    if directory.name not in {version, f"{version}.partial"}:
+        raise SystemExit(
+            f"packaging/build.py: disk image version {version} does not match {directory.name}"
+        )
+    app = directory / "zipseal-gui.app"
+    if not app.is_dir():
+        raise SystemExit("packaging/build.py: the macOS freeze wrote no zipseal-gui.app")
+    destination = directory / f"zipseal-gui-{version}-macos-arm64.dmg"
+    staging = directory / ".dmg-staging"
+    try:
+        _clear_entry(directory, staging.name)
+    except OSError as exc:
+        raise SystemExit(f"packaging/build.py: could not clear {staging.name}: {exc}") from exc
+    image_ok = False
+    try:
+        try:
+            staging.mkdir()
+            shutil.copytree(app, staging / app.name, symlinks=True)
+            (staging / "Applications").symlink_to("/Applications")
+        except OSError as exc:
+            # `shutil.Error` subclasses `OSError`, so this covers a failed copy too.
+            raise SystemExit(
+                f"packaging/build.py: could not stage the disk image contents: {exc}"
+            ) from exc
+        if destination.is_symlink():
+            # A planted link would make `hdiutil -ov` write through to its target.
+            # Unlink the link itself; a regular file is left for `hdiutil` to
+            # overwrite, and a leftover directory still fails below with the
+            # `hdiutil` error, not a cleanup error.
+            try:
+                destination.unlink()
+            except OSError as exc:
+                raise SystemExit(
+                    f"packaging/build.py: could not remove {destination.name}: {exc}"
+                ) from exc
+        try:
+            # nosemgrep: python.lang.security.audit.dangerous-subprocess-use-audit
+            subprocess.run(
+                [
+                    "/usr/bin/hdiutil",
+                    "create",
+                    "-volname",
+                    "zipseal-gui",
+                    "-srcfolder",
+                    str(staging),
+                    "-ov",
+                    "-format",
+                    "UDZO",
+                    str(destination),
+                ],
+                check=True,
+                capture_output=True,
+            )
+            image_ok = True
+        except (OSError, subprocess.CalledProcessError) as exc:
+            try:
+                _clear_entry(directory, destination.name)
+            except OSError:
+                pass
+            if isinstance(exc, subprocess.CalledProcessError):
+                detail = _pyinstaller_error(exc)
+                message = f"packaging/build.py: hdiutil failed: {detail}"
+            else:
+                message = f"packaging/build.py: could not run hdiutil: {exc}"
+            raise SystemExit(message) from exc
+    finally:
+        try:
+            _clear_entry(directory, staging.name)
+        except OSError as exc:
+            if image_ok:
+                raise SystemExit(
+                    f"packaging/build.py: hdiutil wrote {destination.name} but "
+                    f"{staging.name} could not be removed: {exc}"
+                ) from exc
+            # The staging or `hdiutil` error is the one already being raised.
+    if not destination.is_file():
+        try:
+            _clear_entry(directory, destination.name)
+        except OSError:
+            pass
+        raise SystemExit("packaging/build.py: hdiutil reported success but wrote no disk image")
+    return destination
 
 
 def main(argv: list[str] | None = None) -> None:
@@ -522,10 +662,30 @@ def main(argv: list[str] | None = None) -> None:
     require_build_python()
     require_host_target(args.target)
     require_version(args.version)
+    if args.target == "macos":
+        # The image writer is arm64-only. Refuse before icons and PyInstaller
+        # so an Intel Mac stops here; `make_macos_dmg` keeps its own check for
+        # direct callers.
+        _require_arm64()
     load_icons().generate_icons(args.target)
     tk_preflight()
-    dist = run_pyinstaller(args.target, args.version)
-    print(f"packaging/build.py: froze {args.target} {args.version} into {dist}")
+    staging = run_pyinstaller(args.target, args.version)
+    published = published_dist(args.version)
+    try:
+        if args.target == "macos":
+            make_macos_dmg(staging, args.version)
+        _publish_dist(staging, published)
+    except SystemExit:
+        if _present(staging):
+            try:
+                _remove_tree(staging)
+            except OSError:
+                pass
+        raise
+    if args.target == "macos":
+        image = published / f"zipseal-gui-{args.version}-macos-arm64.dmg"
+        print(f"packaging/build.py: wrote {image}")
+    print(f"packaging/build.py: froze {args.target} {args.version} into {published}")
 
 
 if __name__ == "__main__":

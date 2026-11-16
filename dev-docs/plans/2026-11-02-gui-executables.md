@@ -244,10 +244,10 @@ it. The smoke-tested artifact is what ships, never a second local build.
 
 ## Phase 1 — macOS app (milestone M1)
 
-- [ ] Build a local unsigned `zipseal-gui.app`; open it from `dist/<version>/`
+- [x] Build a local unsigned `zipseal-gui.app`; open it from `dist/<version>/`
       and run a real archive end to end (same inputs as the GUI plan smoke
-      test).
-- [ ] `Info.plist`: `CFBundleShortVersionString`/`CFBundleVersion` from
+      test). Done 2026-11-15 from `dist/0.1.0/zipseal-gui.app`.
+- [x] `Info.plist`: `CFBundleShortVersionString`/`CFBundleVersion` from
       `pyproject.toml`, a reverse-DNS `CFBundleIdentifier` derived from the
       GitHub owner (record the exact id when implementing),
       `CFBundleName`/`CFBundleDisplayName` `zipseal`, `CFBundleIconFile`,
@@ -255,9 +255,16 @@ it. The smoke-tested artifact is what ships, never a second local build.
       (`public.app-category.utilities`), `NSHumanReadableCopyright`, and
       `LSMinimumSystemVersion` from what the bundled Python supports — verify
       on the oldest macOS you can; do not guess the floor.
-- [ ] Make the DMG: `hdiutil create -format UDZO`, `zipseal-gui.app` plus an
-      Applications symlink (drag-install).
-- [ ] Manual acceptance (local build — M1 has no CI): open the DMG, drag the
+      The keys are rendered, the id is `io.github.kgforais1.zipseal-gui`, and
+      `LSMinimumSystemVersion` is `11.0`, the pinned 3.13.17 `libpython`
+      `LC_BUILD_VERSION` minos measured 2026-11-15. No macOS 11 machine is
+      available, so that launch will not be done. The declared floor stays
+      the measured Mach-O minimum.
+- [x] Make the DMG: `hdiutil create -format UDZO`, `zipseal-gui.app` plus an
+      Applications symlink (drag-install). The image is written into
+      `dist/<version>.partial` and that tree replaces `dist/<version>/` only
+      after `hdiutil` succeeds.
+- [x] Manual acceptance (local build — M1 has no CI): open the DMG, drag the
       app to Applications, then set a synthetic `com.apple.quarantine` xattr
       on the installed copy so the Gatekeeper path is exercised. The unsigned
       build is expected to be refused; confirm the block, then launch anyway
@@ -265,7 +272,10 @@ it. The smoke-tested artifact is what ships, never a second local build.
       Privacy & Security → "Open Anyway"; older macOS: Control-click the app
       → Open) and finish the check: create an archive with a generated
       password and open it in Finder and 7-Zip. Record the date, macOS
-      version and the override path used. The download-from-the-draft-release
+      version and the override path used. Done 2026-11-15 on macOS 26
+      (darwin 25.6.0): the quarantined Applications copy was refused, launched
+      with Privacy & Security → Open Anyway, and that copy created an archive
+      which was opened. The download-from-the-draft-release
       variant runs from M2 on (the last bullet of Phase 2).
 
 ## Phase 2 — macOS signing, notarization & release pipeline (milestone M2)
