@@ -379,7 +379,10 @@ it. The smoke-tested artifact is what ships, never a second local build.
       `uv sync --locked`/`uv run`), then `uvx --no-build
       pre-commit==4.7.0 run --all-files --show-diff-on-failure`. `check-audit` is `ci.yml`'s
       `audit` job unchanged (`pip-audit==2.10.1`). `check-test` is `ci.yml`'s
-      `test` job copied step for step: `timeout-minutes: 30`, matrix
+      `test` job — same runners, matrix and gates as `ci.yml`, with the
+      `uv` commands hardened for SonarCloud S8541/S8544 (`--no-build`,
+      `--no-install-project`, `PYTHONPATH=src`); a documented divergence from
+      `ci.yml`: `timeout-minutes: 30`, matrix
       `os: [ubuntu-latest, macos-latest]` × `python: ["3.11", "3.13"]`,
       `fail-fast: false`, checkout with `persist-credentials: false`,
       `setup-uv` at `version: "0.12.24"` with

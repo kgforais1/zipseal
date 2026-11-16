@@ -229,13 +229,14 @@ an archive with a generated password, open it.
 |---|---|---|
 | `build-macos`, `sign-macos` | `macos-15` | 2026-11-15 |
 | `publish` | `ubuntu-24.04` (pinned; not `-latest`) | 2026-11-16 |
-| `check-hooks`, `check-audit` | `ubuntu-latest` (copied step for step from `ci.yml`) | 2026-11-15 |
-| `check-test` | matrix `ubuntu-latest` and `macos-latest`, Python 3.11/3.13 (copied from `ci.yml`) | 2026-11-15 |
+| `check-hooks`, `check-audit` | `ubuntu-latest` (same as `ci.yml`; the `uv` steps are hardened, see below) | 2026-11-16 |
+| `check-test` | matrix `ubuntu-latest` and `macos-latest`, Python 3.11/3.13 (same runners as `ci.yml`; the `uv` steps are hardened, see below) | 2026-11-16 |
 
 Only the build/sign/publish images are versioned labels per Decision 6 (a tag
-must not change under the project without a commit); the check jobs copy
-`ci.yml`'s test runners step for step, which is what the plan's Phase 2
-specifies, so their `-latest` labels move with `ci.yml`. Bumping any of these
+must not change under the project without a commit). The check jobs share
+`ci.yml`'s runners, runner labels and gates, but their `uv` commands are
+hardened for SonarCloud (`--no-build --no-install-project`, `PYTHONPATH=src`) —
+a deliberate, documented divergence from `ci.yml`, which `ci.yml` does not use. Bumping any of these
 labels is its own commit and is recorded here with the previous value.
 
 ## Dispatch rehearsal

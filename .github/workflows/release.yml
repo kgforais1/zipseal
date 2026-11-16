@@ -54,8 +54,10 @@ jobs:
       - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884  # v10.3.0
         with:
           version: "0.12.24"
-      # --no-build: no PEP 517 backend runs; --no-install-project: the gates do
-      # not import zipseal, they only inspect source (src/ and packaging/).
+      # The sync step itself runs no PEP 517 backend (--no-build) and does not
+      # install zipseal (--no-install-project); the gates inspect source only.
+      # Note: the basedpyright/check-pins hooks re-run `uv run` — they re-sync
+      # and reinstall the wheel-only project and the build group, as in ci.yml.
       - run: uv sync --locked --no-build --no-install-project
       - run: uvx --no-build pre-commit==4.7.0 run --all-files --show-diff-on-failure
       # Decision 9: compare the whole tag. Stripping a prefix would accept a tag
@@ -102,8 +104,10 @@ jobs:
       - name: Install 7-Zip (macOS)
         if: runner.os == 'macOS'
         run: brew install sevenzip
-      # Same reason: no build backend runs; zipseal is imported from src/
-      # instead of being installed as a wheel.
+      # Same reason for the sync step: no build backend runs, zipseal is
+      # imported from src/ instead of being installed (--no-install-project).
+      # The pre-commit hooks re-run `uv run` and reinstall the wheel-only
+      # project and the build group, as in ci.yml.
       - run: uv sync --locked --no-build --no-install-project
       - run: uv run --locked --no-build --no-sync pytest -q
         env:
