@@ -105,6 +105,16 @@ edits and refactors. User-visible changes go in [`CHANGELOG.md`](CHANGELOG.md).
   controller headlessly, and a `gui` pytest marker covers tests that need a
   real Tk window (deselected by default, run with `-m gui`).
 
+- `release.yml` and `dev-docs/releasing.md`: the Phase 2 tag-to-release
+  pipeline draft, macOS-only at M2. A `v*` tag re-runs ci.yml's gates, builds an
+  unsigned `.app`, signs/notarizes/staples it in a separate `release`-environment
+  job, then publishes a draft release with `SHA256SUMS` and build provenance.
+  `dev-docs/releasing.md` records the account split (`kgrizz-git` pushes tags,
+  `kgforais1` reviews), the `v*` environment and rulesets, the secret names, the
+  rollback procedure and the acceptance checklist; `check-doc-freshness` now
+  requires its `Last reviewed` marker. The plan's Phase 0 `packaging/` box is
+  ticked, and its Phase 2 first bullet carries the admin-permission blocker.
+
 ### Changed
 
 - Dependabot version updates for uv and GitHub Actions now run monthly, on

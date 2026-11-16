@@ -181,7 +181,7 @@ it. The smoke-tested artifact is what ships, never a second local build.
       (`*.dmg`, `*.msi`, `*.exe`, `*.AppImage`, `*.tar.gz`) so even a
       force-added artifact cannot be committed; confirm `dist/` and `build/`
       are in both files' spirit (already ignored; add to `.forbidden-paths`).
-- [ ] Create `packaging/`:
+- [x] Create `packaging/`:
   - `run_gui.py` — the PyInstaller entry point: `import sys; from zipseal.gui import main; sys.exit(main())`.
     Neither `gui.py` nor `gui_view.py` has an `if __name__ == "__main__"` block, so this thin script
     is what the `.spec` targets.
@@ -305,6 +305,11 @@ it. The smoke-tested artifact is what ships, never a second local build.
       does not hold: a missing environment fails `sign-macos` opaquely, and
       a missing immutability ruleset leaves `publish`'s `--verify-tag` with
       nothing behind it.
+      Blocked 2026-11-15: the authenticated GitHub account `kgrizz-git` has
+      push, not admin, and environment/ruleset creation returns HTTP 403
+      ("Must have admin rights to Repository"). `kgforais1` (owner) must run
+      the calls recorded in `dev-docs/releasing.md`; the account split there is
+      tag-pushing `kgrizz-git`, reviewer/ruleset-editing `kgforais1`.
 - [ ] CI signing path (tag pushes only, inside `sign-macos`): `security
       create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"`, `security
       unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"`, `security

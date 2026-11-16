@@ -31,7 +31,7 @@ HARD_DAYS = int(os.getenv("POLICY_FRESHNESS_HARD_DAYS", "365"))
 # ── Paths that MUST carry the marker ─────────────────────────────────────────
 REQUIRED_DIRS: set[str] = {"user-docs"}
 ROOT_REQUIRED: set[str] = {"README.md", "AGENTS.md", "SPEC.md", "TODO.md"}
-REQUIRED_FILES: set[str] = {"dev-docs/README.md"}
+REQUIRED_FILES: set[str] = {"dev-docs/README.md", "dev-docs/releasing.md"}
 
 # ── Exempt path fragments ─────────────────────────────────────────────────────
 # Exemptions match whole path segments or leading path prefixes, never substrings,
@@ -92,8 +92,8 @@ def check(filepath: str) -> tuple[list[str], list[str]]:
         if is_required(path):
             errors.append(
                 f"{filepath}: missing 'Last reviewed: YYYY-MM-DD' marker. "
-                "Required in README.md, AGENTS.md, SPEC.md, TODO.md, user-docs/ "
-                "and dev-docs/README.md."
+                "Required in README.md, AGENTS.md, SPEC.md, TODO.md, user-docs/, "
+                "dev-docs/README.md and dev-docs/releasing.md."
             )
         return errors, warnings
 
