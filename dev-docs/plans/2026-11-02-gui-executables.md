@@ -371,18 +371,20 @@ it. The smoke-tested artifact is what ships, never a second local build.
       `check-test`, `check-audit`, `build-macos`, `sign-macos`, `publish`.
       `ci.yml` runs on pushes to `main` and on pull requests only, so a tag
       runs none of it. The three check jobs re-run those gates on both
-      triggers. `check-hooks` is `ci.yml`'s `checks` job copied step for
-      step: checkout with `fetch-depth: 0` and `persist-credentials: false`,
-      `setup-uv` at `version: "0.12.24"`, `uv sync --locked --no-build
-      --no-install-project` (the basedpyright hook runs through `uv run` and
-      needs only the source tree; SonarCloud S8541/S8544 forbid raw
-      `uv sync --locked`/`uv run`), then `uvx --no-build
+      triggers. `check-hooks` is `ci.yml`'s `checks` job with the same steps
+      except the sync, plus the tag check below; the checkout step with `fetch-depth: 0` and
+      `persist-credentials: false`, `setup-uv` at `version: "0.12.24"`,
+      `uv sync --locked --no-build --no-install-project` (the hardened sync —
+      hardened so SonarCloud's S8541 `--no-build` rule passes; the `check-pins`
+      and `basedpyright` hooks still run their own `uv run`, basedpyright with
+      `--group build`),
+      then `uvx --no-build
       pre-commit==4.7.0 run --all-files --show-diff-on-failure`. `check-audit` is `ci.yml`'s
       `audit` job unchanged (`pip-audit==2.10.1`). `check-test` is `ci.yml`'s
       `test` job — same runners, matrix and gates as `ci.yml`, with the
-      `uv` commands hardened for SonarCloud S8541/S8544 (`--no-build`,
-      `--no-install-project`, `PYTHONPATH=src`); a documented divergence from
-      `ci.yml`: `timeout-minutes: 30`, matrix
+      `uv` commands the documented divergence from `ci.yml` (hardened for Sonar
+      Cloud S8541/S8544: `--no-build`, `--no-install-project`, `PYTHONPATH=src`):
+      `timeout-minutes: 30`, matrix
       `os: [ubuntu-latest, macos-latest]` × `python: ["3.11", "3.13"]`,
       `fail-fast: false`, checkout with `persist-credentials: false`,
       `setup-uv` at `version: "0.12.24"` with
@@ -805,13 +807,14 @@ only if Phase 3 signing is approved. Linux needs no secrets, and
 - 2026-11-12: Step 5 Preview (NVIDIA). The three CodeRabbit edits stood.
   Rollback adds a temporary immutability bypass and removes it in the same
   session, before the tag-pushing account re-tags. `check-test` copies the
-  CI test job step for step, and `build-macos` waits on the check jobs so
+  CI test job. Superseded 2026-11-16: see round 2, and `build-macos` waits on the check jobs so
   a red gate never starts signing. Windows smoke extracts the shipped zip.
   The Linux archive is one `zipseal-gui/` directory with the binary at
   `0755`.
 
 - 2026-11-12: Self-review. `check-hooks` copies `ci.yml`'s `checks` job,
-  including `uv sync --locked`, which the basedpyright hook needs.
+  including `uv sync --locked`, which the basedpyright hook needs
+  (superseded 2026-11-16: see round 2).
   `sign-macos` uploads the signed DMG that `publish` collects.
   Step 5 Preview (NVIDIA) then confirmed both edits. `publish` downloads
   shipped artifacts by name. The PNG tests stay `gui`-marked. The `SPEC.md`
@@ -834,10 +837,16 @@ only if Phase 3 signing is approved. Linux needs no secrets, and
   draft-only release path is unchanged.
 
 - 2026-11-16 (round 2): SonarCloud (S8541/S8544) and CodeRabbit findings applied
-  to the same PR. The gate jobs sync with `--locked --no-build
-  --no-install-project` (zipseal imported from `src/`, not installed as a
-  wheel) so no PEP 517 backend runs. The ephemeral keychain idle lock is raised
-  with `security set-keychain-settings -lut 3600` so it survives notarization.
+  to the Phase 2 draft PR (#20). The `check-hooks` and `check-test` sync steps
+  use `--locked --no-build --no-install-project`, so those syncs build no
+  wheel and install no zipseal wheel; the dependencies still install, and
+  zipseal is imported from `src/` via `PYTHONPATH` in the fast suite. That
+  no-PEP-517-backend guarantee is limited to those syncs: any hook not given
+  those flags — currently `check-pins` and `basedpyright` — re-runs `uv run`,
+  which re-syncs and can build and install the project through `uv_build`
+  (`uv_build` resolves from the `build-system.requires` range, not `uv.lock`).
+  The ephemeral keychain idle lock is raised with
+  `security set-keychain-settings -lut 3600` so it survives notarization.
   The environment now carries both `v*` deployment policies (`branch` and
   `tag`); a branch policy alone does not match tag refs. The plan's
   environment/ruleset box stays unticked: the separate tag-pushing and

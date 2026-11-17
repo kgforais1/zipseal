@@ -229,15 +229,19 @@ an archive with a generated password, open it.
 |---|---|---|
 | `build-macos`, `sign-macos` | `macos-15` | 2026-11-15 |
 | `publish` | `ubuntu-24.04` (pinned; not `-latest`) | 2026-11-16 |
-| `check-hooks`, `check-audit` | `ubuntu-latest` (same as `ci.yml`; the `uv` steps are hardened, see below) | 2026-11-16 |
-| `check-test` | matrix `ubuntu-latest` and `macos-latest`, Python 3.11/3.13 (same runners as `ci.yml`; the `uv` steps are hardened, see below) | 2026-11-16 |
+| `check-hooks` | `ubuntu-latest` (same as `ci.yml`; the `uv sync` step is hardened, see below) | 2026-11-16 |
+| `check-audit` | `ubuntu-latest` (identical to `ci.yml`; nothing hardened) | 2026-11-16 |
+| `check-test` | matrix `ubuntu-latest` and `macos-latest`, Python 3.11/3.13 (same runners as `ci.yml`; the `uv` sync/pytest steps are hardened, see below) | 2026-11-16 |
 
 Only the build/sign/publish images are versioned labels per Decision 6 (a tag
 must not change under the project without a commit). The check jobs share
-`ci.yml`'s runners, runner labels and gates, but their `uv` commands are
-hardened for SonarCloud (`--no-build --no-install-project`, `PYTHONPATH=src`) —
-a deliberate, documented divergence from `ci.yml`, which `ci.yml` does not use. Bumping any of these
-labels is its own commit and is recorded here with the previous value.
+`ci.yml`'s runners, runner labels and gates, but their `uv sync` and pytest
+steps are hardened for SonarCloud (`--no-build --no-install-project`,
+`PYTHONPATH=src`) — a deliberate, documented divergence from `ci.yml`. The
+`check-pins` and `basedpyright` hooks still re-run their own `uv run`,
+basedpyright with `--group build`, so they can build and install the project
+through `uv_build`. Bumping any of these labels
+is its own commit and is recorded here with the previous value.
 
 ## Dispatch rehearsal
 

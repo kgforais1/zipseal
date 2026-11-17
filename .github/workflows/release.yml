@@ -14,8 +14,9 @@
 # branch, but runs the selected ref's copy.
 #
 # Actions are pinned by full SHA with the release tag as a comment; the
-# check-pins hook enforces it. Runner labels are versioned (never -latest), so
-# a tag cannot change under the project without a commit; a label bump is its
+# check-pins hook enforces it. Build, sign and publish run on versioned
+# labels; the check jobs keep ci.yml's `-latest` runners by contract (the same
+# gates as main's CI must not drift on the tag's image). A label bump is its
 # own commit, recorded in dev-docs/releasing.md.
 #
 # Actions usage: ~10 macOS minutes per tag (build + sign), plus Linux minutes
