@@ -14,18 +14,24 @@ as a downloaded app.
 | Role | Account |
 |---|---|
 | Pushes `v*` tags; the only bypass of the creation ruleset | `kgrizz-git` |
-| Required `release` reviewer; edits the rulesets | `kgforais1` |
+| Edits the rulesets | `kgforais1` |
+
+Both accounts are the maintainer's; the return of a genuine second-person
+control is a maintainer decision, not assumed here. As of 2026-11-17 the
+one-account control is accepted; see the environment section.
 
 The repository owner is also the tag-pushing account's operator: both accounts
-belong to the same person. The plan's split is therefore a two-account
-*convention* — the tag-pushing account cannot self-approve under
-`prevent_self_review` when self-review prevention is on — not a second-person
-control. As of 2026-11-16 the owner changed the required reviewer list and
-turned `prevent_self_review` off in the UI, so that convention is currently
-suspended; `can_admins_bypass` is likewise on. All three settings are recorded
-here, not assumed. The `v-tag-immutability` ruleset (empty bypass list) is the
-remaining structural control: it blocks an accidental or malicious tag move
-regardless of account.
+belong to the same person. As of 2026-11-16 the owner changed the required
+reviewer list and turned `prevent_self_review` off in the UI, and on 2026-11-17
+explicitly accepted the one-account control: the `release` environment is
+reviewed by the maintainer in whatever review list the owner keeps it in, and
+the tag-pushing account is the maintainer. The recorded settings (reviewers
+`kgforais1` and `kgrizz-git`, `prevent_self_review` off, `can_admins_bypass`
+on) are the accepted state, not an oversight. The `v-tag-immutability` ruleset
+(empty bypass list) is the remaining structural control: it blocks an
+accidental or malicious tag move regardless of account. If the owner later
+restores the two-account split, update this section and the plan's Phase 2 box
+text, and tick it as restored-and-verified instead of accepted.
 
 ## Repository protections
 
@@ -38,10 +44,9 @@ regardless of account.
   branch-only policy does not apply to tags).
 - Required reviewers: **`kgforais1` and `kgrizz-git`** — the repository owner
   changed the required reviewer list in the UI, with both accounts being the
-  same person's. The intended split (owner reviews; tag-pushing account cannot
-  self-approve) therefore does not currently hold as the plan specifies; it
-  is equivalent to a single person holding both roles.
-- Prevent self-review: **off** (same UI change; see above).
+  maintainer's. The intended split no longer holds; the maintainer accepted
+  the one-account control on 2026-11-17.
+- Prevent self-review: **off** (accepted; see above).
 - Allow administrators to bypass: **on**. The environments REST API has no
   body parameter for this (`wait_timer`, `prevent_self_review`, `reviewers`,
   `deployment_branch_policy` only), so it cannot be verified or set from a
@@ -180,8 +185,9 @@ switch to it.
    `git tag v<version> && git push origin v<version>`.
 3. `release.yml` runs: the three check jobs re-run `ci.yml`'s gates, then
    `build-macos` freezes the unsigned `.app`, smoke-tests it, and uploads it.
-   `sign-macos` waits for a `kgforais1` approval, then signs, notarizes and
-   staples the `.app` and the DMG. `publish` verifies the tag still points at
+   `sign-macos` waits for the maintainer's approval on the `release` environment
+   (one-account control, accepted 2026-11-17 — see the environment section),
+   then signs, notarizes and staples the `.app` and the DMG. `publish` verifies the tag still points at
    the tagged commit, writes `SHA256SUMS`, attests the artifact and the sums,
    and creates a **draft** release.
 4. Do the manual acceptance below on a machine with no Python on `PATH`.

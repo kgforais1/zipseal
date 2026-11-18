@@ -280,18 +280,21 @@ it. The smoke-tested artifact is what ships, never a second local build.
 
 ## Phase 2 — macOS signing, notarization & release pipeline (milestone M2)
 
-- [ ] Create the `release` environment and two `v*` tag rulesets before any
-      signing secret is stored. Blocked 2026-11-16: the environment exists, but
-      the maintainer changed its required reviewers and `prevent_self_review`
-      in the UI (both accounts are theirs), so the separate tag-pushing and
-      reviewer-account control does not hold; obtain explicit acceptance of a
-      single-account control or restore the UI settings.
-      Note: Deployment branches and tags are `v*` only.
+- [x] Create the `release` environment and two `v*` tag rulesets before any
+      signing secret is stored. Deployment branches and tags are `v*` only,
+      with both a `branch` and a `tag` policy, recorded in `dev-docs/releasing.md`
+      together with the exact calls. The maintainer changed the environment in
+      the UI (required reviewers `kgforais1` and `kgrizz-git`,
+      `prevent_self_review` off, `can_admins_bypass` on) and on 2026-11-17
+      explicitly accepted the one-account control; both accounts are theirs,
+      so the approval is the maintainer's own. The two rulesets are as
+      specified: creation limited to the tag-pushing account, immutability
+      with an empty bypass list, so a tag move is blocked regardless of
+      account.
+      Note:
       Created 2026-11-15/2026-11-16 under `kgforais1`'s fine-grained PAT via
       `.context/gh-pat.sh`; see `dev-docs/releasing.md` for the exact calls and
-      for the live state (the owner subsequently changed the required reviewer
-      list and `prevent_self_review` in the UI; both accounts are the
-      maintainer's). No Apple secret has been stored yet. The two rulesets are
+      for the live state. No Apple secret has been stored yet. The two rulesets are
       as specified: creation limited to the tag-pushing account, immutability
       with an empty bypass list.
       The control is the two-account split: tag pushes are created by
@@ -852,6 +855,16 @@ only if Phase 3 signing is approved. Linux needs no secrets, and
   environment/ruleset box stays unticked: the separate tag-pushing and
   reviewer-account control does not hold after the maintainer's UI change, and
   it needs a deliberate decision (restore the settings, or explicit acceptance
-  of a single-account control). The secret-storage prerequisite is recorded as
+  of a single-account control). (Superseded 2026-11-17: one-account control
+  accepted; see the next entry.) The secret-storage prerequisite is recorded as
   "after protection review, before the first tag", not blocked on a draft
   acceptance, because `sign-macos` itself needs the secrets.
+
+- 2026-11-17: The maintainer explicitly accepted the one-account control for
+  the `release` environment (both accounts are theirs): reviewers
+  `kgforais1`/`kgrizz-git`, `prevent_self_review` off, `can_admins_bypass` on.
+  The plan's environment/ruleset box is ticked on that acceptance; the
+  two-account split is no longer required for the approval to count. The
+  `v-tag-immutability` ruleset (empty bypass list) remains the structural
+  control and is unchanged. `dev-docs/releasing.md` records the accepted
+  state.

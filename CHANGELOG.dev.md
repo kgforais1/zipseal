@@ -114,10 +114,10 @@ edits and refactors. User-visible changes go in [`CHANGELOG.md`](CHANGELOG.md).
   environment's live settings recorded after a UI edit), the `v*` environment
   and rulesets, the secret names, the rollback procedure and the acceptance
   checklist; `check-doc-freshness` now requires its `Last reviewed` marker.
-  The plan's Phase 0 `packaging/` box is ticked, Phase 2's environment/ruleset
-  box stays unticked: the environment exists but the two-account control does
-  not hold after the maintainer's UI change. No Apple secrets are stored yet;
-  the review changes are logged in the plan.
+  The plan's Phase 0 `packaging/` box is ticked, and Phase 2's
+  environment/ruleset box is ticked on the maintainer's 2026-11-17 acceptance
+  of a one-account control (both accounts are theirs). No Apple secrets are
+  stored yet; the review changes are logged in the plan.
 
 ### Changed
 
