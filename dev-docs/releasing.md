@@ -28,8 +28,11 @@ reviewed by the maintainer in whatever review list the owner keeps it in, and
 the tag-pushing account is the maintainer. The recorded settings (reviewers
 `kgforais1` and `kgrizz-git`, `prevent_self_review` off, `can_admins_bypass`
 on) are the accepted state, not an oversight. The `v-tag-immutability` ruleset
-(empty bypass list) is the remaining structural control: it blocks an
-accidental or malicious tag move regardless of account. If the owner later
+(empty bypass list) is the remaining structural control: while the ruleset is
+active it blocks an accidental or malicious tag move regardless of account. It
+does not stop an actor with ruleset-editing access (the repository owner or an
+admin) from changing or disabling the ruleset and then moving the tag; that
+residual risk rests on the owner account's own security. If the owner later
 restores the two-account split, update this section and the plan's Phase 2 box
 text, and tick it as restored-and-verified instead of accepted.
 
@@ -58,7 +61,10 @@ text, and tick it as restored-and-verified instead of accepted.
 
 `environment` is job-level, so only `sign-macos` requests it. `build-macos` runs
 on both triggers with no environment and no secrets; a `workflow_dispatch`
-cannot reach the secrets because `sign-macos` is event-guarded.
+cannot reach the secrets because `sign-macos` is event-guarded. Before any step
+reads a secret, `sign-macos` checks out full history and fails unless the tagged
+commit is an ancestor of `origin/main`, so a version-matching tag on an
+unreviewed commit never runs `packaging/build.py` with the Apple secrets.
 
 ### Tag rulesets
 
@@ -174,7 +180,16 @@ is a deliberate tension with AGENTS.md's "never put a password in argv": the
 values are not printed to the log, the runner is destroyed afterwards, and the
 alternative (an expect-like wrapper or a passwordless keychain) would weaken
 hardening rather than help. If a stdin path appears in a future `security`,
-switch to it.
+switch to it. Sourcery raised this on PR #20 (2026-11-18, "Signing credentials
+appear in process arguments") and it was declined for the reason above. The
+residual risk is concrete: for the few milliseconds each `security` call runs,
+another process on the same runner, running as the same user, could read the
+two passwords from the process table. Only this job's own steps run there, and
+only after the tagged commit is verified on `main`. Neither password unlocks
+anything outside that job: the keychain is deleted at the end, and the `.p12`
+password is useless without the `.p12`, which is deleted right after import.
+The other secrets (`.p12`, `.p8`) reach disk through stdin, never argv, and are
+deleted after use.
 
 ## Tag to release
 
@@ -189,7 +204,14 @@ switch to it.
    (one-account control, accepted 2026-11-17 — see the environment section),
    then signs, notarizes and staples the `.app` and the DMG. `publish` verifies the tag still points at
    the tagged commit, writes `SHA256SUMS`, attests the artifact and the sums,
-   and creates a **draft** release.
+   and creates a **draft** release. The signature gate runs `stapler validate`
+   on the DMG and on the unmounted, stapled `.app`. The app inside the mounted
+   DMG gets `codesign --verify --deep --strict` and `spctl --assess` only,
+   because `hdiutil` can drop the staple ticket's xattr. `check-audit` audits
+   the runtime dependencies plus the `build` group (PyInstaller, Pillow).
+   A re-run after a failed `publish` reuses the existing draft and replaces
+   its assets (`gh release upload --clobber`). It fails rather than touch a
+   release that is already published.
 4. Do the manual acceptance below on a machine with no Python on `PATH`.
 5. Publish the draft. The workflow never publishes a final release.
 
@@ -254,7 +276,8 @@ is its own commit and is recorded here with the previous value.
 `workflow_dispatch` runs `check-hooks`, `check-test`, `check-audit` and, only if
 those pass, `build-macos`. It skips `sign-macos` and `publish`: no `release`
 environment and no secrets. The tag-equals-version check stays tag-push only.
-`workflow_dispatch` requires the workflow on the default branch, but a dispatch
-can select another ref and runs that ref's copy, so dispatching a branch
-exercises the branch, not `main`. Pushing a tag is what creates the draft
+`workflow_dispatch` is accepted only on `refs/heads/main`. `check-hooks` fails a
+dispatch on any other ref, and `build-macos` (the only dispatch job holding
+`actions: write`) is also guarded on the ref, so a branch cannot be rehearsed
+this way. Rehearse after merging to `main`. Pushing a tag is what creates the draft
 release, so a rehearsal tag would not do.

@@ -10,8 +10,13 @@
 #
 # A workflow_dispatch rehearsal runs the gates and build-macos only: sign-macos
 # and publish are event-guarded, so a dispatch never sees the Apple secrets and
-# never creates a release. workflow_dispatch needs the workflow on the default
-# branch, but runs the selected ref's copy.
+# never creates a release. A dispatch is accepted only on refs/heads/main:
+# check-hooks fails any other ref, and build-macos (the only dispatch job with
+# actions: write) is also guarded on the ref.
+#
+# sign-macos refuses a tag whose commit is not on main before any secret is
+# read, so a version-matching tag on an unreviewed commit cannot reach the
+# Apple secrets.
 #
 # Actions are pinned by full SHA with the release tag as a comment; the
 # check-pins hook enforces it. Build, sign and publish run on versioned
@@ -37,9 +42,10 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  # packaging/build.py pins the same interpreter; keep both strings equal if
-  # you bump one (check_pins forces a literal version: for setup-uv, so the
-  # pin cannot come from this block).
+  # packaging/build.py pins the same interpreter; check-hooks fails if the two
+  # strings differ (build.py must stay runnable on its own for local builds,
+  # and check_pins forces a literal version: for setup-uv, so neither pin can
+  # come from the other).
   BUILD_PYTHON: "3.13.17"
 
 jobs:
@@ -61,12 +67,37 @@ jobs:
       # and reinstall the wheel-only project and the build group, as in ci.yml.
       - run: uv sync --locked --no-build --no-install-project
       - run: uvx --no-build pre-commit==4.7.0 run --all-files --show-diff-on-failure
+      - name: Dispatch only on main
+        if: github.event_name == 'workflow_dispatch' && github.ref != 'refs/heads/main'
+        run: |
+          echo "::error::workflow_dispatch is accepted only on refs/heads/main, not $GITHUB_REF"
+          exit 1
+      - name: Build interpreter pins agree
+        env:
+          WORKFLOW_PIN: ${{ env.BUILD_PYTHON }}
+        run: |
+          uv run --no-project --python "$WORKFLOW_PIN" python - "$WORKFLOW_PIN" <<'PY'
+          import re
+          import sys
+
+          workflow_pin = sys.argv[1]
+          with open("packaging/build.py", encoding="utf-8") as handle:
+              match = re.search(r'^BUILD_PYTHON = "([^"]+)"$', handle.read(), re.MULTILINE)
+          if match is None:
+              raise SystemExit("packaging/build.py has no BUILD_PYTHON = \"...\" line")
+          if match.group(1) != workflow_pin:
+              raise SystemExit(
+                  f"release.yml BUILD_PYTHON {workflow_pin!r} != "
+                  f"packaging/build.py BUILD_PYTHON {match.group(1)!r}; bump both"
+              )
+          print(f"build interpreter pin {workflow_pin} agrees")
+          PY
       # Decision 9: compare the whole tag. Stripping a prefix would accept a tag
       # the rule rejects (`vv0.1.0` via lstrip, `0.1.0` via removeprefix).
       - name: Tag equals the project version
         if: github.event_name == 'push'
         run: |
-          python3 - "$GITHUB_REF_NAME" <<'PY'
+          uv run --no-project --python ${{ env.BUILD_PYTHON }} python - "$GITHUB_REF_NAME" <<'PY'
           import sys
           import tomllib
 
@@ -125,12 +156,17 @@ jobs:
       - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884  # v10.3.0
         with:
           version: "0.12.24"
-      - run: uv export --locked --no-dev --no-hashes --format requirements-txt -o "$RUNNER_TEMP/req.txt"
+      # --group build: build-macos freezes the app with the build group
+      # (PyInstaller, Pillow), so it must reach the audit too (latest-deps.yml
+      # syncs --group build for the same reason). The dev group stays out.
+      - run: uv export --locked --no-dev --group build --no-hashes --format requirements-txt -o "$RUNNER_TEMP/req.txt"
       - run: uvx --no-build pip-audit==2.10.1 -r "$RUNNER_TEMP/req.txt"
 
   build-macos:
     name: Build macOS app
     needs: [check-hooks, check-test, check-audit]
+    # actions: write must not run for an arbitrary dispatched ref.
+    if: github.event_name == 'push' || github.ref == 'refs/heads/main'
     runs-on: macos-15
     timeout-minutes: 30
     permissions:
@@ -146,7 +182,7 @@ jobs:
       - name: Read the project version
         id: version
         run: |
-          version=$(python3 -c 'import tomllib; print(tomllib.load(open("pyproject.toml", "rb"))["project"]["version"])')
+          version=$(uv run --no-project --python ${{ env.BUILD_PYTHON }} python -c 'import tomllib; print(tomllib.load(open("pyproject.toml", "rb"))["project"]["version"])')
           echo "version=$version" >> "$GITHUB_OUTPUT"
       - run: uv python install ${{ env.BUILD_PYTHON }}
       - name: Freeze the app (unsigned)
@@ -209,14 +245,26 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
+          fetch-depth: 0
           persist-credentials: false
+      # Before any step reads a secret: the tagged commit must already be on
+      # the protected default branch, so an unreviewed commit under a
+      # version-matching tag fails here instead of running build.py with the
+      # Apple secrets present.
+      - name: Tagged commit is on main
+        run: |
+          if ! git merge-base --is-ancestor "$GITHUB_SHA" origin/main; then
+            echo "::error::$GITHUB_REF_NAME ($GITHUB_SHA) is not on origin/main; refusing to sign"
+            exit 1
+          fi
+          echo "$GITHUB_SHA is on origin/main"
       - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884  # v10.3.0
         with:
           version: "0.12.24"
       - name: Read the project version
         id: version
         run: |
-          version=$(python3 -c 'import tomllib; print(tomllib.load(open("pyproject.toml", "rb"))["project"]["version"])')
+          version=$(uv run --no-project --python ${{ env.BUILD_PYTHON }} python -c 'import tomllib; print(tomllib.load(open("pyproject.toml", "rb"))["project"]["version"])')
           echo "version=$version" >> "$GITHUB_OUTPUT"
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333  # v8.0.2
         with:
@@ -236,7 +284,7 @@ jobs:
         run: |
           keychain="$RUNNER_TEMP/build.keychain"
           echo "KEYCHAIN_PATH=$keychain" >> "$GITHUB_ENV"
-          printf '%s' "$APPLE_CERT_P12" | base64 --decode > "$RUNNER_TEMP/cert.p12"
+          printf '%s' "$APPLE_CERT_P12" | base64 -d > "$RUNNER_TEMP/cert.p12"
           security create-keychain -p "$KEYCHAIN_PASSWORD" "$keychain"
           # Five minutes idle would lock it before DMG signing; give it an hour.
           security set-keychain-settings -lut 3600 "$keychain"
@@ -301,7 +349,7 @@ jobs:
           APPLE_API_PRIVATE_KEY: ${{ secrets.APPLE_API_PRIVATE_KEY }}
         run: |
           app="dist/${{ steps.version.outputs.version }}/zipseal-gui.app"
-          printf '%s' "$APPLE_API_PRIVATE_KEY" | base64 --decode > "$RUNNER_TEMP/AuthKey.p8"
+          printf '%s' "$APPLE_API_PRIVATE_KEY" | base64 -d > "$RUNNER_TEMP/AuthKey.p8"
           ditto -c -k --keepParent "$app" "$RUNNER_TEMP/zipseal-gui-app.zip"
           xcrun notarytool submit "$RUNNER_TEMP/zipseal-gui-app.zip" --wait \
             --key "$RUNNER_TEMP/AuthKey.p8" \
@@ -317,8 +365,9 @@ jobs:
         run: |
           version="${{ steps.version.outputs.version }}"
           # Phase 1's hdiutil recipe, reached through build.py so the workflow
-          # and a local build cannot drift.
-          python3 - "$version" <<'PY'
+          # and a local build cannot drift. --no-project: no project sync (and
+          # no build backend) runs while the API key is in the environment.
+          uv run --no-project --python ${{ env.BUILD_PYTHON }} python - "$version" <<'PY'
           import importlib.util
           import pathlib
           import sys
@@ -332,7 +381,7 @@ jobs:
           dmg="dist/$version/zipseal-gui-$version-macos-arm64.dmg"
           # Hardened runtime does not apply to a disk image.
           codesign --force --timestamp --sign "$IDENTITY" "$dmg"
-          printf '%s' "$APPLE_API_PRIVATE_KEY" | base64 --decode > "$RUNNER_TEMP/AuthKey.p8"
+          printf '%s' "$APPLE_API_PRIVATE_KEY" | base64 -d > "$RUNNER_TEMP/AuthKey.p8"
           xcrun notarytool submit "$dmg" --wait \
             --key "$RUNNER_TEMP/AuthKey.p8" \
             --key-id "$APPLE_API_KEY_ID" \
@@ -341,7 +390,10 @@ jobs:
           rm "$RUNNER_TEMP/AuthKey.p8"
       - name: Gate on the signatures
         # Validate the app the user actually runs, not only the pre-image.
-        # hdiutil drops custom xattrs, so check the shipped bytes.
+        # hdiutil drops custom xattrs, which can include the app's stapled
+        # ticket, so stapler validates the DMG and the unmounted (stapled)
+        # app; the mounted copy gets codesign and spctl only (Gatekeeper
+        # resolves its ticket online or via the DMG's staple).
         run: |
           set -e
           app="dist/${{ steps.version.outputs.version }}/zipseal-gui.app"
@@ -351,9 +403,9 @@ jobs:
           xcrun stapler validate "$dmg"
           spctl --assess -t exec -v "$app"
           spctl --assess -t open --context context:primary-signature -v "$dmg"
+          mkdir -p "$mountpoint"
           hdiutil attach -nobrowse -readonly -mountpoint "$mountpoint" "$dmg"
           trap 'hdiutil detach "$mountpoint" || true' EXIT
-          xcrun stapler validate "$mountpoint/zipseal-gui.app"
           codesign --verify --deep --strict "$mountpoint/zipseal-gui.app"
           spctl --assess -t exec -v "$mountpoint/zipseal-gui.app"
           hdiutil detach "$mountpoint"
@@ -383,6 +435,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
           fetch-depth: 0
+      # ubuntu-24.04's python3 is 3.12; this script needs no tomllib.
       - name: Verify the tag points at this commit
         env:
           GH_TOKEN: ${{ github.token }}
@@ -461,11 +514,26 @@ jobs:
             echo "gh attestation verify zipseal-gui-$version-macos-arm64.dmg --repo kgforais1/zipseal"
             echo '```'
           } > "$notes"
-          gh release create "$GITHUB_REF_NAME" \
-            --draft \
-            --verify-tag \
-            --title "zipseal-gui $version" \
-            --notes-file "$notes" \
-            artifacts/zipseal-gui-*.dmg \
-            artifacts/build-info.json \
-            artifacts/SHA256SUMS
+          # A re-run after a partial run reuses the existing draft and
+          # replaces its assets; a published release is never touched.
+          if is_draft=$(gh release view "$GITHUB_REF_NAME" --json isDraft --jq .isDraft 2>/dev/null); then
+            if [ "$is_draft" != "true" ]; then
+              echo "::error::release $GITHUB_REF_NAME is already published; not modifying it"
+              exit 1
+            fi
+            gh release edit "$GITHUB_REF_NAME" --draft \
+              --title "zipseal-gui $version" --notes-file "$notes"
+            gh release upload "$GITHUB_REF_NAME" --clobber \
+              artifacts/zipseal-gui-*.dmg \
+              artifacts/build-info.json \
+              artifacts/SHA256SUMS
+          else
+            gh release create "$GITHUB_REF_NAME" \
+              --draft \
+              --verify-tag \
+              --title "zipseal-gui $version" \
+              --notes-file "$notes" \
+              artifacts/zipseal-gui-*.dmg \
+              artifacts/build-info.json \
+              artifacts/SHA256SUMS
+          fi

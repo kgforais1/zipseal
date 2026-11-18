@@ -494,9 +494,10 @@ it. The smoke-tested artifact is what ships, never a second local build.
       full pytest matrix and the dependency audit; the tag-equals-version
       requirement stays tag-push only (Decision 9).
       `workflow_dispatch` requires the workflow on the default branch, so this
-      is available once `release.yml` is merged to `main`; a dispatch can still
-      select another ref and runs that ref's copy, so dispatching a branch
-      exercises the branch, not `main`. Pushing a tag is what creates the draft
+      is available once `release.yml` is merged to `main`. A dispatch is
+      accepted only on `refs/heads/main` (amended 2026-11-18): `check-hooks`
+      fails any other ref and `build-macos` is guarded on the ref, so a branch
+      cannot be rehearsed. Pushing a tag is what creates the draft
       release, so a rehearsal tag would not do.
       Then the first real run at the next version bump; v0.1.0 stays
       source-only.
@@ -868,3 +869,28 @@ only if Phase 3 signing is approved. Linux needs no secrets, and
   `v-tag-immutability` ruleset (empty bypass list) remains the structural
   control and is unchanged. `dev-docs/releasing.md` records the accepted
   state.
+
+- 2026-11-18: Sourcery and CodeRabbit findings on PR #20 resolved.
+  `sign-macos` now fails before any secret is read unless the tagged commit is
+  an ancestor of `origin/main`. A `workflow_dispatch` is accepted only on
+  `refs/heads/main`; this replaces the "Rehearse first" box's "a dispatch can
+  select another ref" wording. `check-audit` exports the `build` group too.
+  `check-hooks` fails if `env.BUILD_PYTHON` differs from `packaging/build.py`'s
+  constant. Every tomllib/build.py Python step runs on the pinned
+  `BUILD_PYTHON` via `uv run --no-project`; `publish` keeps ubuntu-24.04's
+  Python 3.12 for a script without tomllib. Secret decoding uses `base64 -d`,
+  which macOS and GNU both accept. The DMG mountpoint is created before
+  `hdiutil attach`. The signature gate changed: `stapler validate` runs on the
+  DMG and the unmounted stapled app; the mounted app gets `codesign --verify
+  --deep --strict` and `spctl --assess -t exec` only, because `hdiutil` can drop
+  the staple xattr. `publish` reuses an existing draft and replaces its assets
+  with `--clobber`, and refuses a published release. SPEC.md now says the macOS
+  DMG path is implemented (draft-only, pending M2 acceptance) and Windows and
+  Linux remain planned. `releasing.md` qualifies the `v-tag-immutability`
+  guarantee: it holds only while the ruleset is active, not against an actor
+  who can edit or disable it. Declined: the argv finding for
+  `KEYCHAIN_PASSWORD`/`APPLE_CERT_PASSWORD`, because `security` has no stdin
+  path. The accepted-risk wording in `releasing.md` is that a same-user
+  process on the runner could read the two passwords from the process table
+  while a `security` call runs, and that neither password is useful outside
+  the job.
