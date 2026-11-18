@@ -907,3 +907,12 @@ only if Phase 3 signing is approved. Linux needs no secrets, and
   the `KEYCHAIN_PASSWORD` secret is retired; its argv exposure now reveals
   nothing outside the job. `APPLE_CERT_PASSWORD` remains the one argv
   exception.
+
+- 2026-11-18 (round 3): CodeRabbit findings applied. Immutable releases were
+  enabled on the repository (owner PAT), so `publish`'s draft-reuse path cannot
+  modify a release published mid-run; the `isDraft` re-read stays as a clear
+  early failure. `releasing.md` now says a same-user process that captures
+  `APPLE_CERT_PASSWORD` from argv could also copy `cert.p12` during import and
+  sign off-runner until the certificate is revoked, with revoke-and-rotate as
+  the response. The stale `actions: write` claim was removed from the dispatch
+  section.

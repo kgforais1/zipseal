@@ -56,6 +56,9 @@ text, and tick it as restored-and-verified instead of accepted.
   script. To turn it off: Settings → Environments → `release` → uncheck
   "Allow administrators to bypass".
 - Wait timer: 0.
+- Immutable releases: **on** (enabled 2026-11-18 with the owner PAT). A
+  published release's assets and tag cannot change; drafts stay editable.
+  Verify with `gh api repos/kgforais1/zipseal/immutable-releases` (owner token).
 - Secrets: the six Apple secrets below were stored on 2026-11-18. A seventh,
   `KEYCHAIN_PASSWORD`, was stored the same day and deleted later that day: the
   workflow now generates the keychain password per run.
@@ -182,14 +185,19 @@ alternative (an expect-like wrapper or a passwordless keychain) would weaken
 hardening rather than help. If a stdin path appears in a future `security`,
 switch to it. Sourcery raised this on PR #20 (2026-11-18, "Signing credentials
 appear in process arguments") and it was declined for the reason above. The
-residual risk is concrete: for the few milliseconds each `security` call runs,
-another process on the same runner, running as the same user, could read the
-two passwords from the process table. Only this job's own steps run there, and
-only after the tagged commit is verified on `main`. Neither password unlocks
-anything outside that job: the keychain is deleted at the end, and the `.p12`
-password is useless without the `.p12`, which is deleted right after import.
-The other secrets (`.p12`, `.p8`) reach disk through stdin, never argv, and are
-deleted after use.
+residual risk is concrete: while each `security` call runs, another process on
+the same runner, running as the same user, could read the passwords from the
+process table. The keychain password is generated per run and guards a keychain
+deleted at the end of the job, so leaking it reveals nothing. The `.p12`
+password is different. A same-user process that captures it from argv could
+also copy `cert.p12` while it sits on disk during import. That pair can be
+taken off the runner and used to sign as the Developer ID until the
+certificate is revoked. The mitigation is that only this job's own steps run on
+the runner, and only after the tagged commit is verified on `main`; a
+compromised dependency running in those steps could equally read the secrets
+from its environment. If this exposure is suspected, revoke the certificate and
+rotate `APPLE_CERT_P12` and `APPLE_CERT_PASSWORD`. The `.p12` and `.p8` reach
+disk through stdin, never argv, and are deleted after use.
 
 ## Tag to release
 
@@ -211,7 +219,8 @@ deleted after use.
    the runtime dependencies plus the `build` group (PyInstaller, Pillow).
    A re-run after a failed `publish` reuses the existing draft and replaces
    its assets (`gh release upload --clobber`). It fails rather than touch a
-   release that is already published.
+   release that is already published; immutable releases enforce that
+   server-side even if the draft is published while the job runs.
 4. Do the manual acceptance below on a machine with no Python on `PATH`.
 5. Publish the draft. The workflow never publishes a final release.
 
@@ -219,7 +228,9 @@ deleted after use.
 
 ## Rollback
 
-A published draft can be deleted from the Releases page. A tag needs the
+A published release is immutable: its assets cannot be replaced, so a bad
+published release is fixed by a new version, not by editing it. A draft can be
+deleted from the Releases page. A tag needs the
 immutability ruleset temporarily opened, and the ruleset can only be edited by
 `kgforais1`:
 
@@ -277,7 +288,6 @@ is its own commit and is recorded here with the previous value.
 those pass, `build-macos`. It skips `sign-macos` and `publish`: no `release`
 environment and no secrets. The tag-equals-version check stays tag-push only.
 `workflow_dispatch` is accepted only on `refs/heads/main`. `check-hooks` fails a
-dispatch on any other ref, and `build-macos` (the only dispatch job holding
-`actions: write`) is also guarded on the ref, so a branch cannot be rehearsed
+dispatch on any other ref, and `build-macos` is also guarded on the ref, so a branch cannot be rehearsed
 this way. Rehearse after merging to `main`. Pushing a tag is what creates the draft
 release, so a rehearsal tag would not do.

@@ -521,7 +521,10 @@ jobs:
             echo '```'
           } > "$notes"
           # A re-run after a partial run reuses the existing draft and
-          # replaces its assets; a published release is never touched.
+          # replaces its assets. The isDraft re-read is only a fast, clear
+          # failure: the race (the maintainer publishing mid-run) is closed
+          # server-side by the repository's immutable releases setting, so
+          # edit/upload against a published release fail instead of changing it.
           if is_draft=$(gh release view "$GITHUB_REF_NAME" --json isDraft --jq .isDraft 2>/dev/null); then
             if [ "$is_draft" != "true" ]; then
               echo "::error::release $GITHUB_REF_NAME is already published; not modifying it"
