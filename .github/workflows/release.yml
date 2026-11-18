@@ -11,8 +11,9 @@
 # A workflow_dispatch rehearsal runs the gates and build-macos only: sign-macos
 # and publish are event-guarded, so a dispatch never sees the Apple secrets and
 # never creates a release. A dispatch is accepted only on refs/heads/main:
-# check-hooks fails any other ref, and build-macos (the only dispatch job with
-# actions: write) is also guarded on the ref.
+# check-hooks fails any other ref, and build-macos is also guarded on the ref.
+# No job holds actions: write; artifact upload/download within a run uses
+# ACTIONS_RUNTIME_TOKEN, not GITHUB_TOKEN.
 #
 # sign-macos refuses a tag whose commit is not on main before any secret is
 # read, so a version-matching tag on an unreviewed commit cannot reach the
@@ -165,13 +166,12 @@ jobs:
   build-macos:
     name: Build macOS app
     needs: [check-hooks, check-test, check-audit]
-    # actions: write must not run for an arbitrary dispatched ref.
+    # Belt and braces with check-hooks' dispatch guard.
     if: github.event_name == 'push' || github.ref == 'refs/heads/main'
     runs-on: macos-15
     timeout-minutes: 30
     permissions:
       contents: read
-      actions: write
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
@@ -241,7 +241,6 @@ jobs:
     timeout-minutes: 45
     permissions:
       contents: read
-      actions: write
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
@@ -280,8 +279,11 @@ jobs:
         env:
           APPLE_CERT_P12: ${{ secrets.APPLE_CERT_P12 }}
           APPLE_CERT_PASSWORD: ${{ secrets.APPLE_CERT_PASSWORD }}
-          KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
         run: |
+          # Generated per run, not a secret: it guards a keychain deleted at
+          # the end of this job, so its argv exposure reveals nothing.
+          KEYCHAIN_PASSWORD=$(openssl rand -base64 32)
+          echo "::add-mask::$KEYCHAIN_PASSWORD"
           keychain="$RUNNER_TEMP/build.keychain"
           echo "KEYCHAIN_PATH=$keychain" >> "$GITHUB_ENV"
           printf '%s' "$APPLE_CERT_P12" | base64 -d > "$RUNNER_TEMP/cert.p12"
@@ -340,7 +342,11 @@ jobs:
           codesign --verify --deep --strict "$app"
           info=$(codesign -dv --verbose=4 "$app" 2>&1)
           printf '%s\n' "$info" | grep -q 'Authority=Developer ID Application:'
-          printf '%s\n' "$info" | grep -q "TeamIdentifier=$APPLE_TEAM_ID"
+          if [ -z "$APPLE_TEAM_ID" ]; then
+            echo "::error::APPLE_TEAM_ID is unset in the release environment"
+            exit 1
+          fi
+          printf '%s\n' "$info" | grep -qx "TeamIdentifier=$APPLE_TEAM_ID"
           printf '%s\n' "$info" | grep -q 'flags=0x10000(runtime)'
       - name: Notarize and staple the app
         env:
@@ -430,11 +436,11 @@ jobs:
       contents: write
       id-token: write
       attestations: write
-      actions: read
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
           fetch-depth: 0
+          persist-credentials: false
       # ubuntu-24.04's python3 is 3.12; this script needs no tomllib.
       - name: Verify the tag points at this commit
         env:
@@ -496,7 +502,7 @@ jobs:
             echo "source-installable:"
             echo
             echo '```sh'
-            echo "uv tool install git+https://github.com/kgforais1/zipseal.git"
+            echo "uv tool install git+https://github.com/kgforais1/zipseal.git@$GITHUB_REF_NAME"
             echo '```'
             echo
             echo "## Build info"

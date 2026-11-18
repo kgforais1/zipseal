@@ -687,7 +687,8 @@ Python, dated per platform here, is the blocking gate for publish.
 
 `APPLE_CERT_P12` (base64 Developer ID Application .p12), `APPLE_CERT_PASSWORD`,
 `APPLE_TEAM_ID`, `APPLE_API_KEY_ID`, `APPLE_API_ISSUER_ID`,
-`APPLE_API_PRIVATE_KEY` (base64 .p8), `KEYCHAIN_PASSWORD` (ephemeral chain).
+`APPLE_API_PRIVATE_KEY` (base64 .p8). The ephemeral keychain password is
+generated per run with `openssl rand`, not stored (amended 2026-11-18).
 All Apple secrets live in the protected `release` environment (deployment
 limited to `v*` tags). The reviewer split is the one in the `release.yml`
 bullet: a second account, Prevent self-review on, administrator bypass off.
@@ -894,3 +895,15 @@ only if Phase 3 signing is approved. Linux needs no secrets, and
   process on the runner could read the two passwords from the process table
   while a `security` call runs, and that neither password is useful outside
   the job.
+
+- 2026-11-18 (round 2): Hyrax findings on PR #20 applied. The `publish`
+  checkout sets `persist-credentials: false`. `build-macos` and `sign-macos`
+  drop `actions: write` and `publish` drops `actions: read`, because
+  same-run artifact transfer uses `ACTIONS_RUNTIME_TOKEN`; the main-only
+  dispatch guard stays as a second check. The release notes pin the CLI
+  install line to the tag. The TeamIdentifier gate fails on an empty
+  `APPLE_TEAM_ID` and matches the whole line. Separately, the keychain
+  password is generated per run with `openssl rand -base64 32` and masked, so
+  the `KEYCHAIN_PASSWORD` secret is retired; its argv exposure now reveals
+  nothing outside the job. `APPLE_CERT_PASSWORD` remains the one argv
+  exception.

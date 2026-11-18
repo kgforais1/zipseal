@@ -56,8 +56,9 @@ text, and tick it as restored-and-verified instead of accepted.
   script. To turn it off: Settings → Environments → `release` → uncheck
   "Allow administrators to bypass".
 - Wait timer: 0.
-- Secrets: none stored yet. Add them no earlier than when the M2 acceptance is
-  actually due; do not store placeholder or throwaway values.
+- Secrets: the six Apple secrets below were stored on 2026-11-18. A seventh,
+  `KEYCHAIN_PASSWORD`, was stored the same day and deleted later that day: the
+  workflow now generates the keychain password per run.
 
 `environment` is job-level, so only `sign-macos` requests it. `build-macos` runs
 on both triggers with no environment and no secrets; a `workflow_dispatch`
@@ -165,7 +166,6 @@ tags and requires the reviewer above.
 | `APPLE_API_KEY_ID` | App Store Connect API key id |
 | `APPLE_API_ISSUER_ID` | App Store Connect API issuer id |
 | `APPLE_API_PRIVATE_KEY` | base64-encoded `.p8` private key |
-| `KEYCHAIN_PASSWORD` | ephemeral CI keychain password |
 
 Origin: the certificate and API key come from the Apple Developer account that
 already exists for this project. Rotation: re-export the `.p12` and `.p8`,
@@ -174,7 +174,7 @@ needed. Never put a secret value in this file, a workflow, a log or a test.
 
 **Known exception, recorded deliberately.** `security` has no stdin mechanism
 for the keychain password or the `.p12` import password, and the plan prescribes
-those exact commands, so `KEYCHAIN_PASSWORD` and `APPLE_CERT_PASSWORD` travel in
+those exact commands, so the keychain password and `APPLE_CERT_PASSWORD` travel in
 argv inside the (job-scoped, ephemeral-runner-scoped) `sign-macos` steps. This
 is a deliberate tension with AGENTS.md's "never put a password in argv": the
 values are not printed to the log, the runner is destroyed afterwards, and the
