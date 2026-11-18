@@ -57,7 +57,8 @@ text, and tick it as restored-and-verified instead of accepted.
   "Allow administrators to bypass".
 - Wait timer: 0.
 - Immutable releases: **on** (enabled 2026-11-18 with the owner PAT). A
-  published release's assets and tag cannot change; drafts stay editable.
+  published release's assets and tag cannot change; its title and notes can,
+  and drafts stay fully editable.
   Verify with `gh api repos/kgforais1/zipseal/immutable-releases` (owner token).
 - Secrets: the six Apple secrets below were stored on 2026-11-18. A seventh,
   `KEYCHAIN_PASSWORD`, was stored the same day and deleted later that day: the
@@ -219,8 +220,11 @@ disk through stdin, never argv, and are deleted after use.
    the runtime dependencies plus the `build` group (PyInstaller, Pillow).
    A re-run after a failed `publish` reuses the existing draft and replaces
    its assets (`gh release upload --clobber`). It fails rather than touch a
-   release that is already published; immutable releases enforce that
-   server-side even if the draft is published while the job runs.
+   release that is already published. If the draft is published while the job
+   runs, immutable releases make the asset upload fail, and the job checks
+   again before editing the notes. Immutable releases lock assets and the tag,
+   not the title or notes, so a publish in the last moment before the edit
+   could still overwrite those two.
 4. Do the manual acceptance below on a machine with no Python on `PATH`.
 5. Publish the draft. The workflow never publishes a final release.
 

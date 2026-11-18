@@ -521,21 +521,27 @@ jobs:
             echo '```'
           } > "$notes"
           # A re-run after a partial run reuses the existing draft and
-          # replaces its assets. The isDraft re-read is only a fast, clear
-          # failure: the race (the maintainer publishing mid-run) is closed
-          # server-side by the repository's immutable releases setting, so
-          # edit/upload against a published release fail instead of changing it.
+          # replaces its assets. Immutable releases lock a published release's
+          # assets and tag, not its title or notes, so the assets go first: if
+          # the maintainer published mid-run, upload fails before anything is
+          # edited. The notes are then edited only after a second isDraft
+          # check; a publish inside that last gap could still overwrite the
+          # title and notes, never the assets.
           if is_draft=$(gh release view "$GITHUB_REF_NAME" --json isDraft --jq .isDraft 2>/dev/null); then
             if [ "$is_draft" != "true" ]; then
               echo "::error::release $GITHUB_REF_NAME is already published; not modifying it"
               exit 1
             fi
-            gh release edit "$GITHUB_REF_NAME" --draft \
-              --title "zipseal-gui $version" --notes-file "$notes"
             gh release upload "$GITHUB_REF_NAME" --clobber \
               artifacts/zipseal-gui-*.dmg \
               artifacts/build-info.json \
               artifacts/SHA256SUMS
+            if [ "$(gh release view "$GITHUB_REF_NAME" --json isDraft --jq .isDraft)" != "true" ]; then
+              echo "::error::release $GITHUB_REF_NAME was published during this run; leaving its notes alone"
+              exit 1
+            fi
+            gh release edit "$GITHUB_REF_NAME" --draft \
+              --title "zipseal-gui $version" --notes-file "$notes"
           else
             gh release create "$GITHUB_REF_NAME" \
               --draft \

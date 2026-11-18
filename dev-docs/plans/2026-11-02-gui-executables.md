@@ -910,8 +910,10 @@ only if Phase 3 signing is approved. Linux needs no secrets, and
 
 - 2026-11-18 (round 3): CodeRabbit findings applied. Immutable releases were
   enabled on the repository (owner PAT), so `publish`'s draft-reuse path cannot
-  modify a release published mid-run; the `isDraft` re-read stays as a clear
-  early failure. `releasing.md` now says a same-user process that captures
+  replace the assets of a release published mid-run. Immutable releases do not
+  lock title or notes, so the path uploads assets first and re-checks `isDraft`
+  before editing the notes; a publish inside that last gap could still
+  overwrite title and notes, never assets. `releasing.md` now says a same-user process that captures
   `APPLE_CERT_PASSWORD` from argv could also copy `cert.p12` during import and
   sign off-runner until the certificate is revoked, with revoke-and-rotate as
   the response. The stale `actions: write` claim was removed from the dispatch
