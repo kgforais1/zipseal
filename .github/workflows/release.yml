@@ -1,0 +1,562 @@
+# Release pipeline for the frozen GUI apps (plan:
+# dev-docs/plans/2026-11-02-gui-executables.md, Phase 2). At M2 this is
+# macOS-only; Phases 3 and 4 append build-windows/sign-windows and build-linux.
+#
+# A tag push vX.Y.Z re-runs ci.yml's gates (ci.yml does not run on tags), builds
+# an unsigned .app, then signs/notarizes/staples it in a separate job behind the
+# protected `release` environment, and finally publishes a DRAFT release. The
+# maintainer accepts the artifact by hand and publishes the draft; nothing here
+# publishes a final release.
+#
+# A workflow_dispatch rehearsal runs the gates and build-macos only: sign-macos
+# and publish are event-guarded, so a dispatch never sees the Apple secrets and
+# never creates a release. A dispatch is accepted only on refs/heads/main:
+# check-hooks fails any other ref, and build-macos is also guarded on the ref.
+# No job holds actions: write; artifact upload/download within a run uses
+# ACTIONS_RUNTIME_TOKEN, not GITHUB_TOKEN.
+#
+# sign-macos also refuses a tag whose commit is not on main, before any secret
+# is read. That guards against mis-tagging only: a tag push runs this file as
+# it exists at the tagged commit, so a tag on a commit whose release.yml drops
+# the check would skip it. The secrets boundary is the `release` environment
+# (v* deployment policy and required reviewers) and the tag rulesets.
+#
+# Actions are pinned by full SHA with the release tag as a comment; the
+# check-pins hook enforces it. Build, sign and publish run on versioned
+# labels; the check jobs keep ci.yml's `-latest` runners by contract (the same
+# gates as main's CI must not drift on the tag's image). A label bump is its
+# own commit, recorded in dev-docs/releasing.md.
+#
+# Actions usage: ~10 macOS minutes per tag (build + sign), plus Linux minutes
+# for the gates.
+
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref_name }}
+  cancel-in-progress: false
+
+env:
+  # packaging/build.py pins the same interpreter; check-hooks fails if the two
+  # strings differ (build.py must stay runnable on its own for local builds,
+  # and check_pins forces a literal version: for setup-uv, so neither pin can
+  # come from the other).
+  BUILD_PYTHON: "3.13.17"
+
+jobs:
+  check-hooks:
+    name: Hooks (lint, types, data and secret gates)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884  # v10.3.0
+        with:
+          version: "0.12.24"
+      # The sync step itself runs no PEP 517 backend (--no-build) and does not
+      # install zipseal (--no-install-project); the gates inspect source only.
+      # Note: the basedpyright/check-pins hooks re-run `uv run` — they re-sync
+      # and reinstall the wheel-only project and the build group, as in ci.yml.
+      - run: uv sync --locked --no-build --no-install-project
+      - run: uvx --no-build pre-commit==4.7.0 run --all-files --show-diff-on-failure
+      - name: Dispatch only on main
+        if: github.event_name == 'workflow_dispatch' && github.ref != 'refs/heads/main'
+        run: |
+          echo "::error::workflow_dispatch is accepted only on refs/heads/main, not $GITHUB_REF"
+          exit 1
+      - name: Build interpreter pins agree
+        env:
+          WORKFLOW_PIN: ${{ env.BUILD_PYTHON }}
+        run: |
+          uv run --locked --no-build --no-sync --no-project --python "$WORKFLOW_PIN" python - "$WORKFLOW_PIN" <<'PY'
+          import re
+          import sys
+
+          workflow_pin = sys.argv[1]
+          with open("packaging/build.py", encoding="utf-8") as handle:
+              match = re.search(r'^BUILD_PYTHON = "([^"]+)"$', handle.read(), re.MULTILINE)
+          if match is None:
+              raise SystemExit("packaging/build.py has no BUILD_PYTHON = \"...\" line")
+          if match.group(1) != workflow_pin:
+              raise SystemExit(
+                  f"release.yml BUILD_PYTHON {workflow_pin!r} != "
+                  f"packaging/build.py BUILD_PYTHON {match.group(1)!r}; bump both"
+              )
+          print(f"build interpreter pin {workflow_pin} agrees")
+          PY
+      # Decision 9: compare the whole tag. Stripping a prefix would accept a tag
+      # the rule rejects (`vv0.1.0` via lstrip, `0.1.0` via removeprefix).
+      - name: Tag equals the project version
+        if: github.event_name == 'push'
+        run: |
+          uv run --locked --no-build --no-sync --no-project --python ${{ env.BUILD_PYTHON }} python - "$GITHUB_REF_NAME" <<'PY'
+          import sys
+          import tomllib
+
+          tag = sys.argv[1]
+          with open("pyproject.toml", "rb") as handle:
+              version = tomllib.load(handle)["project"]["version"]
+          expected = "v" + version
+          if tag != expected:
+              raise SystemExit(
+                  f"tag {tag!r} is not {expected!r}: the whole tag must equal "
+                  "'v' plus the pyproject.toml version"
+              )
+          print(f"tag {tag} matches pyproject.toml version {version}")
+          PY
+
+  check-test:
+    name: Tests (Python ${{ matrix.python }}, ${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+        python: ["3.11", "3.13"]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884  # v10.3.0
+        with:
+          python-version: ${{ matrix.python }}
+          version: "0.12.24"
+      - name: Install 7-Zip and bsdtar (Linux)
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y 7zip libarchive-tools
+      - name: Install 7-Zip (macOS)
+        if: runner.os == 'macOS'
+        run: brew install sevenzip
+      # Same reason for the sync step: no build backend runs, zipseal is
+      # imported from src/ instead of being installed (--no-install-project).
+      # The pre-commit hooks re-run `uv run` and reinstall the wheel-only
+      # project and the build group, as in ci.yml.
+      - run: uv sync --locked --no-build --no-install-project
+      - run: uv run --locked --no-build --no-sync pytest -q
+        env:
+          PYTHONPATH: src
+
+  check-audit:
+    name: Dependency audit
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884  # v10.3.0
+        with:
+          version: "0.12.24"
+      # --group build: build-macos freezes the app with the build group
+      # (PyInstaller, Pillow), so it must reach the audit too (latest-deps.yml
+      # syncs --group build for the same reason). The dev group stays out.
+      - run: uv export --locked --no-dev --group build --no-hashes --format requirements-txt -o "$RUNNER_TEMP/req.txt"
+      - run: uvx --no-build pip-audit==2.10.1 -r "$RUNNER_TEMP/req.txt"
+
+  build-macos:
+    name: Build macOS app
+    needs: [check-hooks, check-test, check-audit]
+    # Belt and braces with check-hooks' dispatch guard.
+    if: github.event_name == 'push' || github.ref == 'refs/heads/main'
+    runs-on: macos-15
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884  # v10.3.0
+        with:
+          version: "0.12.24"
+      - name: Read the project version
+        id: version
+        run: |
+          version=$(uv run --locked --no-build --no-sync --no-project --python ${{ env.BUILD_PYTHON }} python -c 'import tomllib; print(tomllib.load(open("pyproject.toml", "rb"))["project"]["version"])')
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+      - run: uv python install ${{ env.BUILD_PYTHON }}
+      - name: Freeze the app (unsigned)
+        run: uv run --python ${{ env.BUILD_PYTHON }} --group build python packaging/build.py --target macos --skip-sign
+      - name: Record build info
+        run: |
+          tk=$(uv run --python ${{ env.BUILD_PYTHON }} --group build python -c 'import tkinter; print(tkinter.TkVersion)')
+          pyinstaller=$(uv run --python ${{ env.BUILD_PYTHON }} --group build python -c 'import PyInstaller; print(PyInstaller.__version__)')
+          cat > "dist/${{ steps.version.outputs.version }}/build-info.json" <<JSON
+          {
+            "artifact": "zipseal-gui-${{ steps.version.outputs.version }}-macos-arm64.dmg",
+            "python": "${{ env.BUILD_PYTHON }}",
+            "pyinstaller": "$pyinstaller",
+            "runner": "macos-15",
+            "tk": "$tk"
+          }
+          JSON
+      # Advisory: the runner has no interactive window server, and the plan's
+      # contract lets this check be advisory because the job still gates on
+      # codesign/spctl/stapler and the manual acceptance. The smoke test runs
+      # on the unsigned build; only a signature is added afterwards, so the
+      # artifact sign-macos uploads is otherwise the same tree.
+      - name: Smoke test the built app
+        continue-on-error: true
+        run: |
+          app="dist/${{ steps.version.outputs.version }}/zipseal-gui.app"
+          binary="$app/Contents/MacOS/zipseal-gui"
+          "$binary" &
+          pid=$!
+          sleep 10
+          if ! kill -0 "$pid" 2>/dev/null; then
+            echo "::warning::the built app exited during the smoke test"
+            exit 1
+          fi
+          kill "$pid" 2>/dev/null || true
+      - name: Archive the app bundle
+        run: |
+          ditto -c -k --keepParent \
+            "dist/${{ steps.version.outputs.version }}/zipseal-gui.app" \
+            "dist/${{ steps.version.outputs.version }}/zipseal-gui-macos-app.zip"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9  # v7.0.2
+        with:
+          # A re-run replaces the earlier attempt's artifact instead of 409ing.
+          overwrite: true
+          name: zipseal-gui-macos-app
+          path: dist/${{ steps.version.outputs.version }}/zipseal-gui-macos-app.zip
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9  # v7.0.2
+        with:
+          # A re-run replaces the earlier attempt's artifact instead of 409ing.
+          overwrite: true
+          name: zipseal-gui-macos-info
+          path: dist/${{ steps.version.outputs.version }}/build-info.json
+
+  sign-macos:
+    name: Sign, notarize and staple the macOS app
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    needs: build-macos
+    runs-on: macos-15
+    environment: release
+    timeout-minutes: 45
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      # Defence in depth against mis-tagging, before any step reads a secret:
+      # the tagged commit must already be on the protected default branch.
+      # Not the secrets boundary (see the header): the reviewer's approval of
+      # the `release` environment is.
+      - name: Tagged commit is on main
+        run: |
+          if ! git merge-base --is-ancestor "$GITHUB_SHA" origin/main; then
+            echo "::error::$GITHUB_REF_NAME ($GITHUB_SHA) is not on origin/main; refusing to sign"
+            exit 1
+          fi
+          echo "$GITHUB_SHA is on origin/main"
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884  # v10.3.0
+        with:
+          version: "0.12.24"
+      - name: Read the project version
+        id: version
+        run: |
+          version=$(uv run --locked --no-build --no-sync --no-project --python ${{ env.BUILD_PYTHON }} python -c 'import tomllib; print(tomllib.load(open("pyproject.toml", "rb"))["project"]["version"])')
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333  # v8.0.2
+        with:
+          name: zipseal-gui-macos-app
+          path: artifacts
+      - name: Extract the app bundle
+        # ditto keeps the executable bit and symlinks; the artifact store drops
+        # them.
+        run: |
+          mkdir -p "dist/${{ steps.version.outputs.version }}"
+          ditto -x -k "artifacts/zipseal-gui-macos-app.zip" "dist/${{ steps.version.outputs.version }}"
+      - name: Build the ephemeral keychain
+        env:
+          APPLE_CERT_P12: ${{ secrets.APPLE_CERT_P12 }}
+          APPLE_CERT_PASSWORD: ${{ secrets.APPLE_CERT_PASSWORD }}
+        run: |
+          # Generated per run, not a secret: it guards a keychain deleted at
+          # the end of this job, so its argv exposure reveals nothing.
+          KEYCHAIN_PASSWORD=$(openssl rand -base64 32)
+          echo "::add-mask::$KEYCHAIN_PASSWORD"
+          keychain="$RUNNER_TEMP/build.keychain"
+          echo "KEYCHAIN_PATH=$keychain" >> "$GITHUB_ENV"
+          printf '%s' "$APPLE_CERT_P12" | base64 -d > "$RUNNER_TEMP/cert.p12"
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$keychain"
+          # Five minutes idle would lock it before DMG signing; give it an hour.
+          security set-keychain-settings -lut 3600 "$keychain"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$keychain"
+          # Without the search-list entry codesign fails with "no identity found".
+          security list-keychains -d user -s "$keychain" login.keychain
+          security import "$RUNNER_TEMP/cert.p12" -k "$keychain" -P "$APPLE_CERT_PASSWORD" -T /usr/bin/codesign
+          rm "$RUNNER_TEMP/cert.p12"
+          # Without the partition list codesign pops a GUI prompt in headless CI
+          # and hangs until the job times out.
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" "$keychain"
+      - name: Resolve the Developer ID identity
+        run: |
+          security find-identity -v -p codesigning "$KEYCHAIN_PATH"
+          identity=$(security find-identity -v -p codesigning "$KEYCHAIN_PATH" \
+            | grep 'Developer ID Application' | head -1 \
+            | sed -E 's/.*"([^"]+)".*/\1/' || true)
+          if [ -z "$identity" ]; then
+            echo "::error::no Developer ID Application identity in the keychain"
+            exit 1
+          fi
+          echo "IDENTITY=$identity" >> "$GITHUB_ENV"
+          echo "signing with $identity"
+      - name: Sign nested Mach-O, frameworks and the app
+        env:
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        # bash 3.2 (the macOS runner default) has no mapfile; avoid it and
+        # tolerate filenames with spaces/newlines via -print0/-d ''.
+        run: |
+          app="dist/${{ steps.version.outputs.version }}/zipseal-gui.app"
+          # Deepest first, so a framework's contents are sealed before the
+          # framework. `file` describes object files as "Mach-O ... object";
+          # codesign refuses those ("code object is not supported at all").
+          find -d "$app" -type f -print0 \
+            | while IFS= read -r -d '' path; do
+                description=$(file "$path")
+                case "$description" in
+                  *"Mach-O"*"object"*) continue ;;
+                  *"Mach-O"*) ;;
+                  *) continue ;;
+                esac
+                echo "signing $path ($description)"
+                codesign --force --options runtime --timestamp --sign "$IDENTITY" "$path"
+              done
+          find -d "$app" -type d -name '*.framework' -print0 \
+            | while IFS= read -r -d '' framework; do
+                echo "signing $framework"
+                codesign --force --options runtime --timestamp --sign "$IDENTITY" "$framework"
+              done
+          codesign --force --options runtime --timestamp \
+            --entitlements packaging/macos/entitlements.plist \
+            --sign "$IDENTITY" "$app"
+          codesign --verify --deep --strict "$app"
+          info=$(codesign -dv --verbose=4 "$app" 2>&1)
+          printf '%s\n' "$info" | grep -q 'Authority=Developer ID Application:'
+          if [ -z "$APPLE_TEAM_ID" ]; then
+            echo "::error::APPLE_TEAM_ID is unset in the release environment"
+            exit 1
+          fi
+          printf '%s\n' "$info" | grep -qx "TeamIdentifier=$APPLE_TEAM_ID"
+          printf '%s\n' "$info" | grep -q 'flags=0x10000(runtime)'
+      - name: Notarize and staple the app
+        env:
+          APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
+          APPLE_API_ISSUER_ID: ${{ secrets.APPLE_API_ISSUER_ID }}
+          APPLE_API_PRIVATE_KEY: ${{ secrets.APPLE_API_PRIVATE_KEY }}
+        run: |
+          app="dist/${{ steps.version.outputs.version }}/zipseal-gui.app"
+          printf '%s' "$APPLE_API_PRIVATE_KEY" | base64 -d > "$RUNNER_TEMP/AuthKey.p8"
+          ditto -c -k --keepParent "$app" "$RUNNER_TEMP/zipseal-gui-app.zip"
+          xcrun notarytool submit "$RUNNER_TEMP/zipseal-gui-app.zip" --wait \
+            --key "$RUNNER_TEMP/AuthKey.p8" \
+            --key-id "$APPLE_API_KEY_ID" \
+            --issuer "$APPLE_API_ISSUER_ID"
+          xcrun stapler staple "$app"
+          rm "$RUNNER_TEMP/AuthKey.p8"
+      - name: Build, sign, notarize and staple the DMG
+        env:
+          APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
+          APPLE_API_ISSUER_ID: ${{ secrets.APPLE_API_ISSUER_ID }}
+          APPLE_API_PRIVATE_KEY: ${{ secrets.APPLE_API_PRIVATE_KEY }}
+        run: |
+          version="${{ steps.version.outputs.version }}"
+          # Phase 1's hdiutil recipe, reached through build.py so the workflow
+          # and a local build cannot drift. --no-project: no project sync (and
+          # no build backend) runs while the API key is in the environment.
+          uv run --locked --no-build --no-sync --no-project --python ${{ env.BUILD_PYTHON }} python - "$version" <<'PY'
+          import importlib.util
+          import pathlib
+          import sys
+
+          version = sys.argv[1]
+          spec = importlib.util.spec_from_file_location("packaging_build", "packaging/build.py")
+          module = importlib.util.module_from_spec(spec)
+          spec.loader.exec_module(module)
+          module.make_macos_dmg(pathlib.Path("dist") / version, version)
+          PY
+          dmg="dist/$version/zipseal-gui-$version-macos-arm64.dmg"
+          # Hardened runtime does not apply to a disk image.
+          codesign --force --timestamp --sign "$IDENTITY" "$dmg"
+          printf '%s' "$APPLE_API_PRIVATE_KEY" | base64 -d > "$RUNNER_TEMP/AuthKey.p8"
+          xcrun notarytool submit "$dmg" --wait \
+            --key "$RUNNER_TEMP/AuthKey.p8" \
+            --key-id "$APPLE_API_KEY_ID" \
+            --issuer "$APPLE_API_ISSUER_ID"
+          xcrun stapler staple "$dmg"
+          rm "$RUNNER_TEMP/AuthKey.p8"
+      - name: Gate on the signatures
+        # Validate the app the user actually runs, not only the pre-image.
+        # hdiutil drops custom xattrs, which can include the app's stapled
+        # ticket, so stapler validates the DMG and the unmounted (stapled)
+        # app; the mounted copy gets codesign and spctl only (Gatekeeper
+        # resolves its ticket online or via the DMG's staple).
+        run: |
+          set -e
+          app="dist/${{ steps.version.outputs.version }}/zipseal-gui.app"
+          dmg="dist/${{ steps.version.outputs.version }}/zipseal-gui-${{ steps.version.outputs.version }}-macos-arm64.dmg"
+          mountpoint="$RUNNER_TEMP/dmg-mounted"
+          xcrun stapler validate "$app"
+          xcrun stapler validate "$dmg"
+          spctl --assess -t exec -v "$app"
+          spctl --assess -t open --context context:primary-signature -v "$dmg"
+          mkdir -p "$mountpoint"
+          hdiutil attach -nobrowse -readonly -mountpoint "$mountpoint" "$dmg"
+          trap 'hdiutil detach "$mountpoint" || true' EXIT
+          codesign --verify --deep --strict "$mountpoint/zipseal-gui.app"
+          spctl --assess -t exec -v "$mountpoint/zipseal-gui.app"
+          hdiutil detach "$mountpoint"
+          trap - EXIT
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9  # v7.0.2
+        with:
+          # A re-run replaces the earlier attempt's artifact instead of 409ing.
+          overwrite: true
+          name: zipseal-gui-macos-dmg
+          path: dist/${{ steps.version.outputs.version }}/zipseal-gui-${{ steps.version.outputs.version }}-macos-arm64.dmg
+      - name: Delete the ephemeral keychain
+        if: always()
+        run: |
+          security list-keychains -d user -s login.keychain 2>/dev/null || true
+          security delete-keychain "$KEYCHAIN_PATH" 2>/dev/null || true
+
+  publish:
+    name: Publish the draft release
+    if: github.event_name == 'push'
+    needs: [check-hooks, check-test, check-audit, sign-macos]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      contents: write
+      id-token: write
+      attestations: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      # ubuntu-24.04's python3 is 3.12; this script needs no tomllib.
+      - name: Verify the tag points at this commit
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python3 - "$GITHUB_REF_NAME" "$GITHUB_SHA" <<'PY'
+          import os
+          import subprocess
+          import sys
+
+          ref_name, sha = sys.argv[1], sys.argv[2]
+          ref = "refs/tags/" + ref_name
+          # Ask for both refs explicitly: an exact-ref pattern never emits the
+          # "^{}" peeled line (only a glob or no pattern does).
+          out = subprocess.check_output(
+              ["git", "ls-remote", "--tags", "origin", ref, ref + "^{}"], text=True
+          )
+          entries = [line.split("\t") for line in out.splitlines() if "\t" in line]
+          tag_shas = [entry[0] for entry in entries if entry[1] == ref]
+          if not tag_shas:
+              raise SystemExit(f"remote has no tag {ref}")
+          peeled = [entry[0] for entry in entries if entry[1] == ref + "^{}"]
+          expected = peeled[0] if peeled else tag_shas[0]
+          if expected != sha:
+              raise SystemExit(f"remote tag {ref_name} points at {expected}, not {sha}")
+          print(f"remote tag {ref_name} points at {sha}")
+          PY
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333  # v8.0.2
+        with:
+          name: zipseal-gui-macos-dmg
+          path: artifacts
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333  # v8.0.2
+        with:
+          name: zipseal-gui-macos-info
+          path: artifacts
+      - name: Write SHA256SUMS
+        run: |
+          cd artifacts
+          sha256sum zipseal-gui-*.dmg build-info.json > SHA256SUMS
+          cat SHA256SUMS
+      - name: Attest the artifact
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8  # v4.2.2
+        with:
+          subject-checksums: artifacts/SHA256SUMS
+      - name: Attest the checksums
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8  # v4.2.2
+        with:
+          subject-path: artifacts/SHA256SUMS
+      - name: Create the draft release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          notes="$RUNNER_TEMP/notes.md"
+          {
+            echo "## zipseal-gui $version"
+            echo
+            echo "Download the macOS app from the assets below. The CLI stays"
+            echo "source-installable:"
+            echo
+            echo '```sh'
+            echo "uv tool install git+https://github.com/kgforais1/zipseal.git@$GITHUB_REF_NAME"
+            echo '```'
+            echo
+            echo "## Build info"
+            echo
+            echo '```json'
+            cat artifacts/build-info.json
+            echo '```'
+            echo
+            echo "## Verify"
+            echo
+            echo '```sh'
+            echo "cd \"\$(mktemp -d)\""
+            echo "gh release download $GITHUB_REF_NAME --repo kgforais1/zipseal"
+            echo "shasum -a 256 -c SHA256SUMS"
+            echo "gh attestation verify zipseal-gui-$version-macos-arm64.dmg --repo kgforais1/zipseal"
+            echo '```'
+          } > "$notes"
+          # A re-run after a partial run reuses the existing draft and
+          # replaces its assets. Immutable releases lock a published release's
+          # assets and tag, not its title or notes, so the assets go first: if
+          # the maintainer published mid-run, upload fails before anything is
+          # edited. The notes are then edited only after a second isDraft
+          # check; a publish inside that last gap could still overwrite the
+          # title and notes, never the assets.
+          if is_draft=$(gh release view "$GITHUB_REF_NAME" --json isDraft --jq .isDraft 2>/dev/null); then
+            if [ "$is_draft" != "true" ]; then
+              echo "::error::release $GITHUB_REF_NAME is already published; not modifying it"
+              exit 1
+            fi
+            gh release upload "$GITHUB_REF_NAME" --clobber \
+              artifacts/zipseal-gui-*.dmg \
+              artifacts/build-info.json \
+              artifacts/SHA256SUMS
+            if [ "$(gh release view "$GITHUB_REF_NAME" --json isDraft --jq .isDraft)" != "true" ]; then
+              echo "::error::release $GITHUB_REF_NAME was published during this run; leaving its notes alone"
+              exit 1
+            fi
+            gh release edit "$GITHUB_REF_NAME" --draft \
+              --title "zipseal-gui $version" --notes-file "$notes"
+          else
+            gh release create "$GITHUB_REF_NAME" \
+              --draft \
+              --verify-tag \
+              --title "zipseal-gui $version" \
+              --notes-file "$notes" \
+              artifacts/zipseal-gui-*.dmg \
+              artifacts/build-info.json \
+              artifacts/SHA256SUMS
+          fi

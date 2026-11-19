@@ -33,3 +33,4 @@ dist/
 *.key
 *.p12
 .env
+.env.gh.PAT

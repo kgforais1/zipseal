@@ -47,6 +47,8 @@ htmlcov/
 .env
 .env.*
 !.env.example
+# Local fine-grained PAT for the owner account; never commit (see .context/gh-pat.sh).
+.env.gh.PAT
 .envrc
 *.pass
 *.password

@@ -13,6 +13,7 @@ User-facing documentation lives in [`../user-docs/`](../user-docs/).
 | `plans/archive/` | Completed and abandoned plans | Permanent |
 | `investigations/` | Research, spikes, benchmarks and bug write-ups, named `YYYY-MM-DD-slug.md` | Permanent, never rewritten |
 | `decisions/` | Architecture decision records, added when the first one is needed | Permanent, superseded rather than edited |
+| `releasing.md` | Tag-to-release runbook: accounts, rulesets, secrets, rollback, acceptance | Permanent |
 
 `SPEC.md` at the repo root is the design. Plans say how and in what order to
 build it. If a plan changes the design, update `SPEC.md` in the same commit.
@@ -80,9 +81,9 @@ honest:
 
 - Durable docs carry `Last reviewed: YYYY-MM-DD` near the top. That covers
   the root `README.md`, `AGENTS.md`, `SPEC.md` and `TODO.md`,
-  `dev-docs/README.md`, and every page in `user-docs/`. This list matches the
-  hook's `ROOT_REQUIRED`, `REQUIRED_FILES` and `REQUIRED_DIRS` sets. Change
-  both together. The pre-commit hook `check-doc-freshness` blocks a missing,
+  `dev-docs/README.md`, `dev-docs/releasing.md`, and every page in
+  `user-docs/`. This list matches the hook's `ROOT_REQUIRED`, `REQUIRED_FILES`
+  and `REQUIRED_DIRS` sets. Change both together. The pre-commit hook `check-doc-freshness` blocks a missing,
   malformed or future-dated marker. It warns after 180 days and blocks after
   365.
 - Bump the date only after re-reading the doc against the current code. The

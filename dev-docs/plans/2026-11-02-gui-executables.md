@@ -181,7 +181,7 @@ it. The smoke-tested artifact is what ships, never a second local build.
       (`*.dmg`, `*.msi`, `*.exe`, `*.AppImage`, `*.tar.gz`) so even a
       force-added artifact cannot be committed; confirm `dist/` and `build/`
       are in both files' spirit (already ignored; add to `.forbidden-paths`).
-- [ ] Create `packaging/`:
+- [x] Create `packaging/`:
   - `run_gui.py` — the PyInstaller entry point: `import sys; from zipseal.gui import main; sys.exit(main())`.
     Neither `gui.py` nor `gui_view.py` has an `if __name__ == "__main__"` block, so this thin script
     is what the `.spec` targets.
@@ -280,11 +280,26 @@ it. The smoke-tested artifact is what ships, never a second local build.
 
 ## Phase 2 — macOS signing, notarization & release pipeline (milestone M2)
 
-- [ ] Create the `release` environment and two `v*` tag rulesets before any
-      signing secret is stored. Deployment branches and tags are `v*` only.
-      The required reviewer is the second GitHub account, Prevent self-review
-      is on, and Allow administrators to bypass is off. A bypass list covers
-      every rule in its ruleset, so creation and immutability are separate.
+- [x] Create the `release` environment and two `v*` tag rulesets before any
+      signing secret is stored. Deployment branches and tags are `v*` only,
+      with both a `branch` and a `tag` policy, recorded in `dev-docs/releasing.md`
+      together with the exact calls. The maintainer changed the environment in
+      the UI (required reviewers `kgforais1` and `kgrizz-git`,
+      `prevent_self_review` off, `can_admins_bypass` on) and on 2026-11-17
+      explicitly accepted the one-account control; both accounts are theirs,
+      so the approval is the maintainer's own. The two rulesets are as
+      specified: creation limited to the tag-pushing account, immutability
+      with an empty bypass list, so a tag move is blocked regardless of
+      account.
+      Note:
+      Created 2026-11-15/2026-11-16 under `kgforais1`'s fine-grained PAT via
+      `.context/gh-pat.sh`; see `dev-docs/releasing.md` for the exact calls and
+      for the live state. The six Apple secrets were stored 2026-11-18 (see
+      `dev-docs/releasing.md`). The two rulesets are
+      as specified: creation limited to the tag-pushing account, immutability
+      with an empty bypass list.
+      The control is the two-account split: tag pushes are created by
+      `kgrizz-git`, the `release` environment's reviewer is the owner.
       The creation ruleset targets `v*` with Restrict creations, and its only
       bypass is the tag-pushing account. The immutability ruleset targets
       `v*` with Restrict updates and Restrict deletions, and its bypass list
@@ -298,14 +313,16 @@ it. The smoke-tested artifact is what ships, never a second local build.
       immutability for every `v*` tag. This repository is not an
       organization, so the add and the remove are written by hand into the
       release's rollback note. The tag-pushing account, the only creation
-      bypass, then pushes the replacement tag. `dev-docs/releasing.md` names
-      both accounts. Record the exact
-      settings and the account names for both rulesets in
-      `dev-docs/releasing.md`. Until this exists, the approval split below
-      does not hold: a missing environment fails `sign-macos` opaquely, and
-      a missing immutability ruleset leaves `publish`'s `--verify-tag` with
-      nothing behind it.
-- [ ] CI signing path (tag pushes only, inside `sign-macos`): `security
+      bypass, then pushes the replacement tag. `dev-docs/releasing.md` records
+      the exact settings and both account names (created 2026-11-15:
+      `kgrizz-git` has only push, not admin, so the calls ran under a
+      `kgforais1` fine-grained PAT). Note: the owner later changed the
+      environment's required reviewers and `prevent_self_review` in the UI
+      (both accounts are theirs); that state is recorded in
+      `dev-docs/releasing.md` rather than assumed to be the intended split.
+- [ ] CI signing path (tag pushes only, inside `sign-macos`). The keychain
+      password is generated per run (`openssl rand -base64 32`, masked), not
+      a stored secret (amended 2026-11-18). `security
       create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"`, `security
       unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"`, `security
       list-keychains -d user -s "$KEYCHAIN_PATH" login.keychain` (without the
@@ -360,20 +377,30 @@ it. The smoke-tested artifact is what ships, never a second local build.
       `check-test`, `check-audit`, `build-macos`, `sign-macos`, `publish`.
       `ci.yml` runs on pushes to `main` and on pull requests only, so a tag
       runs none of it. The three check jobs re-run those gates on both
-      triggers. `check-hooks` is `ci.yml`'s `checks` job copied step for
-      step: checkout with `fetch-depth: 0` and `persist-credentials: false`,
-      `setup-uv` at `version: "0.12.24"`, `uv sync --locked` (the
-      basedpyright hook runs through `uv run`), then `uvx --no-build
+      triggers. `check-hooks` is `ci.yml`'s `checks` job with the same steps
+      except the sync, plus the tag check below; the checkout step with `fetch-depth: 0` and
+      `persist-credentials: false`, `setup-uv` at `version: "0.12.24"`,
+      `uv sync --locked --no-build --no-install-project` (the hardened sync —
+      hardened so SonarCloud's S8541 `--no-build` rule passes; the `check-pins`
+      and `basedpyright` hooks still run their own `uv run`, basedpyright with
+      `--group build`),
+      then `uvx --no-build
       pre-commit==4.7.0 run --all-files --show-diff-on-failure`. `check-audit` is `ci.yml`'s
       `audit` job unchanged (`pip-audit==2.10.1`). `check-test` is `ci.yml`'s
-      `test` job copied step for step: `timeout-minutes: 30`, matrix
+      `test` job — same runners, matrix and gates as `ci.yml`, with the
+      `uv` commands the documented divergence from `ci.yml` (hardened for Sonar
+      Cloud S8541/S8544: `--no-build`, `--no-install-project`, `PYTHONPATH=src`):
+      `timeout-minutes: 30`, matrix
       `os: [ubuntu-latest, macos-latest]` × `python: ["3.11", "3.13"]`,
       `fail-fast: false`, checkout with `persist-credentials: false`,
       `setup-uv` at `version: "0.12.24"` with
       `python-version: ${{ matrix.python }}`, Linux
       `sudo apt-get update && sudo apt-get install -y 7zip libarchive-tools`,
-      macOS `brew install sevenzip`, then `uv sync --locked` and
-      `uv run pytest -q` (the fast suite — `addopts` drops `slow` and `gui`).
+      macOS `brew install sevenzip`, then `uv sync --locked --no-build
+      --no-install-project`, and
+      `PYTHONPATH=src uv run --locked --no-build --no-sync pytest -q` (the
+      fast suite — `addopts` drops `slow` and `gui`; zipseal is imported from
+      `src/`, not installed).
       Those are the test runners `ci.yml` uses, separate from the versioned
       build images in Decision 6. On a tag push `check-hooks` also requires
       the tag to equal `v` plus the `pyproject.toml` version (Decision 9).
@@ -449,7 +476,7 @@ it. The smoke-tested artifact is what ships, never a second local build.
       notes include the resolved Python, PyInstaller, runner image and Tk
       version per artifact, the measured Linux glibc floor, and the
       `SHA256SUMS` / `gh attestation verify` lines.
-- [ ] `dev-docs/releasing.md` (new durable doc): the tag-to-release runbook,
+- [x] `dev-docs/releasing.md` (new durable doc): the tag-to-release runbook,
       the secrets list (names only), rollback (delete draft → delete tag → fix
       → re-tag; the ruleset-edit account adds itself to the immutability
       bypass list, deletes the tag, and removes that entry in the same
@@ -470,9 +497,10 @@ it. The smoke-tested artifact is what ships, never a second local build.
       full pytest matrix and the dependency audit; the tag-equals-version
       requirement stays tag-push only (Decision 9).
       `workflow_dispatch` requires the workflow on the default branch, so this
-      is available once `release.yml` is merged to `main`; a dispatch can still
-      select another ref and runs that ref's copy, so dispatching a branch
-      exercises the branch, not `main`. Pushing a tag is what creates the draft
+      is available once `release.yml` is merged to `main`. A dispatch is
+      accepted only on `refs/heads/main` (amended 2026-11-18): `check-hooks`
+      fails any other ref and `build-macos` is guarded on the ref, so a branch
+      cannot be rehearsed. Pushing a tag is what creates the draft
       release, so a rehearsal tag would not do.
       Then the first real run at the next version bump; v0.1.0 stays
       source-only.
@@ -662,7 +690,8 @@ Python, dated per platform here, is the blocking gate for publish.
 
 `APPLE_CERT_P12` (base64 Developer ID Application .p12), `APPLE_CERT_PASSWORD`,
 `APPLE_TEAM_ID`, `APPLE_API_KEY_ID`, `APPLE_API_ISSUER_ID`,
-`APPLE_API_PRIVATE_KEY` (base64 .p8), `KEYCHAIN_PASSWORD` (ephemeral chain).
+`APPLE_API_PRIVATE_KEY` (base64 .p8). The ephemeral keychain password is
+generated per run with `openssl rand`, not stored (amended 2026-11-18).
 All Apple secrets live in the protected `release` environment (deployment
 limited to `v*` tags). The reviewer split is the one in the `release.yml`
 bullet: a second account, Prevent self-review on, administrator bypass off.
@@ -786,15 +815,142 @@ only if Phase 3 signing is approved. Linux needs no secrets, and
 - 2026-11-12: Step 5 Preview (NVIDIA). The three CodeRabbit edits stood.
   Rollback adds a temporary immutability bypass and removes it in the same
   session, before the tag-pushing account re-tags. `check-test` copies the
-  CI test job step for step, and `build-macos` waits on the check jobs so
+  CI test job. Superseded 2026-11-16: see round 2, and `build-macos` waits on the check jobs so
   a red gate never starts signing. Windows smoke extracts the shipped zip.
   The Linux archive is one `zipseal-gui/` directory with the binary at
   `0755`.
 
 - 2026-11-12: Self-review. `check-hooks` copies `ci.yml`'s `checks` job,
-  including `uv sync --locked`, which the basedpyright hook needs.
+  including `uv sync --locked`, which the basedpyright hook needs
+  (superseded 2026-11-16: see round 2).
   `sign-macos` uploads the signed DMG that `publish` collects.
   Step 5 Preview (NVIDIA) then confirmed both edits. `publish` downloads
   shipped artifacts by name. The PNG tests stay `gui`-marked. The `SPEC.md`
   and `TODO.md` references and the `packaging` shadowing reason were
   corrected.
+
+- 2026-11-16: Muse Spark 1.3 and Step 5 Preview reviews of the Phase 2 draft
+  (both CHANGES REQUESTED). Fixes applied: job-level `actions` scope on the
+  artifact jobs (upload/download needs it), macOS bash 3.2 compatibility in
+  the nested-signing loops (`find -d` + `read -d ''`, `mapfile` removed), a
+  corrected Developer-ID guard (`|| true` and the identity list printed), the
+  DMG-mounted app re-validated (`stapler`/`codesign`/`spctl`), `build-info.json`
+  checksummed and attached to the release, the `.p12`/`.p8` deleted after use,
+  ephemeral-keychain search list restored on exit, `publish` pinned to
+  `ubuntu-24.04`, and `git ls-remote` passed both `ref` and `ref^{}`. The
+  environment/rulesets exist (created under a `kgforais1` PAT; `kgrizz-git`
+  lacks admin); the maintainer then edited the environment in the UI, so the
+  two-account split is currently a convention, recorded in
+  `dev-docs/releasing.md`. `publish`'s tags stay tag-push activated; the
+  draft-only release path is unchanged.
+
+- 2026-11-16 (round 2): SonarCloud (S8541/S8544) and CodeRabbit findings applied
+  to the Phase 2 draft PR (#20). The `check-hooks` and `check-test` sync steps
+  use `--locked --no-build --no-install-project`, so those syncs build no
+  wheel and install no zipseal wheel; the dependencies still install, and
+  zipseal is imported from `src/` via `PYTHONPATH` in the fast suite. That
+  no-PEP-517-backend guarantee is limited to those syncs: any hook not given
+  those flags — currently `check-pins` and `basedpyright` — re-runs `uv run`,
+  which re-syncs and can build and install the project through `uv_build`
+  (`uv_build` resolves from the `build-system.requires` range, not `uv.lock`).
+  The ephemeral keychain idle lock is raised with
+  `security set-keychain-settings -lut 3600` so it survives notarization.
+  The environment now carries both `v*` deployment policies (`branch` and
+  `tag`); a branch policy alone does not match tag refs. The plan's
+  environment/ruleset box stays unticked: the separate tag-pushing and
+  reviewer-account control does not hold after the maintainer's UI change, and
+  it needs a deliberate decision (restore the settings, or explicit acceptance
+  of a single-account control). (Superseded 2026-11-17: one-account control
+  accepted; see the next entry.) The secret-storage prerequisite is recorded as
+  "after protection review, before the first tag", not blocked on a draft
+  acceptance, because `sign-macos` itself needs the secrets.
+
+- 2026-11-17: The maintainer explicitly accepted the one-account control for
+  the `release` environment (both accounts are theirs): reviewers
+  `kgforais1`/`kgrizz-git`, `prevent_self_review` off, `can_admins_bypass` on.
+  The plan's environment/ruleset box is ticked on that acceptance; the
+  two-account split is no longer required for the approval to count. The
+  `v-tag-immutability` ruleset (empty bypass list) remains the structural
+  control and is unchanged. `dev-docs/releasing.md` records the accepted
+  state.
+
+- 2026-11-18: Sourcery and CodeRabbit findings on PR #20 resolved.
+  `sign-macos` now fails before any secret is read unless the tagged commit is
+  an ancestor of `origin/main`. A `workflow_dispatch` is accepted only on
+  `refs/heads/main`; this replaces the "Rehearse first" box's "a dispatch can
+  select another ref" wording. `check-audit` exports the `build` group too.
+  `check-hooks` fails if `env.BUILD_PYTHON` differs from `packaging/build.py`'s
+  constant. Every tomllib/build.py Python step runs on the pinned
+  `BUILD_PYTHON` via `uv run --no-project`; `publish` keeps ubuntu-24.04's
+  Python 3.12 for a script without tomllib. Secret decoding uses `base64 -d`,
+  which macOS and GNU both accept. The DMG mountpoint is created before
+  `hdiutil attach`. The signature gate changed: `stapler validate` runs on the
+  DMG and the unmounted stapled app; the mounted app gets `codesign --verify
+  --deep --strict` and `spctl --assess -t exec` only, because `hdiutil` can drop
+  the staple xattr. `publish` reuses an existing draft and replaces its assets
+  with `--clobber`, and refuses a published release. SPEC.md now says the macOS
+  DMG path is implemented (draft-only, pending M2 acceptance) and Windows and
+  Linux remain planned. `releasing.md` qualifies the `v-tag-immutability`
+  guarantee: it holds only while the ruleset is active, not against an actor
+  who can edit or disable it. Declined: the argv finding for
+  `KEYCHAIN_PASSWORD`/`APPLE_CERT_PASSWORD`, because `security` has no stdin
+  path. The accepted-risk wording in `releasing.md` is that a same-user
+  process on the runner could read the two passwords from the process table
+  while a `security` call runs, and that neither password is useful outside
+  the job.
+
+- 2026-11-18 (round 2): Hyrax findings on PR #20 applied. The `publish`
+  checkout sets `persist-credentials: false`. `build-macos` and `sign-macos`
+  drop `actions: write` and `publish` drops `actions: read`, because
+  same-run artifact transfer uses `ACTIONS_RUNTIME_TOKEN`; the main-only
+  dispatch guard stays as a second check. The release notes pin the CLI
+  install line to the tag. The TeamIdentifier gate fails on an empty
+  `APPLE_TEAM_ID` and matches the whole line. Separately, the keychain
+  password is generated per run with `openssl rand -base64 32` and masked, so
+  the `KEYCHAIN_PASSWORD` secret is retired; its argv exposure now reveals
+  nothing outside the job. `APPLE_CERT_PASSWORD` remains the one argv
+  exception.
+
+- 2026-11-18 (round 3): CodeRabbit findings applied. Immutable releases were
+  enabled on the repository (owner PAT), so `publish`'s draft-reuse path cannot
+  replace the assets of a release published mid-run. Immutable releases do not
+  lock title or notes, so the path uploads assets first and re-checks `isDraft`
+  before editing the notes; a publish inside that last gap could still
+  overwrite title and notes, never assets. `releasing.md` now says a same-user process that captures
+  `APPLE_CERT_PASSWORD` from argv could also copy `cert.p12` during import and
+  sign off-runner until the certificate is revoked, with revoke-and-rotate as
+  the response. The stale `actions: write` claim was removed from the dispatch
+  section.
+
+- 2026-11-18 (round 4): CodeRabbit noted that `--clobber` deletes an asset
+  before re-uploading it, so publishing during a re-run can leave a published,
+  immutable release missing an asset. `releasing.md`'s tag-to-release steps
+  now require every run for the tag to finish before acceptance, a check of
+  the draft's final assets, and no re-run during acceptance or publication.
+  A follow-up CodeRabbit note added the recovery path: if the asset check or
+  acceptance fails, abort, leave the draft unpublished, re-run, wait for it to
+  finish, and repeat every final check before publishing.
+
+- 2026-11-18 (round 5): DeepSeek review of PR #20. `releasing.md` step 1 now
+  runs `uv lock` with the version bump (the lockfile records the project
+  version) and lands it on `main` through a PR (the `main` ruleset requires
+  one). The three `upload-artifact` steps set `overwrite: true` so a full
+  re-run does not fail on an existing artifact name. The stale "no Apple
+  secrets stored" text in this plan and `CHANGELOG.dev.md` and the CI signing
+  box's stored `KEYCHAIN_PASSWORD` were corrected. Open, untested: whether
+  `build.py`'s `tkinter.Tk()` preflight runs on the headless macOS runner; the
+  first dispatch rehearsal answers it.
+
+- 2026-11-19: CodeRabbit asked `releasing.md` step 7 to separate transient
+  failures (re-run, repeat steps 5 and 6) from deterministic app defects. A
+  re-run rebuilds the same commit, so a defect means deleting the draft,
+  fixing it on `main` through a PR, and cutting a new version (re-tagging the
+  same version goes through Rollback and is not preferred).
+
+- 2026-11-19 (round 2): Hyrax noted that a tag push runs `release.yml` from the
+  tagged commit, so the on-main ancestry check cannot keep secrets from a tag
+  pusher who edits the workflow. The workflow comments and `releasing.md` now
+  call it defence in depth against mis-tagging. They name the `release`
+  environment (deployment policy and reviewers) and the tag rulesets as the
+  secrets boundary, and the reviewer confirms the commit is on `main` before
+  approving `sign-macos`. This corrects the 2026-11-18 entry's framing.

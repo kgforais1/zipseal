@@ -109,10 +109,12 @@ with `uv tool install .`. On macOS, `zipseal-gui.command` at the repo root
 runs `uv run --managed-python zipseal-gui` from the clone when double-clicked in Finder, and
 `scripts/set-icon.sh` gives it the `src/zipseal/icon.svg` icon.
 
-Planned, not implemented: the GUI is also intended to ship as a frozen
-download per platform (macOS DMG, Windows zip, Linux AppImage and tarball),
-needing neither Python nor `uv`; `dev-docs/plans/2026-11-02-gui-executables.md`
-is the plan. Until its Phase 5 lands, this section describes the supported
+Frozen downloads, needing neither Python nor `uv`, are partly implemented. The
+macOS DMG path exists: a `v*` tag builds, signs and notarizes it and creates a
+draft release. That release stays draft-only, pending the M2 manual
+acceptance. The Windows zip and Linux AppImage and tarball remain planned. The
+CLI stays source-installable. `dev-docs/plans/2026-11-02-gui-executables.md` is
+the plan. Until its Phase 5 lands, this section describes the supported
 install.
 
 ### 5.1 The GUI
