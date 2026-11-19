@@ -17,6 +17,7 @@ def _load_guard():
 
 _guard = _load_guard()
 check_hook_revs = _guard.check_hook_revs
+check_uv_config = _guard.check_uv_config
 check_workflow = _guard.check_workflow
 scan = _guard.scan
 main = _guard.main
@@ -49,7 +50,8 @@ def _uses_step(uses: str) -> str:
     return f"jobs:\n  check:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: {uses}\n"
 
 
-EXACT = '        with:\n          version: "0.12.24"\n'
+EXACT = '        with:\n          version: "0.13.9"\n'
+VERSION_FILE = "        with:\n          version-file: .github/uv.toml\n"
 
 CONFIG_CASES = [
     ("valid hex with comment", _config(REPO, f"{VALID_SHA}  # v6.0.0"), False),
@@ -110,6 +112,27 @@ CONFIG_CASES = [
 
 WORKFLOW_CASES = [
     ("exact version", _setup_uv(EXACT), False),
+    ("version-file pin", _setup_uv(VERSION_FILE), False),
+    (
+        "dot-slash version-file pin",
+        _setup_uv("        with:\n          version-file: ./.github/uv.toml\n"),
+        False,
+    ),
+    (
+        "wrong version-file",
+        _setup_uv("        with:\n          version-file: other.toml\n"),
+        True,
+    ),
+    (
+        "empty version-file",
+        _setup_uv('        with:\n          version-file: ""\n'),
+        True,
+    ),
+    (
+        "both version and version-file",
+        _setup_uv(f"{EXACT}          version-file: .github/uv.toml\n"),
+        True,
+    ),
     ("missing with block", _setup_uv(""), True),
     ("bare version key", _setup_uv("        with:\n          version:\n"), True),
     ("empty version", _setup_uv('        with:\n          version: ""\n'), True),
@@ -152,6 +175,17 @@ WORKFLOW_CASES = [
 ]
 
 
+UV_CONFIG_CASES = [
+    ("exact pin", 'required-version = "==0.13.9"\n', False),
+    ("range", 'required-version = ">=0.13.9"\n', True),
+    ("bare version", 'required-version = "0.13.9"\n', True),
+    ("two-part pin", 'required-version = "==0.13"\n', True),
+    ("missing key", "", True),
+    ("non-string", "required-version = 0.13\n", True),
+    ("malformed toml", "required-version = [\n", True),
+]
+
+
 @pytest.mark.parametrize(
     ("name", "content", "fails"), CONFIG_CASES, ids=[c[0] for c in CONFIG_CASES]
 )
@@ -183,6 +217,16 @@ def test_workflow_matrix(tmp_path: Path, name: str, content: str, fails: bool) -
     assert bool(findings) is fails, findings
 
 
+@pytest.mark.parametrize(
+    ("name", "content", "fails"), UV_CONFIG_CASES, ids=[c[0] for c in UV_CONFIG_CASES]
+)
+def test_uv_config_matrix(tmp_path: Path, name: str, content: str, fails: bool) -> None:
+    target = tmp_path / "uv.toml"
+    target.write_text(content, encoding="utf-8")
+    findings = check_uv_config(target)
+    assert bool(findings) is fails, findings
+
+
 def test_scan_dispatches_on_filename(tmp_path: Path) -> None:
     dirty = _config(REPO, "v1.0.0")
     assert scan(tmp_path / "notes.txt") == []
@@ -190,6 +234,13 @@ def test_scan_dispatches_on_filename(tmp_path: Path) -> None:
     config.write_text(dirty, encoding="utf-8")
     assert scan(config) != []
     assert scan(config.resolve()) != []
+    uv_dir = tmp_path / ".github"
+    uv_dir.mkdir()
+    uv_config = uv_dir / "uv.toml"
+    uv_config.write_text('required-version = ">=0.13.9"\n', encoding="utf-8")
+    assert scan(uv_config) != []
+    uv_config.write_text('required-version = "==0.13.9"\n', encoding="utf-8")
+    assert scan(uv_config) == []
 
 
 def test_main_exit_codes(tmp_path: Path, capsys) -> None:
@@ -205,5 +256,6 @@ def test_main_exit_codes(tmp_path: Path, capsys) -> None:
 def test_real_tree_is_clean() -> None:
     root = Path(__file__).resolve().parent.parent
     assert check_hook_revs(root / ".pre-commit-config.yaml") == []
-    assert check_workflow(root / ".github" / "workflows" / "ci.yml") == []
-    assert check_workflow(root / ".github" / "workflows" / "dependency-audit.yml") == []
+    assert check_uv_config(root / ".github" / "uv.toml") == []
+    for name in ("ci.yml", "release.yml", "latest-deps.yml", "dependency-audit.yml"):
+        assert check_workflow(root / ".github" / "workflows" / name) == []

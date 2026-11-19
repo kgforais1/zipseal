@@ -310,6 +310,16 @@ basedpyright with `--group build`, so they can build and install the project
 through `uv_build`. Bumping any of these labels
 is its own commit and is recorded here with the previous value.
 
+## Tool pins
+
+The uv version lives once, in `.github/uv.toml`
+(`required-version = "==0.13.9"`). Every `astral-sh/setup-uv` step passes
+`version-file: .github/uv.toml`; `check-pins` rejects a step that omits it,
+names another file, or pins a range. Bump the one file in its own commit and
+record the previous value here. `BUILD_PYTHON` (3.13.17) is separate:
+`release.yml` and `packaging/build.py` must agree, and `check-hooks` enforces
+that pair.
+
 ## Dispatch rehearsal
 
 `workflow_dispatch` runs `check-hooks`, `check-test`, `check-audit` and, only if

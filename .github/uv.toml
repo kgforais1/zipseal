@@ -1,0 +1,4 @@
+# Single source of truth for the uv version used by CI and the release build.
+# Every `astral-sh/setup-uv` step passes `version-file: .github/uv.toml`.
+# Keep this an exact pin: `check-pins` rejects ranges and floating specs.
+required-version = "==0.13.9"
