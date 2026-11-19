@@ -257,5 +257,5 @@ def test_real_tree_is_clean() -> None:
     root = Path(__file__).resolve().parent.parent
     assert check_hook_revs(root / ".pre-commit-config.yaml") == []
     assert check_uv_config(root / ".github" / "uv.toml") == []
-    assert check_workflow(root / ".github" / "workflows" / "ci.yml") == []
-    assert check_workflow(root / ".github" / "workflows" / "dependency-audit.yml") == []
+    for name in ("ci.yml", "release.yml", "latest-deps.yml", "dependency-audit.yml"):
+        assert check_workflow(root / ".github" / "workflows" / name) == []

@@ -159,7 +159,7 @@ edits and refactors. User-visible changes go in [`CHANGELOG.md`](CHANGELOG.md).
   while `BUILD_PYTHON` is 3.13.17. The uv version now lives once in
   `.github/uv.toml` (`required-version = "==0.13.9"`), every `setup-uv` step
   passes `version-file: .github/uv.toml`, and `check-pins` rejects a step
-  that omits it or pins a range.
+  that omits it, names another file, sets both keys, or pins a range.
 - A macOS freeze that cannot remove a leftover `.dmg-staging` exits with
   `SystemExit` instead of a traceback. Packaging tests that drive `main`
   stub an arm64 machine, so Linux CI still reaches PyInstaller.

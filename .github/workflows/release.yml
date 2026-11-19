@@ -47,8 +47,8 @@ concurrency:
 env:
   # packaging/build.py pins the same interpreter; check-hooks fails if the two
   # strings differ (build.py must stay runnable on its own for local builds,
-  # and check_pins forces a literal version: for setup-uv, so neither pin can
-  # come from the other).
+  # and setup-uv reads its own version from .github/uv.toml, so neither pin
+  # can come from the other).
   BUILD_PYTHON: "3.13.17"
 
 jobs:

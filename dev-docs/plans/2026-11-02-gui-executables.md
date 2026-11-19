@@ -509,8 +509,9 @@ it. The smoke-tested artifact is what ships, never a second local build.
       failed `check-hooks` "Build interpreter pins agree" because
       `setup-uv` was pinned to uv 0.12.24, whose embedded Python manifest
       tops out at 3.13.16, while `BUILD_PYTHON` is 3.13.17; the same pin
-      breaks `build-macos`/`sign-macos`. All `setup-uv` pins move to
-      0.13.9. The macOS `check-test` cells were cancelled by GitHub runner
+      breaks `build-macos`/`sign-macos`. The pin moves to 0.13.9 in
+      `.github/uv.toml`; every step reads it with `version-file`. The macOS
+      `check-test` cells were cancelled by GitHub runner
       capacity, not by the code. Unticked until a green dispatch.
 - [ ] Manual acceptance (from M2 on, on a machine without Python): download
       the drafted release asset fresh (the browser sets the quarantine flag),
