@@ -490,7 +490,7 @@ it. The smoke-tested artifact is what ships, never a second local build.
       Add it to `REQUIRED_FILES` in `hooks/scripts/check_doc_freshness.py`,
       update the hook's error text (it lists the required paths), and add it
       to the durable-doc list in `dev-docs/README.md`.
-- [ ] Rehearse first: run the workflow with `workflow_dispatch` (the
+- [x] Rehearse first: run the workflow with `workflow_dispatch` (the
       `release.yml` bullet above). A dispatch runs `check-hooks`,
       `check-test`, `check-audit` and, only if those pass, `build-macos`. It
       skips `sign-macos` and `publish`: no `release` environment and no
@@ -505,14 +505,16 @@ it. The smoke-tested artifact is what ships, never a second local build.
       release, so a rehearsal tag would not do.
       Then the first real run at the next version bump; v0.1.0 stays
       source-only.
-      Blocked 2026-11-19: the first dispatch rehearsal (run 44573815905)
-      failed `check-hooks` "Build interpreter pins agree" because
-      `setup-uv` was pinned to uv 0.12.24, whose embedded Python manifest
-      tops out at 3.13.16, while `BUILD_PYTHON` is 3.13.17; the same pin
-      breaks `build-macos`/`sign-macos`. The pin moves to 0.13.9 in
-      `.github/uv.toml`; every step reads it with `version-file`. The macOS
-      `check-test` cells were cancelled by GitHub runner
-      capacity, not by the code. Unticked until a green dispatch.
+      Passed 2026-11-19 (run 44590496069, `main` at `8f9a814`):
+      `check-hooks` (including the interpreter-pin check), `check-test`
+      (all four cells), `check-audit` and `build-macos` are green;
+      `sign-macos` and `publish` are skipped as designed. This also answers
+      the round-5 open question: `build.py`'s `tkinter.Tk()` preflight runs
+      on the headless macOS runner. The first attempt (run 44573815905)
+      failed the pin check because `setup-uv` 0.12.24 could not install
+      `BUILD_PYTHON` 3.13.17; the pin is now the one `.github/uv.toml` read
+      through `version-file`. Signing, notarization and publishing stay
+      unticked until the first tag run.
 - [ ] Manual acceptance (from M2 on, on a machine without Python): download
       the drafted release asset fresh (the browser sets the quarantine flag),
       open the DMG, drag to Applications, launch, create an archive with a
@@ -979,3 +981,11 @@ only if Phase 3 signing is approved. Linux needs no secrets, and
   accepts the version-file form only when it names that file, validates the
   file's exact `required-version`, and rejects a step that sets both
   `version` and `version-file`.
+
+- 2026-11-19 (rehearsal): The first green `workflow_dispatch` (run
+  44590496069, `main` at `8f9a814`) passed `check-hooks`, `check-test`,
+  `check-audit` and `build-macos`; `sign-macos` and `publish` were skipped
+  as designed. The headless macOS runner accepts `build.py`'s
+  `tkinter.Tk()` preflight, closing the open question in the 2026-11-18
+  round-5 entry. The rehearsal box is ticked; the signing, notarization
+  and publish boxes stay unticked until the first tag run.

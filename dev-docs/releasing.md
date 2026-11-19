@@ -329,3 +329,8 @@ environment and no secrets. The tag-equals-version check stays tag-push only.
 dispatch on any other ref, and `build-macos` is also guarded on the ref, so a branch cannot be rehearsed
 this way. Rehearse after merging to `main`. Pushing a tag is what creates the draft
 release, so a rehearsal tag would not do.
+
+The first green rehearsal ran 2026-11-19 (run 44590496069) on `main` at
+`8f9a814`: `check-hooks`, `check-test`, `check-audit` and `build-macos`
+passed, and `sign-macos`/`publish` were skipped as designed. The macOS
+`build.py` preflight ran on the headless runner.

@@ -161,7 +161,9 @@ edits and refactors. User-visible changes go in [`CHANGELOG.md`](CHANGELOG.md).
   once in `.github/uv.toml` (`required-version = "==0.13.9"`); every
   `setup-uv` step passes `version-file: .github/uv.toml`, and `check-pins`
   rejects a step that omits it, names another file, sets both keys, or pins
-  a range.
+  a range. The re-run on 2026-11-19 (run 44590496069) passed `check-hooks`,
+  `check-test`, `check-audit` and `build-macos`; `sign-macos` and `publish`
+  were skipped as designed.
 - A macOS freeze that cannot remove a leftover `.dmg-staging` exits with
   `SystemExit` instead of a traceback. Packaging tests that drive `main`
   stub an arm64 machine, so Linux CI still reaches PyInstaller.
