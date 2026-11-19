@@ -68,8 +68,12 @@ text, and tick it as restored-and-verified instead of accepted.
 on both triggers with no environment and no secrets; a `workflow_dispatch`
 cannot reach the secrets because `sign-macos` is event-guarded. Before any step
 reads a secret, `sign-macos` checks out full history and fails unless the tagged
-commit is an ancestor of `origin/main`, so a version-matching tag on an
-unreviewed commit never runs `packaging/build.py` with the Apple secrets.
+commit is an ancestor of `origin/main`. That check guards against mis-tagging
+only. A tag push runs `release.yml` as it exists at the tagged commit, so a tag
+on a commit whose workflow drops the check would skip it. The secrets boundary
+is this environment's `v*` policy and required reviewers, plus the tag
+rulesets. Before approving `sign-macos`, the reviewer confirms that the run's
+commit is on `main`.
 
 ### Tag rulesets
 
@@ -212,8 +216,9 @@ disk through stdin, never argv, and are deleted after use.
 3. `release.yml` runs: the three check jobs re-run `ci.yml`'s gates, then
    `build-macos` freezes the unsigned `.app`, smoke-tests it, and uploads it.
    `sign-macos` waits for the maintainer's approval on the `release` environment
-   (one-account control, accepted 2026-11-17 — see the environment section),
-   then signs, notarizes and staples the `.app` and the DMG. `publish` verifies the tag still points at
+   (one-account control, accepted 2026-11-17 — see the environment section).
+   Approve only after confirming the run's commit is on `main`; that approval
+   is what keeps the secrets from an unreviewed commit. It then signs, notarizes and staples the `.app` and the DMG. `publish` verifies the tag still points at
    the tagged commit, writes `SHA256SUMS`, attests the artifact and the sums,
    and creates a **draft** release. The signature gate runs `stapler validate`
    on the DMG and on the unmounted, stapled `.app`. The app inside the mounted

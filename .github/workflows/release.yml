@@ -15,9 +15,11 @@
 # No job holds actions: write; artifact upload/download within a run uses
 # ACTIONS_RUNTIME_TOKEN, not GITHUB_TOKEN.
 #
-# sign-macos refuses a tag whose commit is not on main before any secret is
-# read, so a version-matching tag on an unreviewed commit cannot reach the
-# Apple secrets.
+# sign-macos also refuses a tag whose commit is not on main, before any secret
+# is read. That guards against mis-tagging only: a tag push runs this file as
+# it exists at the tagged commit, so a tag on a commit whose release.yml drops
+# the check would skip it. The secrets boundary is the `release` environment
+# (v* deployment policy and required reviewers) and the tag rulesets.
 #
 # Actions are pinned by full SHA with the release tag as a comment; the
 # check-pins hook enforces it. Build, sign and publish run on versioned
@@ -250,10 +252,10 @@ jobs:
         with:
           fetch-depth: 0
           persist-credentials: false
-      # Before any step reads a secret: the tagged commit must already be on
-      # the protected default branch, so an unreviewed commit under a
-      # version-matching tag fails here instead of running build.py with the
-      # Apple secrets present.
+      # Defence in depth against mis-tagging, before any step reads a secret:
+      # the tagged commit must already be on the protected default branch.
+      # Not the secrets boundary (see the header): the reviewer's approval of
+      # the `release` environment is.
       - name: Tagged commit is on main
         run: |
           if ! git merge-base --is-ancestor "$GITHUB_SHA" origin/main; then

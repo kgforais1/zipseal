@@ -946,3 +946,11 @@ only if Phase 3 signing is approved. Linux needs no secrets, and
   re-run rebuilds the same commit, so a defect means deleting the draft,
   fixing it on `main` through a PR, and cutting a new version (re-tagging the
   same version goes through Rollback and is not preferred).
+
+- 2026-11-19 (round 2): Hyrax noted that a tag push runs `release.yml` from the
+  tagged commit, so the on-main ancestry check cannot keep secrets from a tag
+  pusher who edits the workflow. The workflow comments and `releasing.md` now
+  call it defence in depth against mis-tagging. They name the `release`
+  environment (deployment policy and reviewers) and the tag rulesets as the
+  secrets boundary, and the reviewer confirms the commit is on `main` before
+  approving `sign-macos`. This corrects the 2026-11-18 entry's framing.
