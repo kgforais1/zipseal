@@ -48,7 +48,7 @@ jobs:
       - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884  # v10.3.0
         with:
           python-version: ${{ matrix.python }}
-          version: "0.13.9"
+          version-file: .github/uv.toml
       - name: Install 7-Zip and bsdtar
         run: sudo apt-get update && sudo apt-get install -y 7zip libarchive-tools
       - run: cp uv.lock "$RUNNER_TEMP/uv.lock.committed"

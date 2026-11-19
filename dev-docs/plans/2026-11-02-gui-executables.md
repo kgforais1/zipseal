@@ -379,7 +379,8 @@ it. The smoke-tested artifact is what ships, never a second local build.
       runs none of it. The three check jobs re-run those gates on both
       triggers. `check-hooks` is `ci.yml`'s `checks` job with the same steps
       except the sync, plus the tag check below; the checkout step with `fetch-depth: 0` and
-      `persist-credentials: false`, `setup-uv` at `version: "0.13.9"`,
+      `persist-credentials: false`, `setup-uv` reading the one uv pin in
+      `.github/uv.toml` (`version-file`),
       `uv sync --locked --no-build --no-install-project` (the hardened sync —
       hardened so SonarCloud's S8541 `--no-build` rule passes; the `check-pins`
       and `basedpyright` hooks still run their own `uv run`, basedpyright with
@@ -393,7 +394,7 @@ it. The smoke-tested artifact is what ships, never a second local build.
       `timeout-minutes: 30`, matrix
       `os: [ubuntu-latest, macos-latest]` × `python: ["3.11", "3.13"]`,
       `fail-fast: false`, checkout with `persist-credentials: false`,
-      `setup-uv` at `version: "0.13.9"` with
+      `setup-uv` reading `.github/uv.toml` with
       `python-version: ${{ matrix.python }}`, Linux
       `sudo apt-get update && sudo apt-get install -y 7zip libarchive-tools`,
       macOS `brew install sevenzip`, then `uv sync --locked --no-build
@@ -970,3 +971,10 @@ only if Phase 3 signing is approved. Linux needs no secrets, and
   installs 3.13.17 and still satisfies `uv_build<0.14.0`. The macOS
   `check-test` cells were cancelled by GitHub runner capacity, not by the
   change. The rehearsal box stays unticked until a green dispatch.
+
+- 2026-11-19 (round 4): The uv pin is centralized in `.github/uv.toml`
+  (`required-version = "==0.13.9"`); every `setup-uv` step passes
+  `version-file: .github/uv.toml`, so a bump is one line. `check-pins` now
+  accepts the version-file form only when it names that file, validates the
+  file's exact `required-version`, and rejects a step that sets both
+  `version` and `version-file`.

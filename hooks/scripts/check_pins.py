@@ -12,8 +12,11 @@ Three rules (see dev-docs/plans/2026-10-15-sha-pin-ci-tooling.md, Task 3):
    come from `yaml.compose` marks, since parsing discards comments; alias use
    is detected at the key position and exempted because pre-commit resolves
    it identically.
-2. uv versions: in every workflow, each `astral-sh/setup-uv` step must set
-   `with.version` to a full literal release version. The action name is matched
+2. uv versions: in every workflow, each `astral-sh/setup-uv` step must pin
+   the uv version. Either set `with.version` to a full literal release
+   version, or set `with.version-file: .github/uv.toml` and leave `version`
+   unset. The referenced file must carry an exact `required-version`
+   (`==x.y.z`), which this hook validates directly. The action name is matched
    case-insensitively, since GitHub resolves owner/repo that way.
 3. Action refs: in every workflow, each `uses:` naming a remote action must
    pin a full 40-character lowercase hex SHA. Local (`./…`) and `docker://…`
@@ -26,6 +29,7 @@ from __future__ import annotations
 
 import re
 import sys
+import tomllib
 from pathlib import Path
 
 import yaml
@@ -33,6 +37,7 @@ from yaml.nodes import MappingNode, ScalarNode, SequenceNode
 
 FULL_SHA = re.compile(r"\A[0-9a-f]{40}\Z")
 EXACT_VERSION = re.compile(r"[0-9]+\.[0-9]+\.[0-9]+")
+EXACT_REQUIRED_VERSION = re.compile(r"==[0-9]+\.[0-9]+\.[0-9]+")
 COMMENT = re.compile(r"#[ \t]*\S")
 USES_SHA = re.compile(r"\A[^@\s]+@[0-9a-f]{40}\Z")
 
@@ -40,6 +45,8 @@ SKIP_REPOS = {"local", "meta"}
 # GitHub resolves owner/repo case-insensitively, so a re-cased reference
 # still runs setup-uv and must still pin an exact version.
 SETUP_UV = "astral-sh/setup-uv"
+# The one CI uv pin; setup-uv reads `required-version` from it.
+CI_UV_CONFIG = ".github/uv.toml"
 
 
 def _read_text(path: Path) -> tuple[str | None, list[str]]:
@@ -149,16 +156,46 @@ def check_workflow(path: Path) -> list[str]:
         if uses.rsplit("@", 1)[0].lower() != SETUP_UV:
             continue
         with_block = node.get("with")
-        version = with_block.get("version") if isinstance(with_block, dict) else None
-        if not isinstance(version, str) or not EXACT_VERSION.fullmatch(version):
-            findings.append(f"{path}: {where} setup-uv version must be an exact x.y.z release")
+        values = with_block if isinstance(with_block, dict) else {}
+        version = values.get("version")
+        version_file = values.get("version-file")
+        if version is not None and version_file is not None:
+            findings.append(f"{path}: {where} setup-uv sets both version and version-file")
+            continue
+        if version is not None:
+            if not isinstance(version, str) or not EXACT_VERSION.fullmatch(version):
+                findings.append(f"{path}: {where} setup-uv version must be an exact x.y.z release")
+            continue
+        if isinstance(version_file, str) and version_file.removeprefix("./") == CI_UV_CONFIG:
+            continue
+        findings.append(
+            f"{path}: {where} setup-uv must set an exact version or version-file: {CI_UV_CONFIG}"
+        )
     return findings
+
+
+def check_uv_config(path: Path) -> list[str]:
+    """Require the one CI uv pin to be an exact `required-version`."""
+    text, errors = _read_text(path)
+    if errors or text is None:
+        return errors
+    try:
+        data = tomllib.loads(text)
+    except tomllib.TOMLDecodeError as exc:
+        return [f"{path}: malformed TOML: {exc}"]
+    required = data.get("required-version")
+    if not isinstance(required, str) or not EXACT_REQUIRED_VERSION.fullmatch(required):
+        return [f"{path}: required-version must be an exact `==x.y.z` pin, found {required!r}"]
+    return []
 
 
 def scan(path: Path) -> list[str]:
     if path.name == ".pre-commit-config.yaml":
         return check_hook_revs(path)
-    if ".github/workflows/" in path.as_posix():
+    normalized = path.as_posix()
+    if normalized.endswith(CI_UV_CONFIG):
+        return check_uv_config(path)
+    if ".github/workflows/" in normalized:
         return check_workflow(path)
     return []
 

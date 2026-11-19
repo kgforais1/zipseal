@@ -56,7 +56,7 @@ repos:
         name: "policy: immutable version pins"
         entry: uv run python hooks/scripts/check_pins.py
         language: system
-        files: '^(\.pre-commit-config\.yaml|\.github/workflows/[^/]+\.ya?ml)$'
+        files: '^(\.pre-commit-config\.yaml|\.github/workflows/[^/]+\.ya?ml|\.github/uv\.toml)$'
         types: [text]
 
       - id: basedpyright
