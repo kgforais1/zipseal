@@ -154,12 +154,14 @@ edits and refactors. User-visible changes go in [`CHANGELOG.md`](CHANGELOG.md).
 
 ### Fixed
 
-- The first release rehearsal failed `check-hooks` because `setup-uv` was
-  pinned to uv 0.12.24, whose embedded Python manifest stops at 3.13.16
-  while `BUILD_PYTHON` is 3.13.17. The uv version now lives once in
-  `.github/uv.toml` (`required-version = "==0.13.9"`), every `setup-uv` step
-  passes `version-file: .github/uv.toml`, and `check-pins` rejects a step
-  that omits it, names another file, sets both keys, or pins a range.
+- The release pipeline's `setup-uv` pin moves from uv 0.12.24 to 0.13.9.
+  0.12.24's embedded Python manifest stops at 3.13.16 while `BUILD_PYTHON`
+  is 3.13.17, so the first rehearsal failed `check-hooks` and
+  `build-macos`/`sign-macos` would have failed too. The version now lives
+  once in `.github/uv.toml` (`required-version = "==0.13.9"`); every
+  `setup-uv` step passes `version-file: .github/uv.toml`, and `check-pins`
+  rejects a step that omits it, names another file, sets both keys, or pins
+  a range.
 - A macOS freeze that cannot remove a leftover `.dmg-staging` exits with
   `SystemExit` instead of a traceback. Packaging tests that drive `main`
   stub an arm64 machine, so Linux CI still reaches PyInstaller.
