@@ -235,8 +235,16 @@ disk through stdin, never argv, and are deleted after use.
    `SHA256SUMS` are all present and the checksums match.
 6. Do the manual acceptance below on a machine with no Python on `PATH`.
 7. If step 5 or 6 fails, abort acceptance and leave the draft unpublished.
-   Re-run the workflow, wait for it to finish (step 4), and repeat steps 5 and
-   6 from the start.
+   Then decide which kind of failure it is.
+   - A transient failure, such as a missing or corrupt asset from an
+     interrupted run, or a notarization or network error: re-run the
+     workflow, wait for it to finish (step 4), and repeat steps 5 and 6 from
+     the start.
+   - A deterministic defect in the app: a re-run rebuilds the same tagged
+     commit, so it cannot fix the defect. Delete the draft, fix the defect on
+     `main` through a PR, and cut a new version from step 1. Re-tagging the
+     same version needs the [Rollback](#rollback) procedure; prefer a new
+     version.
 8. Publish the draft. The workflow never publishes a final release.
 
 `v0.1.0` stays source-only; the first run is the next version bump.

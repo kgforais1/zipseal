@@ -940,3 +940,9 @@ only if Phase 3 signing is approved. Linux needs no secrets, and
   box's stored `KEYCHAIN_PASSWORD` were corrected. Open, untested: whether
   `build.py`'s `tkinter.Tk()` preflight runs on the headless macOS runner; the
   first dispatch rehearsal answers it.
+
+- 2026-11-19: CodeRabbit asked `releasing.md` step 7 to separate transient
+  failures (re-run, repeat steps 5 and 6) from deterministic app defects. A
+  re-run rebuilds the same commit, so a defect means deleting the draft,
+  fixing it on `main` through a PR, and cutting a new version (re-tagging the
+  same version goes through Rollback and is not preferred).
