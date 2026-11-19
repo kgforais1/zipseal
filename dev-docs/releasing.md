@@ -238,7 +238,9 @@ disk through stdin, never argv, and are deleted after use.
    is being checked or published, no run may be in progress.
 5. Check the draft's final assets: the DMG, `build-info.json` and
    `SHA256SUMS` are all present and the checksums match.
-6. Do the manual acceptance below on a machine with no Python on `PATH`.
+6. Do the manual acceptance below on a machine with no user-installed Python
+   on `PATH` (no uv-managed, pyenv or Homebrew interpreter; Apple's
+   `/usr/bin/python3` may be present).
 7. If step 5 or 6 fails, abort acceptance and leave the draft unpublished.
    Then decide which kind of failure it is.
    - A transient failure, such as a missing or corrupt asset from an
@@ -274,21 +276,27 @@ notes or the commit that re-tags.
 ## Acceptance checklist
 
 Blocking gate for publish: the drafted artifact for every platform the release
-contains is accepted on a machine with no Python on `PATH` — launch it, create
-an archive with a generated password, open it.
+contains is accepted on a machine with no **user-installed** Python on `PATH`
+(no uv-managed, pyenv or Homebrew interpreter) — launch it, create an archive
+with a generated password, open it. The Apple-provided `/usr/bin/python3` may
+be present on macOS; it ships with the OS and is not a user install. Windows
+and Linux use the M3 environments below.
 
 - **M1 (local macOS, done 2026-11-15, macOS 26 / darwin 25.6.0):** the unsigned
   app and DMG from `dist/0.1.0/` were opened; a synthetic quarantine xattr
   triggered the Gatekeeper refusal, the app was launched with Privacy & Security
   → Open Anyway, and it created an archive that opened. M1 has no CI.
-- **M2 (macOS, from the draft release):** download the DMG fresh (the browser
-  sets quarantine), open it, drag to Applications, launch, create an archive
-  with a generated password, open it in Finder and 7-Zip. Record the date and
-  macOS version here.
-- **M3 (Windows and Linux, from the draft release):** download and run each
-  artifact on a machine with no Python on `PATH`; create an archive with a
-  generated password and open it in 7-Zip or `bsdtar`. Record the date and OS
-  here.
+- **M2 (macOS, from the draft release, in a clean Standard second account or
+  VM with no user-installed Python on `PATH`; Apple's `/usr/bin/python3` may
+  be present):** download the DMG fresh (the browser sets quarantine), open
+  it, drag to Applications, launch, create an archive with a generated
+  password, open it in Finder and 7-Zip. Record the date, macOS version and
+  which `python3` was visible here.
+- **M3 (Windows and Linux, from the draft release):** run the Windows zip on a
+  clean Windows 11 VM under Parallels/UTM, where the x64 build runs under
+  emulation on Windows-on-ARM, and the Linux artifacts in a VM with no system
+  Python. Create an archive with a generated password and open it in 7-Zip or
+  `bsdtar`. Record the date and OS here.
 
 ## Runner images
 
@@ -329,3 +337,8 @@ environment and no secrets. The tag-equals-version check stays tag-push only.
 dispatch on any other ref, and `build-macos` is also guarded on the ref, so a branch cannot be rehearsed
 this way. Rehearse after merging to `main`. Pushing a tag is what creates the draft
 release, so a rehearsal tag would not do.
+
+The first green rehearsal ran 2026-11-19 (run 44590496069) on `main` at
+`8f9a814`: `check-hooks`, `check-test`, `check-audit` and `build-macos`
+passed, and `sign-macos`/`publish` were skipped as designed. The macOS
+`build.py` preflight ran on the headless runner.

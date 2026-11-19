@@ -24,8 +24,12 @@ smoke launches that same artifact; Windows and Linux fail the job, the macOS
 check may be advisory, and `codesign`/`spctl`/`stapler` still fail it. Before
 publishing, the drafted artifact for every platform the release contains
 (macOS at M2; Windows and Linux from M3) is accepted on a machine with no
-Python on PATH: launch it, create an archive with a generated password, open
-it. The smoke-tested artifact is what ships, never a second local build.
+user-installed Python on `PATH` (no uv-managed, pyenv or Homebrew
+interpreter): launch it, create an archive with a generated password, open
+it. The Apple-provided `/usr/bin/python3` may be present; it ships with the
+OS and is not a user install. On macOS a clean Standard second account is
+equivalent to a clean VM. The smoke-tested artifact is what ships, never a
+second local build.
 
 ## Non-goals
 
@@ -490,7 +494,7 @@ it. The smoke-tested artifact is what ships, never a second local build.
       Add it to `REQUIRED_FILES` in `hooks/scripts/check_doc_freshness.py`,
       update the hook's error text (it lists the required paths), and add it
       to the durable-doc list in `dev-docs/README.md`.
-- [ ] Rehearse first: run the workflow with `workflow_dispatch` (the
+- [x] Rehearse first: run the workflow with `workflow_dispatch` (the
       `release.yml` bullet above). A dispatch runs `check-hooks`,
       `check-test`, `check-audit` and, only if those pass, `build-macos`. It
       skips `sign-macos` and `publish`: no `release` environment and no
@@ -505,19 +509,22 @@ it. The smoke-tested artifact is what ships, never a second local build.
       release, so a rehearsal tag would not do.
       Then the first real run at the next version bump; v0.1.0 stays
       source-only.
-      Blocked 2026-11-19: the first dispatch rehearsal (run 44573815905)
-      failed `check-hooks` "Build interpreter pins agree" because
-      `setup-uv` was pinned to uv 0.12.24, whose embedded Python manifest
-      tops out at 3.13.16, while `BUILD_PYTHON` is 3.13.17; the same pin
-      breaks `build-macos`/`sign-macos`. The pin moves to 0.13.9 in
-      `.github/uv.toml`; every step reads it with `version-file`. The macOS
-      `check-test` cells were cancelled by GitHub runner
-      capacity, not by the code. Unticked until a green dispatch.
-- [ ] Manual acceptance (from M2 on, on a machine without Python): download
-      the drafted release asset fresh (the browser sets the quarantine flag),
-      open the DMG, drag to Applications, launch, create an archive with a
-      generated password, open it in Finder and 7-Zip. Record the date and
-      macOS version here.
+      Passed 2026-11-19 (run 44590496069, `main` at `8f9a814`):
+      `check-hooks` (including the interpreter-pin check), `check-test`
+      (all four cells), `check-audit` and `build-macos` are green;
+      `sign-macos` and `publish` are skipped as designed. This also answers
+      the round-5 open question: `build.py`'s `tkinter.Tk()` preflight runs
+      on the headless macOS runner. The first attempt (run 44573815905)
+      failed the pin check because `setup-uv` 0.12.24 could not install
+      `BUILD_PYTHON` 3.13.17; the pin is now the one `.github/uv.toml` read
+      through `version-file`. Signing, notarization and publishing stay
+      unticked until the first tag run.
+- [ ] Manual acceptance (from M2 on, in a clean Standard second account or VM
+      with no user-installed Python on `PATH`; Apple's `/usr/bin/python3` may
+      be present): download the drafted release asset fresh (the browser sets
+      the quarantine flag), open the DMG, drag to Applications, launch, create
+      an archive with a generated password, open it in Finder and 7-Zip.
+      Record the date, macOS version and which `python3` was visible here.
 
 ## Phase 3 — Windows app
 
@@ -532,11 +539,13 @@ it. The smoke-tested artifact is what ships, never a second local build.
       launch `zipseal-gui.exe` from that extraction. Running the exe from
       the build tree does not count. Wait, confirm it is alive, stop it.
       A failure fails the job.
-- [ ] Manual acceptance (drafted release, on a machine without Python):
-      download the zip, unzip, run `zipseal-gui.exe`, create an archive with a
-      generated password, and open it in 7-Zip (Explorer's built-in zip
-      support is unreliable for AES; see `user-docs/opening-archives.md`).
-      Record the date and Windows version here.
+- [ ] Manual acceptance (drafted release, on a clean Windows 11 VM under
+      Parallels/UTM, where the x64 zip runs under emulation on
+      Windows-on-ARM): download the zip, unzip, run `zipseal-gui.exe`, create
+      an archive with a generated password, and open it in 7-Zip (Explorer's
+      built-in zip support is unreliable for AES; see
+      `user-docs/opening-archives.md`). Record the date and Windows version
+      here.
 - [ ] Resolve signing (Decision 3) on both tracks:
   - SignPath Foundation application — only after the first tagged release has
     shipped the (unsigned) zip: SignPath requires the project to be already
@@ -615,11 +624,12 @@ it. The smoke-tested artifact is what ships, never a second local build.
       `zipseal` (`xdotool search --name`), then terminate. Run
       `desktop-file-validate` on the AppDir desktop file. A failure fails
       the job.
-- [ ] Manual acceptance (drafted release, on a machine without Python):
-      download the AppImage and the `.tar.gz`; extract the `.tar.gz` and run
-      the binary; run the AppImage (use `--appimage-extract-and-run` if FUSE
-      is unavailable); create an archive with a generated password, and open
-      it in 7-Zip or `bsdtar`. Record the date and distro here.
+- [ ] Manual acceptance (drafted release, in a Linux VM with no system
+      Python): download the AppImage and the `.tar.gz`; extract the `.tar.gz`
+      and run the binary; run the AppImage (use
+      `--appimage-extract-and-run` if FUSE is unavailable); create an archive
+      with a generated password, and open it in 7-Zip or `bsdtar`. Record the
+      date and distro here.
 - [ ] Docs: `chmod +x`, the FUSE fallback
       (`./zipseal-gui.AppImage --appimage-extract-and-run`), and that the
       `.tar.gz` runs from any folder.
@@ -741,11 +751,12 @@ only if Phase 3 signing is approved. Linux needs no secrets, and
 - **M2**: tagged workflow produces a signed, notarized, stapled DMG as a draft
   release; manual acceptance recorded; maintainer publishes.
 - **M3**: Windows zip and Linux AppImage + tar.gz join the same workflow,
-  smoke-tested in CI and accepted on machines with no Python on PATH
-  (macOS: a clean VM or second account, not the dev account where `uv` and its
-  managed interpreters live; Windows: a clean Windows 11 VM under
-  Parallels/UTM, where the x64 zip runs emulated on Windows-on-ARM; Linux: a
-  VM with no system Python), `SHA256SUMS` + attestations attached; the
+  smoke-tested in CI and accepted on machines with no user-installed Python on
+  `PATH` (macOS: a clean VM or Standard second account, not the dev account
+  where `uv` and its managed interpreters live; Apple's `/usr/bin/python3` may
+  be present; Windows: a clean Windows 11 VM under Parallels/UTM, where the
+  x64 zip runs emulated on Windows-on-ARM; Linux: a VM with no system Python),
+  `SHA256SUMS` + attestations attached; the
   Windows signing outcome is recorded per artifact (zip signed, or zip
   unsigned with the Store MSIX signed separately).
 - **M4**: README, `user-docs/`, `AGENTS.md` and `SPEC.md` updated;
@@ -979,3 +990,19 @@ only if Phase 3 signing is approved. Linux needs no secrets, and
   accepts the version-file form only when it names that file, validates the
   file's exact `required-version`, and rejects a step that sets both
   `version` and `version-file`.
+
+- 2026-11-19 (rehearsal): The first green `workflow_dispatch` (run
+  44590496069, `main` at `8f9a814`) passed `check-hooks`, `check-test`,
+  `check-audit` and `build-macos`; `sign-macos` and `publish` were skipped
+  as designed. The headless macOS runner accepts `build.py`'s
+  `tkinter.Tk()` preflight, closing the open question in the 2026-11-18
+  round-5 entry. The rehearsal box is ticked; the signing, notarization
+  and publish boxes stay unticked until the first tag run.
+
+- 2026-11-19 (acceptance): The "no Python on `PATH`" gate now means no
+  user-installed Python (uv-managed, pyenv or Homebrew). The Apple-provided
+  `/usr/bin/python3` may be present: it ships with the OS and is not a user
+  install. A clean Standard second account is the macOS clean environment,
+  as M3 already allowed, so acceptance needs no separate hardware; the
+  maintainer has no Python-free machine. The acceptance record names the
+  visible `python3`.
