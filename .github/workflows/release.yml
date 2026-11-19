@@ -225,10 +225,14 @@ jobs:
             "dist/${{ steps.version.outputs.version }}/zipseal-gui-macos-app.zip"
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9  # v7.0.2
         with:
+          # A re-run replaces the earlier attempt's artifact instead of 409ing.
+          overwrite: true
           name: zipseal-gui-macos-app
           path: dist/${{ steps.version.outputs.version }}/zipseal-gui-macos-app.zip
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9  # v7.0.2
         with:
+          # A re-run replaces the earlier attempt's artifact instead of 409ing.
+          overwrite: true
           name: zipseal-gui-macos-info
           path: dist/${{ steps.version.outputs.version }}/build-info.json
 
@@ -418,6 +422,8 @@ jobs:
           trap - EXIT
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9  # v7.0.2
         with:
+          # A re-run replaces the earlier attempt's artifact instead of 409ing.
+          overwrite: true
           name: zipseal-gui-macos-dmg
           path: dist/${{ steps.version.outputs.version }}/zipseal-gui-${{ steps.version.outputs.version }}-macos-arm64.dmg
       - name: Delete the ephemeral keychain

@@ -202,10 +202,12 @@ disk through stdin, never argv, and are deleted after use.
 
 ## Tag to release
 
-1. Bump `version` in `pyproject.toml`, commit to `main`, and push. The tag check
-   in `check-hooks` requires the tag to equal `v` plus that version, compared
-   whole.
-2. Tag and push the tag as `kgrizz-git`:
+1. Bump `version` in `pyproject.toml`, run `uv lock` (`uv.lock` records the
+   project version, so every `--locked` gate fails without it), and land both
+   files on `main` through a pull request. `main`'s ruleset requires a PR, so
+   a direct push is rejected. The tag check in `check-hooks` requires the tag
+   to equal `v` plus that version, compared whole.
+2. After the PR merges, pull `main`, then tag and push the tag as `kgrizz-git`:
    `git tag v<version> && git push origin v<version>`.
 3. `release.yml` runs: the three check jobs re-run `ci.yml`'s gates, then
    `build-macos` freezes the unsigned `.app`, smoke-tests it, and uploads it.

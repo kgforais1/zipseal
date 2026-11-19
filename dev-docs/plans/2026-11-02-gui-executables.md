@@ -294,7 +294,8 @@ it. The smoke-tested artifact is what ships, never a second local build.
       Note:
       Created 2026-11-15/2026-11-16 under `kgforais1`'s fine-grained PAT via
       `.context/gh-pat.sh`; see `dev-docs/releasing.md` for the exact calls and
-      for the live state. No Apple secret has been stored yet. The two rulesets are
+      for the live state. The six Apple secrets were stored 2026-11-18 (see
+      `dev-docs/releasing.md`). The two rulesets are
       as specified: creation limited to the tag-pushing account, immutability
       with an empty bypass list.
       The control is the two-account split: tag pushes are created by
@@ -319,7 +320,9 @@ it. The smoke-tested artifact is what ships, never a second local build.
       environment's required reviewers and `prevent_self_review` in the UI
       (both accounts are theirs); that state is recorded in
       `dev-docs/releasing.md` rather than assumed to be the intended split.
-- [ ] CI signing path (tag pushes only, inside `sign-macos`): `security
+- [ ] CI signing path (tag pushes only, inside `sign-macos`). The keychain
+      password is generated per run (`openssl rand -base64 32`, masked), not
+      a stored secret (amended 2026-11-18). `security
       create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"`, `security
       unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"`, `security
       list-keychains -d user -s "$KEYCHAIN_PATH" login.keychain` (without the
@@ -927,3 +930,13 @@ only if Phase 3 signing is approved. Linux needs no secrets, and
   A follow-up CodeRabbit note added the recovery path: if the asset check or
   acceptance fails, abort, leave the draft unpublished, re-run, wait for it to
   finish, and repeat every final check before publishing.
+
+- 2026-11-18 (round 5): DeepSeek review of PR #20. `releasing.md` step 1 now
+  runs `uv lock` with the version bump (the lockfile records the project
+  version) and lands it on `main` through a PR (the `main` ruleset requires
+  one). The three `upload-artifact` steps set `overwrite: true` so a full
+  re-run does not fail on an existing artifact name. The stale "no Apple
+  secrets stored" text in this plan and `CHANGELOG.dev.md` and the CI signing
+  box's stored `KEYCHAIN_PASSWORD` were corrected. Open, untested: whether
+  `build.py`'s `tkinter.Tk()` preflight runs on the headless macOS runner; the
+  first dispatch rehearsal answers it.
