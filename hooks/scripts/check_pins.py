@@ -137,6 +137,23 @@ def _iter_steps(data: object) -> list[tuple[dict, str]]:
     return found
 
 
+def check_setup_uv_pin(path: Path, where: str, node: dict) -> list[str]:
+    """Return findings for one setup-uv step's version pin."""
+    with_block = node.get("with")
+    values = with_block if isinstance(with_block, dict) else {}
+    version = values.get("version")
+    version_file = values.get("version-file")
+    if version is not None and version_file is not None:
+        return [f"{path}: {where} setup-uv sets both version and version-file"]
+    if version is not None:
+        if isinstance(version, str) and EXACT_VERSION.fullmatch(version):
+            return []
+        return [f"{path}: {where} setup-uv version must be an exact x.y.z release"]
+    if isinstance(version_file, str) and version_file.removeprefix("./") == CI_UV_CONFIG:
+        return []
+    return [f"{path}: {where} setup-uv must set an exact version or version-file: {CI_UV_CONFIG}"]
+
+
 def check_workflow(path: Path) -> list[str]:
     findings: list[str] = []
     text, errors = _read_text(path)
@@ -153,24 +170,8 @@ def check_workflow(path: Path) -> list[str]:
             continue
         if not USES_SHA.match(uses):
             findings.append(f"{path}: {where} uses must pin a 40-char hex SHA")
-        if uses.rsplit("@", 1)[0].lower() != SETUP_UV:
-            continue
-        with_block = node.get("with")
-        values = with_block if isinstance(with_block, dict) else {}
-        version = values.get("version")
-        version_file = values.get("version-file")
-        if version is not None and version_file is not None:
-            findings.append(f"{path}: {where} setup-uv sets both version and version-file")
-            continue
-        if version is not None:
-            if not isinstance(version, str) or not EXACT_VERSION.fullmatch(version):
-                findings.append(f"{path}: {where} setup-uv version must be an exact x.y.z release")
-            continue
-        if isinstance(version_file, str) and version_file.removeprefix("./") == CI_UV_CONFIG:
-            continue
-        findings.append(
-            f"{path}: {where} setup-uv must set an exact version or version-file: {CI_UV_CONFIG}"
-        )
+        if uses.rsplit("@", 1)[0].lower() == SETUP_UV:
+            findings.extend(check_setup_uv_pin(path, where, node))
     return findings
 
 
