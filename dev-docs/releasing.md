@@ -224,9 +224,15 @@ disk through stdin, never argv, and are deleted after use.
    runs, immutable releases make the asset upload fail, and the job checks
    again before editing the notes. Immutable releases lock assets and the tag,
    not the title or notes, so a publish in the last moment before the edit
-   could still overwrite those two.
-4. Do the manual acceptance below on a machine with no Python on `PATH`.
-5. Publish the draft. The workflow never publishes a final release.
+   could still overwrite those two. Worse, `--clobber` deletes each old asset
+   before uploading its replacement. A publish in that gap leaves a published
+   release missing that asset, and immutability then blocks re-adding it.
+4. Wait until every `release.yml` run for the tag has finished. Do not start a
+   re-run from here until the draft is published.
+5. Check the draft's final assets: the DMG, `build-info.json` and
+   `SHA256SUMS` are all present and the checksums match.
+6. Do the manual acceptance below on a machine with no Python on `PATH`.
+7. Publish the draft. The workflow never publishes a final release.
 
 `v0.1.0` stays source-only; the first run is the next version bump.
 

@@ -918,3 +918,9 @@ only if Phase 3 signing is approved. Linux needs no secrets, and
   sign off-runner until the certificate is revoked, with revoke-and-rotate as
   the response. The stale `actions: write` claim was removed from the dispatch
   section.
+
+- 2026-11-18 (round 4): CodeRabbit noted that `--clobber` deletes an asset
+  before re-uploading it, so publishing during a re-run can leave a published,
+  immutable release missing an asset. `releasing.md`'s tag-to-release steps
+  now require every run for the tag to finish before acceptance, a check of
+  the draft's final assets, and no re-run during acceptance or publication.
