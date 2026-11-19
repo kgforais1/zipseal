@@ -379,7 +379,7 @@ it. The smoke-tested artifact is what ships, never a second local build.
       runs none of it. The three check jobs re-run those gates on both
       triggers. `check-hooks` is `ci.yml`'s `checks` job with the same steps
       except the sync, plus the tag check below; the checkout step with `fetch-depth: 0` and
-      `persist-credentials: false`, `setup-uv` at `version: "0.12.24"`,
+      `persist-credentials: false`, `setup-uv` at `version: "0.13.9"`,
       `uv sync --locked --no-build --no-install-project` (the hardened sync —
       hardened so SonarCloud's S8541 `--no-build` rule passes; the `check-pins`
       and `basedpyright` hooks still run their own `uv run`, basedpyright with
@@ -393,7 +393,7 @@ it. The smoke-tested artifact is what ships, never a second local build.
       `timeout-minutes: 30`, matrix
       `os: [ubuntu-latest, macos-latest]` × `python: ["3.11", "3.13"]`,
       `fail-fast: false`, checkout with `persist-credentials: false`,
-      `setup-uv` at `version: "0.12.24"` with
+      `setup-uv` at `version: "0.13.9"` with
       `python-version: ${{ matrix.python }}`, Linux
       `sudo apt-get update && sudo apt-get install -y 7zip libarchive-tools`,
       macOS `brew install sevenzip`, then `uv sync --locked --no-build
@@ -504,6 +504,13 @@ it. The smoke-tested artifact is what ships, never a second local build.
       release, so a rehearsal tag would not do.
       Then the first real run at the next version bump; v0.1.0 stays
       source-only.
+      Blocked 2026-11-19: the first dispatch rehearsal (run 44573815905)
+      failed `check-hooks` "Build interpreter pins agree" because
+      `setup-uv` was pinned to uv 0.12.24, whose embedded Python manifest
+      tops out at 3.13.16, while `BUILD_PYTHON` is 3.13.17; the same pin
+      breaks `build-macos`/`sign-macos`. All `setup-uv` pins move to
+      0.13.9. The macOS `check-test` cells were cancelled by GitHub runner
+      capacity, not by the code. Unticked until a green dispatch.
 - [ ] Manual acceptance (from M2 on, on a machine without Python): download
       the drafted release asset fresh (the browser sets the quarantine flag),
       open the DMG, drag to Applications, launch, create an archive with a
@@ -954,3 +961,12 @@ only if Phase 3 signing is approved. Linux needs no secrets, and
   environment (deployment policy and reviewers) and the tag rulesets as the
   secrets boundary, and the reviewer confirms the commit is on `main` before
   approving `sign-macos`. This corrects the 2026-11-18 entry's framing.
+
+- 2026-11-19 (round 3): The first `workflow_dispatch` rehearsal (run
+  44573815905) failed `check-hooks` "Build interpreter pins agree": uv
+  0.12.24 cannot install `BUILD_PYTHON` 3.13.17 (its embedded manifest
+  stops at 3.13.16), which also breaks `build-macos`/`sign-macos`'s
+  `uv run --python 3.13.17`. All `setup-uv` pins move to 0.13.9, which
+  installs 3.13.17 and still satisfies `uv_build<0.14.0`. The macOS
+  `check-test` cells were cancelled by GitHub runner capacity, not by the
+  change. The rehearsal box stays unticked until a green dispatch.

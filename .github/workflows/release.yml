@@ -63,7 +63,7 @@ jobs:
           persist-credentials: false
       - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884  # v10.3.0
         with:
-          version: "0.12.24"
+          version: "0.13.9"
       # The sync step itself runs no PEP 517 backend (--no-build) and does not
       # install zipseal (--no-install-project); the gates inspect source only.
       # Note: the basedpyright/check-pins hooks re-run `uv run` — they re-sync
@@ -132,7 +132,7 @@ jobs:
       - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884  # v10.3.0
         with:
           python-version: ${{ matrix.python }}
-          version: "0.12.24"
+          version: "0.13.9"
       - name: Install 7-Zip and bsdtar (Linux)
         if: runner.os == 'Linux'
         run: sudo apt-get update && sudo apt-get install -y 7zip libarchive-tools
@@ -158,7 +158,7 @@ jobs:
           persist-credentials: false
       - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884  # v10.3.0
         with:
-          version: "0.12.24"
+          version: "0.13.9"
       # --group build: build-macos freezes the app with the build group
       # (PyInstaller, Pillow), so it must reach the audit too (latest-deps.yml
       # syncs --group build for the same reason). The dev group stays out.
@@ -180,7 +180,7 @@ jobs:
           persist-credentials: false
       - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884  # v10.3.0
         with:
-          version: "0.12.24"
+          version: "0.13.9"
       - name: Read the project version
         id: version
         run: |
@@ -265,7 +265,7 @@ jobs:
           echo "$GITHUB_SHA is on origin/main"
       - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884  # v10.3.0
         with:
-          version: "0.12.24"
+          version: "0.13.9"
       - name: Read the project version
         id: version
         run: |
