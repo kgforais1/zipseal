@@ -924,3 +924,6 @@ only if Phase 3 signing is approved. Linux needs no secrets, and
   immutable release missing an asset. `releasing.md`'s tag-to-release steps
   now require every run for the tag to finish before acceptance, a check of
   the draft's final assets, and no re-run during acceptance or publication.
+  A follow-up CodeRabbit note added the recovery path: if the asset check or
+  acceptance fails, abort, leave the draft unpublished, re-run, wait for it to
+  finish, and repeat every final check before publishing.

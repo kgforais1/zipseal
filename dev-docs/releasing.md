@@ -227,12 +227,15 @@ disk through stdin, never argv, and are deleted after use.
    could still overwrite those two. Worse, `--clobber` deletes each old asset
    before uploading its replacement. A publish in that gap leaves a published
    release missing that asset, and immutability then blocks re-adding it.
-4. Wait until every `release.yml` run for the tag has finished. Do not start a
-   re-run from here until the draft is published.
+4. Wait until every `release.yml` run for the tag has finished. While a draft
+   is being checked or published, no run may be in progress.
 5. Check the draft's final assets: the DMG, `build-info.json` and
    `SHA256SUMS` are all present and the checksums match.
 6. Do the manual acceptance below on a machine with no Python on `PATH`.
-7. Publish the draft. The workflow never publishes a final release.
+7. If step 5 or 6 fails, abort acceptance and leave the draft unpublished.
+   Re-run the workflow, wait for it to finish (step 4), and repeat steps 5 and
+   6 from the start.
+8. Publish the draft. The workflow never publishes a final release.
 
 `v0.1.0` stays source-only; the first run is the next version bump.
 
