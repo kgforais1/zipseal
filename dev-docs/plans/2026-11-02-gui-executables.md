@@ -539,10 +539,11 @@ second local build.
       launch `zipseal-gui.exe` from that extraction. Running the exe from
       the build tree does not count. Wait, confirm it is alive, stop it.
       A failure fails the job.
-- [ ] Manual acceptance (drafted release, on a machine with no user-installed
-      Python on `PATH`): download the zip, unzip, run `zipseal-gui.exe`,
-      create an archive with a generated password, and open it in 7-Zip
-      (Explorer's built-in zip support is unreliable for AES; see
+- [ ] Manual acceptance (drafted release, on a clean Windows 11 VM under
+      Parallels/UTM, where the x64 zip runs under emulation on
+      Windows-on-ARM): download the zip, unzip, run `zipseal-gui.exe`, create
+      an archive with a generated password, and open it in 7-Zip (Explorer's
+      built-in zip support is unreliable for AES; see
       `user-docs/opening-archives.md`). Record the date and Windows version
       here.
 - [ ] Resolve signing (Decision 3) on both tracks:
@@ -623,9 +624,9 @@ second local build.
       `zipseal` (`xdotool search --name`), then terminate. Run
       `desktop-file-validate` on the AppDir desktop file. A failure fails
       the job.
-- [ ] Manual acceptance (drafted release, on a machine with no user-installed
-      Python on `PATH`): download the AppImage and the `.tar.gz`; extract the
-      `.tar.gz` and run the binary; run the AppImage (use
+- [ ] Manual acceptance (drafted release, in a Linux VM with no system
+      Python): download the AppImage and the `.tar.gz`; extract the `.tar.gz`
+      and run the binary; run the AppImage (use
       `--appimage-extract-and-run` if FUSE is unavailable); create an archive
       with a generated password, and open it in 7-Zip or `bsdtar`. Record the
       date and distro here.

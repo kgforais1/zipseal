@@ -279,7 +279,8 @@ Blocking gate for publish: the drafted artifact for every platform the release
 contains is accepted on a machine with no **user-installed** Python on `PATH`
 (no uv-managed, pyenv or Homebrew interpreter) — launch it, create an archive
 with a generated password, open it. The Apple-provided `/usr/bin/python3` may
-be present on macOS; it ships with the OS and is not a user install.
+be present on macOS; it ships with the OS and is not a user install. Windows
+and Linux use the M3 environments below.
 
 - **M1 (local macOS, done 2026-11-15, macOS 26 / darwin 25.6.0):** the unsigned
   app and DMG from `dist/0.1.0/` were opened; a synthetic quarantine xattr
@@ -291,10 +292,11 @@ be present on macOS; it ships with the OS and is not a user install.
   it, drag to Applications, launch, create an archive with a generated
   password, open it in Finder and 7-Zip. Record the date, macOS version and
   which `python3` was visible here.
-- **M3 (Windows and Linux, from the draft release):** download and run each
-  artifact on a machine with no user-installed Python on `PATH`; create an
-  archive with a generated password and open it in 7-Zip or `bsdtar`. Record
-  the date and OS here.
+- **M3 (Windows and Linux, from the draft release):** run the Windows zip on a
+  clean Windows 11 VM under Parallels/UTM, where the x64 build runs under
+  emulation on Windows-on-ARM, and the Linux artifacts in a VM with no system
+  Python. Create an archive with a generated password and open it in 7-Zip or
+  `bsdtar`. Record the date and OS here.
 
 ## Runner images
 
