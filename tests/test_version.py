@@ -1,5 +1,6 @@
 """The package version must match pyproject.toml and reach `--version`."""
 
+import sys
 import tomllib
 from pathlib import Path
 
@@ -20,8 +21,11 @@ def test_package_version_matches_pyproject() -> None:
     assert zipseal.__version__ == _pyproject_version()
 
 
-def test_cli_version_prints_the_package_version(capsys) -> None:
+def test_cli_version_prints_the_package_version(capsys, monkeypatch) -> None:
+    # argparse's version action uses sys.argv[0] as the program name, which
+    # under pytest is the test runner, not the console script.
+    monkeypatch.setattr(sys, "argv", ["zipseal"])
     with pytest.raises(SystemExit) as exit_info:
         cli.main(["--version"])
     assert exit_info.value.code == 0
-    assert capsys.readouterr().out.strip().endswith(zipseal.__version__)
+    assert capsys.readouterr().out.strip() == f"zipseal {zipseal.__version__}"
