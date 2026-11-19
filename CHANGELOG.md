@@ -46,6 +46,8 @@ All notable user-facing changes are documented here. The format follows
 
 ### Fixed
 
+- `zipseal --version` reports the package version, so an upgrade to 0.2.0 no
+  longer prints 0.1.0.
 - The window keeps its icon when Tk uses the PNG fallback. The image used to
   disappear as soon as it was set, because Tkinter deletes a `PhotoImage`
   once nothing in Python still refers to it. If Tk cannot apply the icon,
