@@ -6,8 +6,14 @@ All notable user-facing changes are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-11-19
+
 ### Added
 
+- A signed and notarized macOS app, `zipseal-gui-0.2.0-macos-arm64.dmg`,
+  needs no Python, no `uv` and no terminal: open the disk image and drag
+  `zipseal-gui.app` to Applications. The CLI stays source-installable.
+  Windows and Linux builds follow.
 - `zipseal-gui.command`: double-click it in Finder to open the zipseal window
   from a clone, with no install step. It finds `uv` even when Finder's shell
   has it off `PATH`, and gives itself the zipseal icon on first run.
@@ -40,6 +46,8 @@ All notable user-facing changes are documented here. The format follows
 
 ### Fixed
 
+- `zipseal --version` reports the package version, so an upgrade to 0.2.0 no
+  longer prints 0.1.0.
 - The window keeps its icon when Tk uses the PNG fallback. The image used to
   disappear as soon as it was set, because Tkinter deletes a `PhotoImage`
   once nothing in Python still refers to it. If Tk cannot apply the icon,
