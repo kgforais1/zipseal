@@ -121,6 +121,11 @@ edits and refactors. User-visible changes go in [`CHANGELOG.md`](CHANGELOG.md).
 
 ### Changed
 
+- The manual-acceptance gate now means no **user-installed** Python on `PATH`
+  (no uv-managed, pyenv or Homebrew interpreter). Apple's `/usr/bin/python3`
+  may be present: it ships with the OS and is not a user install. A clean
+  Standard second account is the macOS clean environment, as the plan's M3
+  milestone already allowed, so acceptance needs no separate hardware.
 - Dependabot version updates for uv and GitHub Actions now run monthly, on
   the 22nd at 16:00 America/New_York, with a 7-day cooldown. Security updates
   are unaffected. The weekly dependency audit keeps its Thursday schedule.
