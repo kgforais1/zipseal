@@ -34,6 +34,14 @@ An item that needs more than a few lines of thought gets a plan in
   Releases. The CLI remains source-installable from GitHub with
   `uv tool install`.
   ([executables plan](dev-docs/plans/2026-11-02-gui-executables.md)).
+- Port the core's filesystem layer to Windows before shipping the Windows
+  GUI: the `collect`/`sources`/`verify`/`output` paths use POSIX-only
+  `O_DIRECTORY`, `O_NOFOLLOW`, `dir_fd` and `os.fwalk`, so the Windows app
+  launches but cannot create archives. A production-parity backend
+  abstraction is estimated at 15–25 person-days (3–5 focused weeks); a weak
+  stdlib prototype is not shippable under the current security claims.
+  PR #26 is the draft build half; see
+  [the investigation](dev-docs/investigations/2026-11-21-windows-core-portability.md).
 - Ship Linux arm64 and Windows arm64 GUI executables once someone asks —
   deferred as non-goals in the
   [executables plan](dev-docs/plans/2026-11-02-gui-executables.md), where the

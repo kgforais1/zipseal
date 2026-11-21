@@ -541,6 +541,15 @@ second local build.
 
 ## Phase 3 — Windows app
 
+> **Deferred 2026-11-21.** The core is POSIX-only (`O_DIRECTORY`,
+> `O_NOFOLLOW`, `dir_fd` and `os.fwalk` in `collect.py`, `sources.py`,
+> `verify.py` and `output.py`), so the Windows app launches but fails when
+> Start is pressed. PR #26 is the draft build half; it must not publish or
+> attach a Windows artifact until the filesystem backend and Windows tests
+> land. Phase 4 Linux proceeds first. See
+> [the investigation](../investigations/2026-11-21-windows-core-portability.md)
+> and the Greptile P1 on PR #26.
+
 - [ ] Build the onedir zip unsigned in `build-windows` (both triggers, no
       environment, uploads the zip) on a versioned Windows label
       (`windows-2025`, or `windows-2022` if that image is what the plan
@@ -1041,3 +1050,14 @@ only if Phase 3 signing is approved. Linux needs no secrets, and
   the sums, and created the draft. The five Phase 2 boxes above are ticked;
   the strict manual-acceptance box stays unticked under the 2026-11-19 M2
   deviation.
+
+- 2026-11-21 (Windows deferral): PR #26's `build-windows` job and spec were
+  reviewed clean, but Greptile found the core is POSIX-only
+  (`O_DIRECTORY`/`O_NOFOLLOW`/`dir_fd`/`os.fwalk` in `collect.py`,
+  `sources.py`, `verify.py`, `output.py`); the Windows app launches but fails
+  on Start. An NVIDIA-hosted Kimi K3.1 Pro review estimated 15–25 person-days
+  (3–5 focused weeks) for production parity, recommended a small filesystem
+  backend abstraction and a `windows-2025` core matrix, and rejected a weak
+  stdlib prototype under the current security claims. PR #26 is a draft;
+  Phase 4 Linux proceeds first. See
+  [the investigation](../investigations/2026-11-21-windows-core-portability.md).
