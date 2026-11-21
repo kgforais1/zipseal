@@ -7,6 +7,14 @@ edits and refactors. User-visible changes go in [`CHANGELOG.md`](CHANGELOG.md).
 
 ### Added
 
+- `release.yml` gains `build-linux`: it builds in a digest-pinned
+  `ubuntu:22.04` container on `ubuntu-24.04`, measures the glibc floor from
+  the bundled Python/Tcl/Tk, packages an AppImage (pinned `appimagetool`
+  checksum) and a `tar.gz`, and smoke-tests both under `xvfb-run` by
+  launching the AppImage with `--appimage-extract-and-run` and the extracted
+  tarball, then finding the `zipseal` window.
+  `publish` collects the AppImage, tarball and `build-info-linux.json` into
+  `SHA256SUMS`, the attestations and the draft release.
 - A macOS freeze writes `dist/<version>/zipseal-gui-<version>-macos-arm64.dmg`
   (`hdiutil create -format UDZO`) containing `zipseal-gui.app` and an
   Applications symlink. `Info.plist` now includes the bundle id

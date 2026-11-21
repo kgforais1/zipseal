@@ -1,17 +1,19 @@
 # Release pipeline for the frozen GUI apps (plan:
-# dev-docs/plans/2026-11-02-gui-executables.md, Phase 2). At M2 this is
-# macOS-only; Phases 3 and 4 append build-windows/sign-windows and build-linux.
+# dev-docs/plans/2026-11-02-gui-executables.md). At M2 this was macOS-only;
+# Phase 4 adds build-linux. The Windows build is a draft in PR #26, deferred
+# until the core is ported (see the plan's Phase 3 note).
 #
 # A tag push vX.Y.Z re-runs ci.yml's gates (ci.yml does not run on tags), builds
-# an unsigned .app, then signs/notarizes/staples it in a separate job behind the
-# protected `release` environment, and finally publishes a DRAFT release. The
-# maintainer accepts the artifact by hand and publishes the draft; nothing here
-# publishes a final release.
+# an unsigned .app and the Linux AppImage/tarball, then signs/notarizes/staples
+# the app in a separate job behind the protected `release` environment, and
+# finally publishes a DRAFT release. The maintainer accepts the artifact by
+# hand and publishes the draft; nothing here publishes a final release.
 #
-# A workflow_dispatch rehearsal runs the gates and build-macos only: sign-macos
-# and publish are event-guarded, so a dispatch never sees the Apple secrets and
-# never creates a release. A dispatch is accepted only on refs/heads/main:
-# check-hooks fails any other ref, and build-macos is also guarded on the ref.
+# A workflow_dispatch rehearsal runs the gates, build-macos and build-linux:
+# sign-macos and publish are event-guarded, so a dispatch never sees the Apple
+# secrets and never creates a release. A dispatch is accepted only on
+# refs/heads/main: check-hooks fails any other ref, and the build jobs are also
+# guarded on the ref.
 # No job holds actions: write; artifact upload/download within a run uses
 # ACTIONS_RUNTIME_TOKEN, not GITHUB_TOKEN.
 #
@@ -27,8 +29,8 @@
 # gates as main's CI must not drift on the tag's image). A label bump is its
 # own commit, recorded in dev-docs/releasing.md.
 #
-# Actions usage: ~10 macOS minutes per tag (build + sign), plus Linux minutes
-# for the gates.
+# Actions usage: ~10 macOS minutes per tag (build + sign), ~10 Linux build
+# minutes, plus Linux minutes for the gates.
 
 name: Release
 
@@ -238,6 +240,148 @@ jobs:
           name: zipseal-gui-macos-info
           path: dist/${{ steps.version.outputs.version }}/build-info.json
 
+  build-linux:
+    name: Build Linux app
+    needs: [check-hooks, check-test, check-audit]
+    # Belt and braces with check-hooks' dispatch guard.
+    if: github.event_name == 'push' || github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    container:
+      # ubuntu:22.04 (glibc 2.35), digest recorded in dev-docs/releasing.md.
+      image: ubuntu@sha256:f64b2ffc2f10ab8f8505aa56b2664bd846cbb9df87c7e2532e30f7667021c0e6
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    env:
+      # The appimagetool release is "continuous"; the checksum pins the bytes.
+      APPIMAGE_TOOL_SHA256: e8c1169c4af66c3184d7ee110713d4be04befe671fa358e2c1591ee840553b03
+      APPIMAGE_TOOL_URL: https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage
+    steps:
+      # git must exist before actions/checkout; the image is bare 22.04.
+      - name: Install container packages
+        run: |
+          export DEBIAN_FRONTEND=noninteractive
+          apt-get update
+          apt-get install -y --no-install-recommends \
+            ca-certificates curl file binutils libc-bin desktop-file-utils \
+            git xauth xvfb xdotool \
+            libx11-6 libxext6 libxrender1 libxft2 libxss1 \
+            libfontconfig1 libfreetype6
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884  # v10.3.0
+        with:
+          version-file: .github/uv.toml
+      - name: Read the project version
+        id: version
+        run: |
+          version=$(uv run --locked --no-build --no-sync --no-project --python ${{ env.BUILD_PYTHON }} python -c 'import tomllib; print(tomllib.load(open("pyproject.toml", "rb"))["project"]["version"])')
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+      - run: uv python install ${{ env.BUILD_PYTHON }}
+      - name: Freeze the app (unsigned)
+        run: xvfb-run -a uv run --python ${{ env.BUILD_PYTHON }} --group build python packaging/build.py --target linux --skip-sign
+      - name: Record build info and glibc floor
+        run: |
+          version="${{ steps.version.outputs.version }}"
+          tk=$(uv run --python ${{ env.BUILD_PYTHON }} --group build python -c 'import tkinter; print(tkinter.TkVersion)')
+          pyinstaller=$(uv run --python ${{ env.BUILD_PYTHON }} --group build python -c 'import PyInstaller; print(PyInstaller.__version__)')
+          glibc=$(
+            find "dist/$version/zipseal-gui" -type f \
+              \( -name 'zipseal-gui' -o -name '*.so*' -o -name 'libpython*' -o -name 'libtcl*' -o -name 'libtk*' \) \
+              -print0 |
+              xargs -0 -r objdump -T 2>/dev/null |
+              grep -o 'GLIBC_[0-9.]*' | sort -Vu | tail -1
+          )
+          if [ -z "$glibc" ]; then
+            echo "::error::could not measure the glibc floor"
+            exit 1
+          fi
+          cat > "dist/$version/build-info-linux.json" <<JSON
+          {
+            "appimage": "zipseal-gui-$version-linux-x86_64.AppImage",
+            "tarball": "zipseal-gui-$version-linux-x86_64.tar.gz",
+            "python": "${{ env.BUILD_PYTHON }}",
+            "pyinstaller": "$pyinstaller",
+            "runner": "ubuntu-24.04",
+            "container": "ubuntu@sha256:f64b2ffc2f10ab8f8505aa56b2664bd846cbb9df87c7e2532e30f7667021c0e6",
+            "tk": "$tk",
+            "glibc": "$glibc"
+          }
+          JSON
+      - name: Build the AppImage
+        run: |
+          version="${{ steps.version.outputs.version }}"
+          appdir="dist/$version/AppDir"
+          rm -rf "$appdir"
+          mkdir -p "$appdir"
+          cp -a "dist/$version/zipseal-gui" "$appdir/zipseal-gui"
+          install -m 0755 packaging/linux/AppRun "$appdir/AppRun"
+          install -m 0644 packaging/linux/zipseal-gui.desktop "$appdir/zipseal-gui.desktop"
+          install -m 0644 build/icons/icon.png "$appdir/zipseal-gui.png"
+          desktop-file-validate "$appdir/zipseal-gui.desktop"
+          mkdir -p build/tools
+          curl -fsSL --proto '=https' --proto-redir '=https' --tlsv1.2 \
+            "$APPIMAGE_TOOL_URL" -o build/tools/appimagetool
+          echo "$APPIMAGE_TOOL_SHA256  build/tools/appimagetool" | sha256sum -c -
+          chmod +x build/tools/appimagetool
+          (cd build/tools && ./appimagetool --appimage-extract >/dev/null)
+          ARCH=x86_64 build/tools/squashfs-root/AppRun "$appdir" "dist/$version/zipseal-gui-$version-linux-x86_64.AppImage"
+          chmod +x "dist/$version/zipseal-gui-$version-linux-x86_64.AppImage"
+      - name: Pack the tarball
+        run: |
+          version="${{ steps.version.outputs.version }}"
+          tar -czf "dist/$version/zipseal-gui-$version-linux-x86_64.tar.gz" -C "dist/$version" zipseal-gui
+      - name: Smoke test the shipped artifacts
+        run: |
+          version="${{ steps.version.outputs.version }}"
+          appimage="dist/$version/zipseal-gui-$version-linux-x86_64.AppImage"
+          tarball="dist/$version/zipseal-gui-$version-linux-x86_64.tar.gz"
+          fresh="$RUNNER_TEMP/zipseal-smoke"
+          rm -rf "$fresh"
+          mkdir -p "$fresh/tar"
+          tar -xzf "$tarball" -C "$fresh/tar"
+          smoke() {
+            label="$1"
+            shift
+            LABEL="$label" xvfb-run -a bash -euc '
+              "$@" &
+              pid=$!
+              found=0
+              for _ in $(seq 1 30); do
+                if xdotool search --name "^zipseal$" >/dev/null; then
+                  found=1
+                  break
+                fi
+                sleep 1
+              done
+              if [ "$found" != 1 ]; then
+                echo "::error::no zipseal window for $LABEL"
+                kill "$pid" 2>/dev/null || true
+                exit 1
+              fi
+              kill "$pid" 2>/dev/null || true
+              wait "$pid" 2>/dev/null || true
+            ' _ "$@"
+          }
+          smoke "AppImage" "$appimage" --appimage-extract-and-run
+          smoke "tarball" "$fresh/tar/zipseal-gui/zipseal-gui"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9  # v7.0.2
+        with:
+          overwrite: true
+          name: zipseal-gui-linux-appimage
+          path: dist/${{ steps.version.outputs.version }}/zipseal-gui-${{ steps.version.outputs.version }}-linux-x86_64.AppImage
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9  # v7.0.2
+        with:
+          overwrite: true
+          name: zipseal-gui-linux-tarball
+          path: dist/${{ steps.version.outputs.version }}/zipseal-gui-${{ steps.version.outputs.version }}-linux-x86_64.tar.gz
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9  # v7.0.2
+        with:
+          overwrite: true
+          name: zipseal-gui-linux-info
+          path: dist/${{ steps.version.outputs.version }}/build-info-linux.json
+
   sign-macos:
     name: Sign, notarize and staple the macOS app
     if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
@@ -437,7 +581,7 @@ jobs:
   publish:
     name: Publish the draft release
     if: github.event_name == 'push'
-    needs: [check-hooks, check-test, check-audit, sign-macos]
+    needs: [check-hooks, check-test, check-audit, build-linux, sign-macos]
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     permissions:
@@ -484,10 +628,24 @@ jobs:
         with:
           name: zipseal-gui-macos-info
           path: artifacts
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333  # v8.0.2
+        with:
+          name: zipseal-gui-linux-appimage
+          path: artifacts
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333  # v8.0.2
+        with:
+          name: zipseal-gui-linux-tarball
+          path: artifacts
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333  # v8.0.2
+        with:
+          name: zipseal-gui-linux-info
+          path: artifacts
+      - name: Make the AppImage executable
+        run: chmod +x artifacts/zipseal-gui-*-linux-x86_64.AppImage
       - name: Write SHA256SUMS
         run: |
           cd artifacts
-          sha256sum zipseal-gui-*.dmg build-info.json > SHA256SUMS
+          sha256sum zipseal-gui-*.dmg zipseal-gui-*-linux-x86_64.AppImage zipseal-gui-*-linux-x86_64.tar.gz build-info.json build-info-linux.json > SHA256SUMS
           cat SHA256SUMS
       - name: Attest the artifact
         uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8  # v4.2.2
@@ -506,17 +664,27 @@ jobs:
           {
             echo "## zipseal-gui $version"
             echo
-            echo "Download the macOS app from the assets below. The CLI stays"
-            echo "source-installable:"
+            echo "Download the app for your platform from the assets below:"
+            echo
+            echo "- macOS (Apple silicon): \`zipseal-gui-$version-macos-arm64.dmg\`"
+            echo "- Linux (x86_64): \`zipseal-gui-$version-linux-x86_64.AppImage\` or \`.tar.gz\`"
+            echo
+            echo "The CLI stays source-installable:"
             echo
             echo '```sh'
             echo "uv tool install git+https://github.com/kgforais1/zipseal.git@$GITHUB_REF_NAME"
             echo '```'
             echo
-            echo "## Build info"
+            echo "## Build info (macOS)"
             echo
             echo '```json'
             cat artifacts/build-info.json
+            echo '```'
+            echo
+            echo "## Build info (Linux)"
+            echo
+            echo '```json'
+            cat artifacts/build-info-linux.json
             echo '```'
             echo
             echo "## Verify"
@@ -526,6 +694,8 @@ jobs:
             echo "gh release download $GITHUB_REF_NAME --repo kgforais1/zipseal"
             echo "shasum -a 256 -c SHA256SUMS"
             echo "gh attestation verify zipseal-gui-$version-macos-arm64.dmg --repo kgforais1/zipseal"
+            echo "gh attestation verify zipseal-gui-$version-linux-x86_64.AppImage --repo kgforais1/zipseal"
+            echo "gh attestation verify zipseal-gui-$version-linux-x86_64.tar.gz --repo kgforais1/zipseal"
             echo '```'
           } > "$notes"
           # A re-run after a partial run reuses the existing draft and
@@ -542,7 +712,10 @@ jobs:
             fi
             gh release upload "$GITHUB_REF_NAME" --clobber \
               artifacts/zipseal-gui-*.dmg \
+              artifacts/zipseal-gui-*-linux-x86_64.AppImage \
+              artifacts/zipseal-gui-*-linux-x86_64.tar.gz \
               artifacts/build-info.json \
+              artifacts/build-info-linux.json \
               artifacts/SHA256SUMS
             if [ "$(gh release view "$GITHUB_REF_NAME" --json isDraft --jq .isDraft)" != "true" ]; then
               echo "::error::release $GITHUB_REF_NAME was published during this run; leaving its notes alone"
@@ -557,6 +730,9 @@ jobs:
               --title "zipseal-gui $version" \
               --notes-file "$notes" \
               artifacts/zipseal-gui-*.dmg \
+              artifacts/zipseal-gui-*-linux-x86_64.AppImage \
+              artifacts/zipseal-gui-*-linux-x86_64.tar.gz \
               artifacts/build-info.json \
+              artifacts/build-info-linux.json \
               artifacts/SHA256SUMS
           fi
