@@ -324,7 +324,7 @@ second local build.
       environment's required reviewers and `prevent_self_review` in the UI
       (both accounts are theirs); that state is recorded in
       `dev-docs/releasing.md` rather than assumed to be the intended split.
-- [ ] CI signing path (tag pushes only, inside `sign-macos`). The keychain
+- [x] CI signing path (tag pushes only, inside `sign-macos`). The keychain
       password is generated per run (`openssl rand -base64 32`, masked), not
       a stored secret (amended 2026-11-18). `security
       create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"`, `security
@@ -363,7 +363,7 @@ second local build.
       so freezing and signing stay in separate jobs. Verify with `codesign
       --verify --deep --strict`, and run `security delete-keychain
       "$KEYCHAIN_PATH"` from an `if: always()` step.
-- [ ] Notarization path. Every path is under `dist/<version>/`, the directory
+- [x] Notarization path. Every path is under `dist/<version>/`, the directory
       `build.py` writes. `notarytool submit --wait` rejects a bare `.app`, so
       zip it first (`ditto -c -k --keepParent dist/<version>/zipseal-gui.app
       dist/<version>/zipseal-gui-app.zip`), submit, then staple the `.app`.
@@ -376,7 +376,7 @@ second local build.
       exec -v dist/<version>/zipseal-gui.app`, and `spctl --assess -t open
       --context context:primary-signature -v dist/<version>/zipseal-*.dmg`
       (without `-v`, `spctl` prints nothing on success).
-- [ ] `.github/workflows/release.yml` triggers on `push` of tags matching
+- [x] `.github/workflows/release.yml` triggers on `push` of tags matching
       `v*` and on `workflow_dispatch` with no inputs. Jobs: `check-hooks`,
       `check-test`, `check-audit`, `build-macos`, `sign-macos`, `publish`.
       `ci.yml` runs on pushes to `main` and on pull requests only, so a tag
@@ -468,10 +468,10 @@ second local build.
       `permissions:`. `contents: write`, `id-token: write` and
       `attestations: write` are on `publish` only, so provenance is minted
       after the `needs` jobs have produced the bytes that ship.
-- [ ] CI smoke: launch the built app's inner binary, wait, confirm it is
+- [x] CI smoke: launch the built app's inner binary, wait, confirm it is
       alive, terminate. Mark advisory if the runner proves flaky; the real
       gate is the manual acceptance at the end of this phase.
-- [ ] Publish job: collect the artifacts its `needs` uploaded — the signed
+- [x] Publish job: collect the artifacts its `needs` uploaded — the signed
       DMG, and later the repacked Windows zip rather than the unsigned one.
       Write `SHA256SUMS`, attest each artifact
       and the sums with `actions/attest-build-provenance`, then
@@ -1031,3 +1031,13 @@ only if Phase 3 signing is approved. Linux needs no secrets, and
   first-party external interpreter. The maintainer accepted the deviation
   for v0.2.0; the strict acceptance box stays unticked for a future clean
   VM.
+
+- 2026-11-20 (v0.2.0 tag run): Tag `v0.2.0` on `main` at `87e1f5d` ran
+  `release.yml` as run 44629800543. All five check jobs, `build-macos`,
+  `sign-macos` and `publish` succeeded. `sign-macos` passed the on-main
+  ancestry check, the ephemeral-keychain and Developer ID steps, nested
+  signing, notarization/stapling and the `codesign`/`stapler`/`spctl` gate.
+  `publish` verified the tag, wrote `SHA256SUMS`, attested the artifact and
+  the sums, and created the draft. The five Phase 2 boxes above are ticked;
+  the strict manual-acceptance box stays unticked under the 2026-11-19 M2
+  deviation.
