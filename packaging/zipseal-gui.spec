@@ -53,6 +53,19 @@ a = Analysis(
 )
 pyz = PYZ(a.pure)
 
+# Windows gets the generated `.ico` and the rendered version resource. The
+# macOS `.icns` goes to BUNDLE below; Linux has neither at the EXE level.
+_exe_extra = {}
+if _target == "windows":
+    if not build.WINDOWS_ICO.is_file():
+        raise SystemExit(
+            f"zipseal-gui.spec: {build.WINDOWS_ICO} is missing; build.py generates it "
+            "before PyInstaller runs"
+        )
+    _version_file = build.REPO_ROOT / "build" / "windows-version-info.txt"
+    _version_file.write_text(build.render_windows_version_info(_version), encoding="utf-8")
+    _exe_extra = {"icon": str(build.WINDOWS_ICO), "version": str(_version_file)}
+
 exe = EXE(
     pyz,
     a.scripts,
@@ -69,6 +82,7 @@ exe = EXE(
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
+    **_exe_extra,
 )
 coll = COLLECT(
     exe,

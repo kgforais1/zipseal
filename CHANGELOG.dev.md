@@ -7,6 +7,12 @@ edits and refactors. User-visible changes go in [`CHANGELOG.md`](CHANGELOG.md).
 
 ### Added
 
+- `release.yml` gains `build-windows`: it freezes the unsigned Windows onedir
+  on `windows-2025`, embeds the generated `.ico` and version resource, zips
+  the published tree, uploads it, downloads that artifact into a fresh
+  directory, and launches `zipseal-gui.exe` from the extraction. `publish`
+  collects the zip and `build-info-windows.json` into `SHA256SUMS`, the
+  attestations and the draft release.
 - A macOS freeze writes `dist/<version>/zipseal-gui-<version>-macos-arm64.dmg`
   (`hdiutil create -format UDZO`) containing `zipseal-gui.app` and an
   Applications symlink. `Info.plist` now includes the bundle id
