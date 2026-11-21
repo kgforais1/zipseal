@@ -292,6 +292,18 @@ and Linux use the M3 environments below.
   it, drag to Applications, launch, create an archive with a generated
   password, open it in Finder and 7-Zip. Record the date, macOS version and
   which `python3` was visible here.
+  - **v0.2.0 deviation (2026-11-19, macOS 26 / darwin 25.6.0, DMG SHA-256
+    `9da7a00b7e64e8692c7204312800590f464e4d3a5825682cc572699c8f733b8e`):**
+    the signed/notarized draft was installed in the Standard `test` account
+    and passed the Finder launch and archive workflow, but the login shell
+    saw Homebrew `/opt/homebrew/bin/python3` (3.14.7) through
+    `/etc/paths.d/homebrew`; unadorned `python` was absent. The
+    Finder-launched app's PATH was not separately measured, so the literal
+    no-user-installed-Python condition was not established. Static
+    inspection found bundled Python/Tcl/Tk, only system or bundle-relative
+    direct Mach-O dependencies, and no first-party external interpreter.
+    Accepted by the maintainer as a deviation, not an unqualified M2 pass;
+    the strict check remains open for a clean VM.
 - **M3 (Windows and Linux, from the draft release):** run the Windows zip on a
   clean Windows 11 VM under Parallels/UTM, where the x64 build runs under
   emulation on Windows-on-ARM, and the Linux artifacts in a VM with no system

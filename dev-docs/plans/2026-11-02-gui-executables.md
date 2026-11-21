@@ -525,6 +525,19 @@ second local build.
       the quarantine flag), open the DMG, drag to Applications, launch, create
       an archive with a generated password, open it in Finder and 7-Zip.
       Record the date, macOS version and which `python3` was visible here.
+      Accepted as an M2 deviation 2026-11-19 (macOS 26 / darwin 25.6.0, DMG
+      SHA-256 `9da7a00b7e64e8692c7204312800590f464e4d3a5825682cc572699c8f733b8e`):
+      the signed/notarized draft was installed in the Standard `test` account;
+      Finder launch, generated-password archive creation and archive opening
+      succeeded. The login shell saw Homebrew `/opt/homebrew/bin/python3`
+      (3.14.7) through `/etc/paths.d/homebrew`; unadorned `python` was absent.
+      The Finder-launched app's own `PATH` and Python/Tcl environment were not
+      separately measured, so the literal no-user-installed-Python-on-`PATH`
+      condition was not established. Static inspection found bundled
+      Python/Tcl/Tk, only system or bundle-relative direct Mach-O
+      dependencies, and no first-party external-interpreter invocation. The
+      maintainer accepted this as a deviation for the v0.2.0 draft; the
+      strict box stays unticked for a future clean-VM recheck.
 
 ## Phase 3 — Windows app
 
@@ -1006,3 +1019,15 @@ only if Phase 3 signing is approved. Linux needs no secrets, and
   as M3 already allowed, so acceptance needs no separate hardware; the
   maintainer has no Python-free machine. The acceptance record names the
   visible `python3`.
+
+- 2026-11-19 (M2 acceptance deviation): The v0.2.0 signed/notarized draft
+  passed the Finder launch and archive workflow in the Standard `test`
+  account, but that account's login shell saw Homebrew
+  `/opt/homebrew/bin/python3` (3.14.7) through `/etc/paths.d/homebrew`;
+  unadorned `python` was absent. The Finder-launched app's own PATH was not
+  separately measured, so the literal no-user-installed-Python condition was
+  not established. Static inspection (47 Mach-O files, source search) found
+  bundled Python/Tcl/Tk, only system or bundle-relative dependencies, and no
+  first-party external interpreter. The maintainer accepted the deviation
+  for v0.2.0; the strict acceptance box stays unticked for a future clean
+  VM.
