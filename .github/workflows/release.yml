@@ -253,9 +253,10 @@ jobs:
     permissions:
       contents: read
     env:
-      # The appimagetool release is "continuous"; the checksum pins the bytes.
-      APPIMAGE_TOOL_SHA256: e8c1169c4af66c3184d7ee110713d4be04befe671fa358e2c1591ee840553b03
-      APPIMAGE_TOOL_URL: https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage
+      # appimagetool 1.9.1: a versioned release, not the rolling "continuous"
+      # asset, which upstream overwrites on every rebuild.
+      APPIMAGE_TOOL_SHA256: ed4ce84f0d9caff66f50bcca6ff6f35aae54ce8135408b3fa33abfc3cb384eb0
+      APPIMAGE_TOOL_URL: https://github.com/AppImage/appimagetool/releases/download/1.9.1/appimagetool-x86_64.AppImage
     steps:
       # git must exist before actions/checkout; the image is bare 22.04.
       - name: Install container packages
