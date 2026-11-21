@@ -41,6 +41,7 @@ An item that needs more than a few lines of thought gets a plan in
   abstraction is estimated at 15–26 person-days (3–5 focused weeks); a weak
   stdlib prototype is not shippable under the current security claims.
   PR #26 is the draft build half; see
+  [the plan](dev-docs/plans/2026-11-21-windows-core-port.md) and
   [the investigation](dev-docs/investigations/2026-11-21-windows-core-portability.md).
 - Ship Linux arm64 and Windows arm64 GUI executables once someone asks —
   deferred as non-goals in the
