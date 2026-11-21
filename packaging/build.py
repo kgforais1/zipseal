@@ -46,6 +46,7 @@ BUNDLE_ID = "io.github.kgforais1.zipseal-gui"
 # The binary refuses to load below it.
 MACOS_MINIMUM_SYSTEM_VERSION = "11.0"
 MACOS_ICNS = REPO_ROOT / "build" / "icons" / "icon.icns"
+WINDOWS_ICO = REPO_ROOT / "build" / "icons" / "icon.ico"
 
 TARGETS = ("macos", "windows", "linux")
 

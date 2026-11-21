@@ -214,8 +214,9 @@ disk through stdin, never argv, and are deleted after use.
 2. After the PR merges, pull `main`, then tag and push the tag as `kgrizz-git`:
    `git tag v<version> && git push origin v<version>`.
 3. `release.yml` runs: the three check jobs re-run `ci.yml`'s gates, then
-   `build-macos` freezes the unsigned `.app`, smoke-tests it, and uploads it.
-   `sign-macos` waits for the maintainer's approval on the `release` environment
+   `build-macos` freezes the unsigned `.app` and `build-windows` freezes,
+   zips and smoke-tests the unsigned Windows onedir. `sign-macos` waits for
+   the maintainer's approval on the `release` environment
    (one-account control, accepted 2026-11-17 — see the environment section).
    Approve only after confirming the run's commit is on `main`; that approval
    is what keeps the secrets from an unreviewed commit. It then signs, notarizes and staples the `.app` and the DMG. `publish` verifies the tag still points at
@@ -315,6 +316,7 @@ and Linux use the M3 environments below.
 | Job | Image | Since |
 |---|---|---|
 | `build-macos`, `sign-macos` | `macos-15` | 2026-11-15 |
+| `build-windows` | `windows-2025` | 2026-11-21 |
 | `publish` | `ubuntu-24.04` (pinned; not `-latest`) | 2026-11-16 |
 | `check-hooks` | `ubuntu-latest` (same as `ci.yml`; the `uv sync` step is hardened, see below) | 2026-11-16 |
 | `check-audit` | `ubuntu-latest` (identical to `ci.yml`; nothing hardened) | 2026-11-16 |
