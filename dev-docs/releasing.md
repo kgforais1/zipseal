@@ -346,11 +346,12 @@ that pair.
 ## Dispatch rehearsal
 
 `workflow_dispatch` runs `check-hooks`, `check-test`, `check-audit` and, only if
-those pass, `build-macos`. It skips `sign-macos` and `publish`: no `release`
-environment and no secrets. The tag-equals-version check stays tag-push only.
-`workflow_dispatch` is accepted only on `refs/heads/main`. `check-hooks` fails a
-dispatch on any other ref, and `build-macos` is also guarded on the ref, so a branch cannot be rehearsed
-this way. Rehearse after merging to `main`. Pushing a tag is what creates the draft
+those pass, `build-macos` and `build-linux`. It skips `sign-macos` and
+`publish`: no `release` environment and no secrets. The tag-equals-version
+check stays tag-push only. `workflow_dispatch` is accepted only on
+`refs/heads/main`. `check-hooks` fails a dispatch on any other ref, and the
+build jobs are also guarded on the ref, so a branch cannot be rehearsed this
+way. A Linux build or smoke failure stops the rehearsal. Rehearse after merging to `main`. Pushing a tag is what creates the draft
 release, so a rehearsal tag would not do.
 
 The first green rehearsal ran 2026-11-19 (run 44590496069) on `main` at
