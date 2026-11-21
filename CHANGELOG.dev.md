@@ -11,7 +11,8 @@ edits and refactors. User-visible changes go in [`CHANGELOG.md`](CHANGELOG.md).
   `ubuntu:22.04` container on `ubuntu-24.04`, measures the glibc floor from
   the bundled Python/Tcl/Tk, packages an AppImage (pinned `appimagetool`
   checksum) and a `tar.gz`, and smoke-tests both under `xvfb-run` by
-  launching the extracted artifacts and finding the `zipseal` window.
+  launching the AppImage with `--appimage-extract-and-run` and the extracted
+  tarball, then finding the `zipseal` window.
   `publish` collects the AppImage, tarball and `build-info-linux.json` into
   `SHA256SUMS`, the attestations and the draft release.
 - A macOS freeze writes `dist/<version>/zipseal-gui-<version>-macos-arm64.dmg`

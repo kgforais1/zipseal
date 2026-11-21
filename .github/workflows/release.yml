@@ -9,10 +9,11 @@
 # finally publishes a DRAFT release. The maintainer accepts the artifact by
 # hand and publishes the draft; nothing here publishes a final release.
 #
-# A workflow_dispatch rehearsal runs the gates and build-macos only: sign-macos
-# and publish are event-guarded, so a dispatch never sees the Apple secrets and
-# never creates a release. A dispatch is accepted only on refs/heads/main:
-# check-hooks fails any other ref, and build-macos is also guarded on the ref.
+# A workflow_dispatch rehearsal runs the gates, build-macos and build-linux:
+# sign-macos and publish are event-guarded, so a dispatch never sees the Apple
+# secrets and never creates a release. A dispatch is accepted only on
+# refs/heads/main: check-hooks fails any other ref, and the build jobs are also
+# guarded on the ref.
 # No job holds actions: write; artifact upload/download within a run uses
 # ACTIONS_RUNTIME_TOKEN, not GITHUB_TOKEN.
 #
@@ -28,8 +29,8 @@
 # gates as main's CI must not drift on the tag's image). A label bump is its
 # own commit, recorded in dev-docs/releasing.md.
 #
-# Actions usage: ~10 macOS minutes per tag (build + sign), plus Linux minutes
-# for the gates.
+# Actions usage: ~10 macOS minutes per tag (build + sign), ~10 Linux build
+# minutes, plus Linux minutes for the gates.
 
 name: Release
 
@@ -340,8 +341,10 @@ jobs:
           mkdir -p "$fresh/tar"
           tar -xzf "$tarball" -C "$fresh/tar"
           smoke() {
-            xvfb-run -a bash -euc '
-              "$1" &
+            label="$1"
+            shift
+            LABEL="$label" xvfb-run -a bash -euc '
+              "$@" &
               pid=$!
               found=0
               for _ in $(seq 1 30); do
@@ -352,16 +355,16 @@ jobs:
                 sleep 1
               done
               if [ "$found" != 1 ]; then
-                echo "::error::no zipseal window for $2"
+                echo "::error::no zipseal window for $LABEL"
                 kill "$pid" 2>/dev/null || true
                 exit 1
               fi
               kill "$pid" 2>/dev/null || true
               wait "$pid" 2>/dev/null || true
-            ' _ "$1" "$2"
+            ' _ "$@"
           }
-          smoke "$appimage" "AppImage"
-          smoke "$fresh/tar/zipseal-gui/zipseal-gui" "tarball"
+          smoke "AppImage" "$appimage" --appimage-extract-and-run
+          smoke "tarball" "$fresh/tar/zipseal-gui/zipseal-gui"
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9  # v7.0.2
         with:
           overwrite: true
