@@ -1055,7 +1055,7 @@ only if Phase 3 signing is approved. Linux needs no secrets, and
   reviewed clean, but Greptile found the core is POSIX-only
   (`O_DIRECTORY`/`O_NOFOLLOW`/`dir_fd`/`os.fwalk` in `collect.py`,
   `sources.py`, `verify.py`, `output.py`); the Windows app launches but fails
-  on Start. An NVIDIA-hosted Kimi K3.1 Pro review estimated 15–25 person-days
+  on Start. An NVIDIA-hosted Kimi K3.1 Pro review estimated 15–26 person-days
   (3–5 focused weeks) for production parity, recommended a small filesystem
   backend abstraction and a `windows-2025` core matrix, and rejected a weak
   stdlib prototype under the current security claims. PR #26 is a draft;

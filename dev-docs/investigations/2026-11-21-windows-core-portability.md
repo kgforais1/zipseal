@@ -19,7 +19,7 @@ what would production-parity Windows support cost?
 | 1 | The Windows app launches but cannot create archives. `collect.py` opens the input parent with `os.O_DIRECTORY` and walks with `os.fwalk(..., dir_fd=...)`/`os.stat(..., dir_fd=...)`; `sources.py` uses `O_DIRECTORY` and `os.open(..., dir_fd=...)`; `verify.py` and `output.py` use `O_NOFOLLOW`. Windows Python does not provide these. | Greptile P1 on PR #26; code inspection. The launch-only smoke would not catch it. |
 | 2 | A path-based `os.scandir`/`os.lstat` rewrite can preserve basic behavior but not the descriptor-relative, component-by-component TOCTOU protection in `SPEC.md` §6.5–§6.7. | The chain checks in `collect.py`/`sources.py` rely on held directory descriptors and `st_dev`/`st_ino`. |
 | 3 | The right boundary is a small filesystem backend abstraction, not a separate Windows collector/pipeline. Keep excludes/collisions, change detection, publication/rollback and archive logic shared; backends own walking, component open/stat, identity, exclusive create, verification reopen and close. Make `Collection.roots` opaque handles. | Kimi advisory; matches the existing module boundaries. |
-| 4 | Production parity is roughly 15–25 person-days (3–5 focused weeks). A weak stdlib prototype is 4–7 days but must not ship under the current security claims. | Kimi estimate; phase table below. |
+| 4 | Production parity is roughly 15–26 person-days (3–5 focused weeks). A weak stdlib prototype is 4–7 days but must not ship under the current security claims. | Kimi estimate; phase table below. |
 | 5 | Windows mechanics: `scandir`/`lstat` + `fstat`; treat all reparse points (symlink, junction, mount point) as unsafe; `CreateFileW` with `FILE_FLAG_OPEN_REPARSE_POINT`/`BACKUP_SEMANTICS` is not an `openat` replacement; full parity likely needs a tested `NtCreateFile` + `OBJECT_ATTRIBUTES.RootDirectory` spike; `O_EXCL` and `os.link` survive; `0o600` is not a POSIX ACL. | Kimi advisory. |
 | 6 | Add `windows-2025` to the full pytest matrix and an extracted-artifact archive-create/decrypt-open smoke. Launch-only must not be the release gate. | Kimi advisory; the current `check-test` matrix is Ubuntu/macOS. |
 
@@ -34,7 +34,7 @@ what would production-parity Windows support cost?
 | Tests | 4–6 | Existing suites plus Windows replacement/reparse races |
 | CI + packaging/acceptance/docs | 2–4 | `windows-2025` matrix, artifact smoke, PR #26, `SPEC.md` |
 
-Total: **15–25 person-days**, or **3–5 focused weeks** for one person.
+Total: **15–26 person-days**, or **3–5 focused weeks** for one person.
 Biggest risks: rooted Windows opens, identity across NTFS/ReFS/network
 volumes, sharing/antivirus interference, and ACL semantics.
 

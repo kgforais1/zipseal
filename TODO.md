@@ -38,7 +38,7 @@ An item that needs more than a few lines of thought gets a plan in
   GUI: the `collect`/`sources`/`verify`/`output` paths use POSIX-only
   `O_DIRECTORY`, `O_NOFOLLOW`, `dir_fd` and `os.fwalk`, so the Windows app
   launches but cannot create archives. A production-parity backend
-  abstraction is estimated at 15–25 person-days (3–5 focused weeks); a weak
+  abstraction is estimated at 15–26 person-days (3–5 focused weeks); a weak
   stdlib prototype is not shippable under the current security claims.
   PR #26 is the draft build half; see
   [the investigation](dev-docs/investigations/2026-11-21-windows-core-portability.md).
