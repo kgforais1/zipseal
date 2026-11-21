@@ -321,7 +321,8 @@ jobs:
           install -m 0644 build/icons/icon.png "$appdir/zipseal-gui.png"
           desktop-file-validate "$appdir/zipseal-gui.desktop"
           mkdir -p build/tools
-          curl -fsSL "$APPIMAGE_TOOL_URL" -o build/tools/appimagetool
+          curl -fsSL --proto '=https' --proto-redir '=https' --tlsv1.2 \
+            "$APPIMAGE_TOOL_URL" -o build/tools/appimagetool
           echo "$APPIMAGE_TOOL_SHA256  build/tools/appimagetool" | sha256sum -c -
           chmod +x build/tools/appimagetool
           (cd build/tools && ./appimagetool --appimage-extract >/dev/null)
