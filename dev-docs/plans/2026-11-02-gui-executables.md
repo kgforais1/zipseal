@@ -609,7 +609,7 @@ second local build.
 
 ## Phase 4 — Linux app
 
-- [ ] `build-linux` uses `runs-on: ubuntu-24.04` and
+- [x] `build-linux` uses `runs-on: ubuntu-24.04` and
       `container: image: ubuntu@sha256:<digest>`, the digest of `ubuntu:22.04`
       recorded in `dev-docs/releasing.md` when this phase lands (glibc 2.35;
       the PyInstaller bootloader needs 2.17+ — neither is the shipped floor).
@@ -635,9 +635,9 @@ second local build.
       needs `file`, `binutils`
       (PyInstaller shells out to `objdump`/`objcopy`), `libc-bin` (`ldd`),
       `desktop-file-utils`, plus `xvfb`/`xdotool` for the smoke test below.
-- [ ] AppDir contents: `zipseal-gui.desktop` (`Terminal=false`,
+- [x] AppDir contents: `zipseal-gui.desktop` (`Terminal=false`,
       `Categories=Utility;Security;`), `AppRun`, generated icon.
-- [ ] CI smoke under `xvfb-run`, both artifacts. The AppImage has no FUSE
+- [x] CI smoke under `xvfb-run`, both artifacts. The AppImage has no FUSE
       here: `./zipseal-gui-<version>-linux-x86_64.AppImage
       --appimage-extract-and-run` (or `--appimage-extract`, then
       `./squashfs-root/AppRun`). For the archive, extract
@@ -1064,3 +1064,12 @@ only if Phase 3 signing is approved. Linux needs no secrets, and
   stdlib prototype under the current security claims. PR #26 is a draft;
   Phase 4 Linux proceeds first. See
   [the investigation](../investigations/2026-11-21-windows-core-portability.md).
+
+- 2026-11-22 (Linux rehearsal): Run 45077481075 on `main` at `a8bfb92`
+  passed the check jobs, `build-macos` and `build-linux`; `sign-macos` and
+  `publish` were skipped as designed. `build-linux` built the AppImage and
+  tarball, both smoke tests found the `zipseal` window, and
+  `build-info-linux.json` reports `GLIBC_2.35`, Tk 9.0, Python 3.13.17 and
+  PyInstaller 6.22.3. The tag's `publish` job appends this file to the
+  release notes. The Phase 4 build, AppDir and smoke boxes are ticked; the
+  manual-acceptance and Linux-docs boxes remain.
