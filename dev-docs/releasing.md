@@ -214,8 +214,9 @@ disk through stdin, never argv, and are deleted after use.
 2. After the PR merges, pull `main`, then tag and push the tag as `kgrizz-git`:
    `git tag v<version> && git push origin v<version>`.
 3. `release.yml` runs: the three check jobs re-run `ci.yml`'s gates, then
-   `build-macos` freezes the unsigned `.app`, smoke-tests it, and uploads it.
-   `sign-macos` waits for the maintainer's approval on the `release` environment
+   `build-macos` freezes the unsigned `.app` and `build-linux` builds and
+   smoke-tests the AppImage and tarball. `sign-macos` waits for the
+   maintainer's approval on the `release` environment
    (one-account control, accepted 2026-11-17 — see the environment section).
    Approve only after confirming the run's commit is on `main`; that approval
    is what keeps the secrets from an unreviewed commit. It then signs, notarizes and staples the `.app` and the DMG. `publish` verifies the tag still points at
@@ -236,8 +237,9 @@ disk through stdin, never argv, and are deleted after use.
    release missing that asset, and immutability then blocks re-adding it.
 4. Wait until every `release.yml` run for the tag has finished. While a draft
    is being checked or published, no run may be in progress.
-5. Check the draft's final assets: the DMG, `build-info.json` and
-   `SHA256SUMS` are all present and the checksums match.
+5. Check the draft's final assets: the DMG, the Linux AppImage and `.tar.gz`,
+   `build-info.json`, `build-info-linux.json` and `SHA256SUMS` are all
+   present and the checksums match.
 6. Do the manual acceptance below on a machine with no user-installed Python
    on `PATH` (no uv-managed, pyenv or Homebrew interpreter; Apple's
    `/usr/bin/python3` may be present).
@@ -315,6 +317,7 @@ and Linux use the M3 environments below.
 | Job | Image | Since |
 |---|---|---|
 | `build-macos`, `sign-macos` | `macos-15` | 2026-11-15 |
+| `build-linux` | `ubuntu-24.04`; container `ubuntu@sha256:f64b2ffc2f10ab8f8505aa56b2664bd846cbb9df87c7e2532e30f7667021c0e6` (22.04) | 2026-11-21 |
 | `publish` | `ubuntu-24.04` (pinned; not `-latest`) | 2026-11-16 |
 | `check-hooks` | `ubuntu-latest` (same as `ci.yml`; the `uv sync` step is hardened, see below) | 2026-11-16 |
 | `check-audit` | `ubuntu-latest` (identical to `ci.yml`; nothing hardened) | 2026-11-16 |
@@ -343,11 +346,12 @@ that pair.
 ## Dispatch rehearsal
 
 `workflow_dispatch` runs `check-hooks`, `check-test`, `check-audit` and, only if
-those pass, `build-macos`. It skips `sign-macos` and `publish`: no `release`
-environment and no secrets. The tag-equals-version check stays tag-push only.
-`workflow_dispatch` is accepted only on `refs/heads/main`. `check-hooks` fails a
-dispatch on any other ref, and `build-macos` is also guarded on the ref, so a branch cannot be rehearsed
-this way. Rehearse after merging to `main`. Pushing a tag is what creates the draft
+those pass, `build-macos` and `build-linux`. It skips `sign-macos` and
+`publish`: no `release` environment and no secrets. The tag-equals-version
+check stays tag-push only. `workflow_dispatch` is accepted only on
+`refs/heads/main`. `check-hooks` fails a dispatch on any other ref, and the
+build jobs are also guarded on the ref, so a branch cannot be rehearsed this
+way. A Linux build or smoke failure stops the rehearsal. Rehearse after merging to `main`. Pushing a tag is what creates the draft
 release, so a rehearsal tag would not do.
 
 The first green rehearsal ran 2026-11-19 (run 44590496069) on `main` at
