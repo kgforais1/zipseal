@@ -2,6 +2,9 @@
 # Security updates are separate: they open as soon as an advisory is
 # published. They ignore this schedule, the cooldown and
 # open-pull-requests-limit, and have their own cap of 10 open PRs.
+#
+# Minor and patch updates are grouped per ecosystem. The 0.x uv
+# dependencies stay individual because a 0.x minor bump may be breaking.
 version: 2
 updates:
   - package-ecosystem: "uv"
@@ -13,6 +16,19 @@ updates:
     cooldown:
       default-days: 7
     open-pull-requests-limit: 5
+    groups:
+      minor-and-patch:
+        applies-to: version-updates
+        update-types:
+          - "minor"
+          - "patch"
+        exclude-patterns:
+          - "stream-zip"
+          - "stream-unzip"
+          # Dependabot names the build backend "uv-build"; "uv_build" is
+          # the pyproject spelling. Keep both so the carveout cannot miss.
+          - "uv-build"
+          - "uv_build"
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
@@ -23,3 +39,9 @@ updates:
       default-days: 7
     commit-message:
       prefix: "ci"
+    groups:
+      minor-and-patch:
+        applies-to: version-updates
+        update-types:
+          - "minor"
+          - "patch"
