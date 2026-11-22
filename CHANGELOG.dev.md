@@ -130,6 +130,11 @@ edits and refactors. User-visible changes go in [`CHANGELOG.md`](CHANGELOG.md).
 
 ### Changed
 
+- The Linux rehearsal passed on 2026-11-22 (run 45077481075): `build-linux`
+  built the AppImage and tarball, both smoke tests found the `zipseal` window,
+  and `build-info-linux.json` reports `GLIBC_2.35`, Tk 9.0, Python 3.13.17
+  and PyInstaller 6.22.3. The Phase 4 build, AppDir and smoke boxes are
+  ticked; manual acceptance and Linux docs remain.
 - The manual-acceptance gate now means no **user-installed** Python on `PATH`
   (no uv-managed, pyenv or Homebrew interpreter). Apple's `/usr/bin/python3`
   may be present: it ships with the OS and is not a user install. A clean
