@@ -45,11 +45,12 @@ edits and refactors. User-visible changes go in [`CHANGELOG.md`](CHANGELOG.md).
 - `packaging/icons.py`: the icon rasters are now generated at build time from
   `src/zipseal/icon.svg` rather than checked in, so `*.png` stays a forbidden
   path and no raster enters the repository. The toolchain is one pinned
-  `resvg` release (`v0.50.0`), fetched for the build host into gitignored
+  `resvg` release (`v0.49.0`), fetched for the build host into gitignored
   `build/tools/` and sha256-checked before the archive is extracted or its
   binary executed: resvg publishes no checksum file with a release, so the
   three digests (macOS arm64, Windows x64, Linux x86_64) were computed from
-  the downloaded assets. Pillow is the second pinned build tool -
+  the downloaded assets. 0.50.0's Linux asset needs GLIBC_2.43, newer than
+  the `ubuntu:22.04` build container; 0.49.0 needs 2.35. Pillow is the second pinned build tool -
   `pillow==13.0.0` joins `pyinstaller==6.22.3` in the `build` dependency group
   and `uv.lock` - and it packs the multi-size `.ico`; macOS `iconutil` builds
   the `.icns` for a macOS target only. Everything lands in `build/icons/`,
