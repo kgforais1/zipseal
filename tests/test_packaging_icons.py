@@ -4,6 +4,7 @@
 it would shadow the PyPI `packaging` distribution.
 """
 
+import hashlib
 import importlib.util
 import io
 import os
@@ -66,6 +67,66 @@ def test_matching_checksum_accepts_the_archive(tmp_path: Path) -> None:
     digest = _icons.sha256_file(archive)
     assert _icons.verify_asset(archive, digest) == archive
     assert archive.exists()
+
+
+def _pinned_archive_fixture() -> tuple[str, bytes, str]:
+    asset_name = "resvg-linux-x86_64.tar.gz"
+    body = b"fresh pinned archive bytes"
+    return asset_name, body, hashlib.sha256(body).hexdigest()
+
+
+def test_fetch_resvg_replaces_a_stale_cached_archive(tmp_path, monkeypatch) -> None:
+    tools = tmp_path / "tools"
+    tools.mkdir()
+    asset_name, body, digest = _pinned_archive_fixture()
+    archive = tools / asset_name
+    archive.write_bytes(b"a stale 0.50.0 archive")
+    downloads = []
+
+    def fake_download(name: str, destination: Path) -> Path:
+        downloads.append(name)
+        destination.write_bytes(body)
+        return destination
+
+    monkeypatch.setattr(_icons, "host_asset", lambda: (asset_name, digest))
+    monkeypatch.setattr(_icons, "download_asset", fake_download)
+    monkeypatch.setattr(_icons, "extract_binary", lambda path, _tools: path)
+    assert _icons.fetch_resvg(tools) == archive
+    assert downloads == [asset_name]
+    assert archive.read_bytes() == body
+
+
+def test_fetch_resvg_reuses_a_valid_cached_archive(tmp_path, monkeypatch) -> None:
+    tools = tmp_path / "tools"
+    tools.mkdir()
+    asset_name, body, digest = _pinned_archive_fixture()
+    archive = tools / asset_name
+    archive.write_bytes(body)
+
+    def refuse_download(_name: str, _destination: Path) -> Path:
+        raise AssertionError("a valid cache must not be downloaded again")
+
+    monkeypatch.setattr(_icons, "host_asset", lambda: (asset_name, digest))
+    monkeypatch.setattr(_icons, "download_asset", refuse_download)
+    monkeypatch.setattr(_icons, "extract_binary", lambda path, _tools: path)
+    assert _icons.fetch_resvg(tools) == archive
+
+
+def test_fetch_resvg_fails_after_a_bad_download(tmp_path, monkeypatch) -> None:
+    tools = tmp_path / "tools"
+    tools.mkdir()
+    asset_name, _body, digest = _pinned_archive_fixture()
+    archive = tools / asset_name
+
+    def bad_download(_name: str, destination: Path) -> Path:
+        destination.write_bytes(b"a bad download")
+        return destination
+
+    monkeypatch.setattr(_icons, "host_asset", lambda: (asset_name, digest))
+    monkeypatch.setattr(_icons, "download_asset", bad_download)
+    with pytest.raises(SystemExit, match="has sha256"):
+        _icons.fetch_resvg(tools)
+    assert not archive.exists()
 
 
 def test_the_icon_helpers_run_without_the_network(tmp_path: Path, monkeypatch) -> None:
