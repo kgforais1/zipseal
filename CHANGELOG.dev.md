@@ -137,6 +137,8 @@ edits and refactors. User-visible changes go in [`CHANGELOG.md`](CHANGELOG.md).
 - Dependabot groups minor and patch version updates per ecosystem. The 0.x
   uv dependencies (`stream-zip`, `stream-unzip`, `uv_build`) stay individual
   because a 0.x minor bump may be breaking.
+- CI validates `.github/dependabot.yml` with the `check-dependabot`
+  pre-commit hook, which checks the vendored SchemaStore schema offline.
 - Dependabot version updates for uv and GitHub Actions now run monthly, on
   the 22nd at 16:00 America/New_York, with a 7-day cooldown. Security updates
   are unaffected. The weekly dependency audit keeps its Thursday schedule.
