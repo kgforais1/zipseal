@@ -50,7 +50,7 @@ ICONS_DIR = REPO_ROOT / "build" / "icons"
 
 TARGETS = ("macos", "windows", "linux")
 
-RESVG_VERSION = "0.50.0"
+RESVG_VERSION = "0.49.0"
 RESVG_URL = f"https://github.com/linebender/resvg/releases/download/v{RESVG_VERSION}"
 
 # Exact hosts a resvg download may connect to. `github.com` answers first and
@@ -64,25 +64,26 @@ RELEASE_HOSTS = (
 DOWNLOAD_ATTEMPTS = 3
 MAX_ASSET_BYTES = 32 * 1024 * 1024
 
-# resvg publishes no checksum file with a release (checked 2026-11-13 against
-# the v0.50.0 assets), so each sha256 below was computed here with
+# resvg publishes no checksum file with a release (checked 2026-11-22 against
+# the v0.49.0 assets), so each sha256 below was computed here with
 # `shasum -a 256` on the asset this repository downloaded from that release,
 # and each asset's size matched what the GitHub release API reported. They are
 # the published release binaries rather than static ones: the Linux asset links
-# glibc and the macOS asset links libSystem, and the Linux build runs in the
-# pinned container that provides the glibc it expects.
+# glibc and the macOS asset links libSystem. 0.49.0's Linux asset needs
+# GLIBC_2.35, which the pinned ubuntu:22.04 container provides; 0.50.0's needs
+# GLIBC_2.43 and cannot run there.
 RESVG_ASSETS: dict[tuple[str, str], tuple[str, str]] = {
     ("darwin", "arm64"): (
         "resvg-macos-aarch64.zip",
-        "8155b569f2b93723ba3645b53536eead3b591c8faf62bdaafd3033ba37838837",
+        "847acb5210c7c6244b5e8f07dd62fa1ce596108cce8193628ebfd5750504b259",
     ),
     ("windows", "x86_64"): (
         "resvg-win-x86_64.zip",
-        "e4817e40ac63d3eb5c9e5762526cf6cc91f0cc108de38cd09dd60be765184efd",
+        "38af9631b37e61118a32a5ef31e6be6af083eda63b4c17ffc4fdc63e449277df",
     ),
     ("linux", "x86_64"): (
         "resvg-linux-x86_64.tar.gz",
-        "5d1c9ffd43c82fb802d92cef8100055c612cd3e248d5a787c20079293a456e21",
+        "216637e75e909e53e3098b0875cd5f7da2fdc8b4359771b4a29b539afff9d3f5",
     ),
 }
 
@@ -388,7 +389,7 @@ def fetch_resvg(tools_dir: Path = TOOLS_DIR) -> Path:
 def path_argument(path: Path) -> str:
     """Return `path` as an argv element the build tool cannot treat as an option.
 
-    resvg 0.50.0 treats a leading `-` as an option and does not take `--` as
+    resvg 0.49.0 treats a leading `-` as an option and does not take `--` as
     the end of options: it tries to open `--` as a file. A path that starts
     with `-`, or that contains a NUL, never reaches the tool.
     """
