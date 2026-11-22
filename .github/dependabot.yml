@@ -25,6 +25,9 @@ updates:
         exclude-patterns:
           - "stream-zip"
           - "stream-unzip"
+          # Dependabot names the build backend "uv-build"; "uv_build" is
+          # the pyproject spelling. Keep both so the carveout cannot miss.
+          - "uv-build"
           - "uv_build"
   - package-ecosystem: "github-actions"
     directory: "/"

@@ -135,7 +135,7 @@ edits and refactors. User-visible changes go in [`CHANGELOG.md`](CHANGELOG.md).
   Standard second account is the macOS clean environment, as the plan's M3
   milestone already allowed, so acceptance needs no separate hardware.
 - Dependabot groups minor and patch version updates per ecosystem. The 0.x
-  uv dependencies (`stream-zip`, `stream-unzip`, `uv_build`) stay individual
+  uv dependencies (`stream-zip`, `stream-unzip`, `uv-build`) stay individual
   because a 0.x minor bump may be breaking.
 - CI validates `.github/dependabot.yml` with the `check-dependabot`
   pre-commit hook, which checks the vendored SchemaStore schema offline.
