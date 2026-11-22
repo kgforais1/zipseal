@@ -377,9 +377,14 @@ def fetch_resvg(tools_dir: Path = TOOLS_DIR) -> Path:
 
     The archive is the pinned artifact, so its digest is checked on every run
     and the extracted binary only ever comes from an archive that matched it.
+    A cached archive that no longer matches the pin (for example after a
+    version bump keeps the filename) is replaced by a fresh download; a freshly
+    downloaded archive that still mismatches fails.
     """
     asset_name, digest = host_asset()
     archive = tools_dir / asset_name
+    if archive.exists() and sha256_file(archive) != digest:
+        archive.unlink(missing_ok=True)
     if not archive.exists():
         download_asset(asset_name, archive)
     verify_asset(archive, digest)
