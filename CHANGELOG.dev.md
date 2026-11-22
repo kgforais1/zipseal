@@ -134,6 +134,9 @@ edits and refactors. User-visible changes go in [`CHANGELOG.md`](CHANGELOG.md).
   may be present: it ships with the OS and is not a user install. A clean
   Standard second account is the macOS clean environment, as the plan's M3
   milestone already allowed, so acceptance needs no separate hardware.
+- Dependabot groups minor and patch version updates per ecosystem. The 0.x
+  uv dependencies (`stream-zip`, `stream-unzip`, `uv_build`) stay individual
+  because a 0.x minor bump may be breaking.
 - Dependabot version updates for uv and GitHub Actions now run monthly, on
   the 22nd at 16:00 America/New_York, with a 7-day cooldown. Security updates
   are unaffected. The weekly dependency audit keeps its Thursday schedule.
