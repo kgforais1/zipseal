@@ -130,6 +130,9 @@ edits and refactors. User-visible changes go in [`CHANGELOG.md`](CHANGELOG.md).
 
 ### Changed
 
+- Release prep for v0.3.0: version bump, Linux download docs/glibc 2.35,
+  Windows deferral, and the Phase 5 close-out. The Linux draft acceptance
+  remains to repeat on the tagged artifacts.
 - The Linux GUI acceptance for v0.3.0 is recorded as an accepted
   clean-container deviation: the rehearsal tarball added `/work/input`,
   generated a password, wrote a one-part AES-256 archive, and `7z t` reported

@@ -1,7 +1,7 @@
 # zipseal — plan and design specification
 
-Status: implemented; v0.2.0 released 2026-11-19. The Linux app lands in
-v0.3.0. Drafted 2026-10-07.
+Status: implemented; v0.3.0 released 2026-11-23. The Windows app remains
+deferred. Drafted 2026-10-07.
 Last reviewed: 2026-11-23
 
 `zipseal` is a CLI that takes files and folders and writes them into one
@@ -123,7 +123,7 @@ port lands (see `TODO.md`).
 | Windows (x64) | Deferred | No artifact until the core filesystem port lands. |
 
 Linux artifacts are published starting with v0.3.0. The CLI remains
-source-installable for users on the v0.2.0 release, which has macOS only.
+source-installable.
 
 `dev-docs/plans/2026-11-02-gui-executables.md` is the plan, and
 `dev-docs/releasing.md` is the operator's runbook.

@@ -676,9 +676,9 @@ second local build.
 - [x] `AGENTS.md`: build command, `packaging/` in the layout, release workflow.
 - [x] `SPEC.md`: replace the "planned, not implemented" note with the artifact
       table above; the GUI ships frozen while the CLI stays source-installable.
-- [ ] `CHANGELOG.md` (user-visible) and `CHANGELOG.dev.md` (workflow internals);
-      the internal changelog is updated; the v0.3.0 user entry and final
-      doc-gardening pass land with release prep.
+- [x] `CHANGELOG.md` (user-visible) and `CHANGELOG.dev.md` (workflow internals);
+      the v0.3.0 user entry and final doc-gardening pass landed with release
+      prep.
 
 ## Phase 6 — CLI on PyPI (optional, decide after M3)
 
@@ -1085,3 +1085,8 @@ only if Phase 3 signing is approved. Linux needs no secrets, and
   `input/notes.txt`. The AppImage launched via `qemu-user-static`. The strict
   clean-VM box stays unticked for a future VM; repeat the container check on
   the v0.3.0 draft artifacts.
+
+- 2026-11-23 (v0.3.0 release prep): Version 0.3.0; the Phase 5 docs and the
+  user-visible Linux entry are in. Linux artifacts are v0.3.0+; Windows is
+  deferred. The manual acceptance remains the accepted clean-container
+  deviation, to repeat on the v0.3.0 draft artifacts.
