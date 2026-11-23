@@ -1,6 +1,6 @@
 # App troubleshooting
 
-Last reviewed: 2026-11-22
+Last reviewed: 2026-11-23
 
 This page covers the frozen zipseal window: the downloaded `.dmg`, AppImage or
 `.tar.gz`. It does the same job as the `zipseal` command, so archive problems
@@ -16,8 +16,11 @@ The frozen window does not show a version. The download filename and the
 | Platform | Artifact | Requirements |
 |---|---|---|
 | macOS | `zipseal-gui-<version>-macos-arm64.dmg` | macOS 11 or later, Apple silicon; signed and notarized |
-| Linux | `zipseal-gui-<version>-linux-x86_64.AppImage` or `.tar.gz` | x86_64; glibc 2.35 or later |
+| Linux (v0.3.0 or later) | `zipseal-gui-<version>-linux-x86_64.AppImage` or `.tar.gz` | x86_64; glibc 2.35 or later |
 | Windows | Not yet available | The core filesystem port is still in progress |
+
+The Linux artifacts are published starting with v0.3.0; the v0.2.0 release
+has macOS only.
 
 ## macOS
 

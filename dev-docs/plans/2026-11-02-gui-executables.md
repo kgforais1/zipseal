@@ -1075,12 +1075,13 @@ only if Phase 3 signing is approved. Linux needs no secrets, and
   release notes. The Phase 4 build, AppDir and smoke boxes are ticked; the
   manual-acceptance and Linux-docs boxes remain.
 
-- 2026-11-22 (Linux acceptance pre-check / v0.3.0 deviation): The
-  maintainer accepts the clean Ubuntu 22.04 amd64 container check
-  (Docker/Colima, no system Python) as the Linux acceptance for v0.3.0
+- 2026-11-22 (Linux acceptance pre-check / v0.3.0 deviation; 7z t verified
+  2026-11-23): The maintainer accepts the clean Ubuntu 22.04 amd64 container
+  check (Docker/Colima, no system Python) as the Linux acceptance for v0.3.0
   instead of a literal VM. The rehearsal tarball from run 45077481075 added
   `/work/input`, generated a password, and wrote a one-part AES-256 archive
-  (418 bytes); `7z l` listed `input/hello.txt` and `input/notes.txt`. The
-  AppImage launched via `qemu-user-static`. The strict clean-VM box stays
-  unticked for a future VM; repeat the container check on the v0.3.0 draft
-  artifacts.
+  (418 bytes); `7z t` reported `Everything is Ok` with the generated password
+  (2 files, 48 bytes), and `7z l` listed `input/hello.txt` and
+  `input/notes.txt`. The AppImage launched via `qemu-user-static`. The strict
+  clean-VM box stays unticked for a future VM; repeat the container check on
+  the v0.3.0 draft artifacts.

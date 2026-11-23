@@ -1,6 +1,6 @@
 # TODO
 
-Last reviewed: 2026-11-03
+Last reviewed: 2026-11-23
 
 Future work only. Each item is something nobody has started or finished.
 
@@ -28,12 +28,11 @@ An item that needs more than a few lines of thought gets a plan in
   reports no progress until the whole part is decrypted, so a cancel waits for
   it. It needs a progress or cancel hook inside verification.
 - Add drag-and-drop to the GUI via `tkinterdnd2` ([GUI plan](dev-docs/plans/2026-10-10-gui.md)).
-- Ship `zipseal-gui` as downloadable apps for macOS (signed and notarized
-  `.app` in a DMG), Windows (zip) and Linux (AppImage and a `.tar.gz` of the
-  onedir), built and smoke-tested in CI from a tag and published as GitHub
-  Releases. The CLI remains source-installable from GitHub with
-  `uv tool install`.
-  ([executables plan](dev-docs/plans/2026-11-02-gui-executables.md)).
+- Ship the Windows GUI as a downloadable zip once the core filesystem port
+  lands. The macOS and Linux apps are covered by the executables plan; the
+  CLI remains source-installable from GitHub with `uv tool install`.
+  ([executables plan](dev-docs/plans/2026-11-02-gui-executables.md),
+  [Windows port plan](dev-docs/plans/2026-11-21-windows-core-port.md)).
 - Port the core's filesystem layer to Windows before shipping the Windows
   GUI: the `collect`/`sources`/`verify`/`output` paths use POSIX-only
   `O_DIRECTORY`, `O_NOFOLLOW`, `dir_fd` and `os.fwalk`, so the Windows app

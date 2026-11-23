@@ -1,6 +1,6 @@
 # Releasing zipseal-gui
 
-Last reviewed: 2026-11-22
+Last reviewed: 2026-11-23
 
 The operator's runbook for the frozen GUI apps. The design and the phase order
 are in
@@ -311,14 +311,16 @@ uses the M3 environment below; Windows is deferred.
   accepted clean container); create an archive with a generated password and
   open it in 7-Zip or `bsdtar`. Record the date and OS here. The Windows zip
   is not part of a release until the core filesystem port lands.
-  - **v0.3.0 Linux deviation (2026-11-22, Ubuntu 22.04.5 LTS amd64
-    container on Docker/Colima, no system Python):** the maintainer accepts
-    the clean-container check as the Linux acceptance for v0.3.0 instead of a
-    literal VM. The rehearsal tarball from run 45077481075 added
-    `/work/input`, generated a password, and wrote a one-part AES-256 archive
-    (418 bytes); `7z l` listed `input/hello.txt` and `input/notes.txt`. The
-    AppImage launched via `qemu-user-static`. The literal clean-VM check
-    remains open. Repeat on the v0.3.0 draft artifacts.
+  - **v0.3.0 Linux deviation (2026-11-22; 7z t verified 2026-11-23, Ubuntu
+    22.04.5 LTS amd64 container on Docker/Colima, no system Python):** the
+    maintainer accepts the clean-container check as the Linux acceptance for
+    v0.3.0 instead of a literal VM. The rehearsal tarball from run
+    45077481075 added `/work/input`, generated a password, and wrote a
+    one-part AES-256 archive (418 bytes); `7z t` reported `Everything is Ok`
+    with the generated password (2 files, 48 bytes), and `7z l` listed
+    `input/hello.txt` and `input/notes.txt`. The AppImage launched via
+    `qemu-user-static`. The literal clean-VM check remains open. Repeat on the
+    v0.3.0 draft artifacts.
 
 ## Runner images
 

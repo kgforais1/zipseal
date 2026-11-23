@@ -1,6 +1,6 @@
 # The zipseal window
 
-Last reviewed: 2026-11-22
+Last reviewed: 2026-11-23
 
 `zipseal-gui` opens a window that does the same job as the `zipseal` command.
 The archives are the same either way, and the same rules apply. Options the
@@ -15,8 +15,12 @@ frozen app needs no Python and no `uv`.
 | Platform | Download | First run |
 |---|---|---|
 | macOS (Apple silicon) | `zipseal-gui-<version>-macos-arm64.dmg` | Open the DMG, drag `zipseal-gui.app` to Applications, and launch it. The app is signed and notarized; macOS 11 or later. |
-| Linux (x86_64) | `zipseal-gui-<version>-linux-x86_64.AppImage` or `.tar.gz` | `chmod +x` the AppImage and run it. Without FUSE, use `./zipseal-gui-<version>-linux-x86_64.AppImage --appimage-extract-and-run`. The tarball extracts to a `zipseal-gui/` folder and runs from anywhere. Needs glibc 2.35 or later. |
+| Linux (x86_64, v0.3.0 or later) | `zipseal-gui-<version>-linux-x86_64.AppImage` or `.tar.gz` | `chmod +x` the AppImage and run it. Without FUSE, use `./zipseal-gui-<version>-linux-x86_64.AppImage --appimage-extract-and-run`. The tarball extracts to a `zipseal-gui/` folder and runs from anywhere. Needs glibc 2.35 or later. |
 | Windows (x64) | Not yet available. | The Windows build is deferred until the core filesystem port lands. See [`TODO.md`](../TODO.md). |
+
+The Linux artifacts are published starting with v0.3.0; the v0.2.0 release
+has macOS only. If the latest release is still v0.2.0, use the source install
+below until v0.3.0 is published.
 
 `<version>` is the release you downloaded, such as `0.3.0`. The frozen window
 does not show a version; the download filename and the release page do. See

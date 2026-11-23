@@ -8,7 +8,7 @@
 ![AES-256](https://img.shields.io/badge/encryption-AES--256-2E7D32)
 [![MIT license](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
 
-Last reviewed: 2026-11-22
+Last reviewed: 2026-11-23
 
 `zipseal` writes files and folders into AES-256 encrypted zips. It can split
 the output into parts that each stay under a size cap, such as an email
@@ -48,8 +48,11 @@ files from the [latest release](https://github.com/kgforais1/zipseal/releases/la
 | Platform | Download | First run |
 |---|---|---|
 | macOS (Apple silicon) | `zipseal-gui-<version>-macos-arm64.dmg` | Open the DMG, drag `zipseal-gui.app` to Applications, and launch it. The app is signed and notarized. |
-| Linux (x86_64) | `zipseal-gui-<version>-linux-x86_64.AppImage` or `.tar.gz` | `chmod +x` the AppImage and run it. Without FUSE, use `--appimage-extract-and-run`. The tarball extracts to a `zipseal-gui/` folder and runs from anywhere. Needs glibc 2.35 or later. |
+| Linux (x86_64, v0.3.0+) | `zipseal-gui-<version>-linux-x86_64.AppImage` or `.tar.gz` | `chmod +x` the AppImage and run it. Without FUSE, use `--appimage-extract-and-run`. The tarball extracts to a `zipseal-gui/` folder and runs from anywhere. Needs glibc 2.35 or later. |
 | Windows (x64) | Not yet available. | The Windows build is deferred until the core filesystem port lands. See [`TODO.md`](TODO.md). |
+
+Linux artifacts are published starting with v0.3.0. If the latest release is
+still v0.2.0 (macOS only), use the CLI until v0.3.0 is published.
 
 `<version>` is the release you downloaded, such as `0.3.0`. The release page
 lists the exact filenames. See [the zipseal window](user-docs/gui.md) for the

@@ -132,8 +132,9 @@ edits and refactors. User-visible changes go in [`CHANGELOG.md`](CHANGELOG.md).
 
 - The Linux GUI acceptance for v0.3.0 is recorded as an accepted
   clean-container deviation: the rehearsal tarball added `/work/input`,
-  generated a password, wrote a one-part AES-256 archive, and `7z l` listed
-  both files; the AppImage launched via `qemu-user-static`. The strict
+  generated a password, wrote a one-part AES-256 archive, and `7z t` reported
+  `Everything is Ok` with the generated password (2 files, 48 bytes); `7z l`
+  listed both files. The AppImage launched via `qemu-user-static`. The strict
   clean-VM check remains open.
 - Phase 5 app docs: a downloads table and Linux first-run/FUSE notes, a new
   `user-docs/troubleshooting-app.md`, and `AGENTS.md`/`SPEC.md` updates. The
