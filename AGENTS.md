@@ -1,6 +1,6 @@
 # AGENTS.md
 
-Last reviewed: 2026-10-18
+Last reviewed: 2026-11-22
 
 Single source of truth for AI coding agents in this repository. `CLAUDE.md` is a
 thin pointer back here.
@@ -12,8 +12,9 @@ cap. `zipseal-gui` is a Tkinter window over the same core. The design lives in
 
 ## Status
 
-v0.1.0 is released. The v1 plan is complete and archived in
-[`dev-docs/plans/archive/`](dev-docs/plans/archive/). Future work is in
+v0.2.0 is released. The v1 plan is complete and archived in
+[`dev-docs/plans/archive/`](dev-docs/plans/archive/). The frozen GUI
+executables plan is active; Windows is deferred. Future work is in
 [`TODO.md`](TODO.md).
 
 ## Read this first
@@ -46,6 +47,8 @@ uv run pytest -m gui           # tests that need a real Tk display
 # Linux has no display of its own: run the same command under xvfb-run.
 uv python install 3.13.17
 uv run --python 3.13.17 --group build python packaging/build.py --target macos --skip-sign
+# Release runbook: dev-docs/releasing.md. A v* tag runs
+# .github/workflows/release.yml; a dispatch is a rehearsal only.
 pre-commit run --all-files     # lint, format, secret scan, file-size policy
 uv run python scripts/make_samples.py  # rebuild sample archives in sample-data/
 scripts/install.sh             # put zipseal and zipseal-gui on PATH (editable)
@@ -63,10 +66,14 @@ CHANGELOG.md          finished user-visible work
 CHANGELOG.dev.md      finished internal work (harness, hooks, CI, tests)
 src/zipseal/          cli, collect, plan, sources, write, verify, zipcheck, output,
                       pipeline, options, job, progress, gui, gui_view
+packaging/            frozen-GUI build: build.py, icons.py, PyInstaller spec,
+                      Linux AppRun and desktop file
 tests/                pytest; fixtures are generated in tmp_path
 user-docs/            docs for people who run zipseal or open its archives
 dev-docs/plans/       active plans; finished ones move to plans/archive/
 dev-docs/investigations/  dated research and spike write-ups
+dev-docs/releasing.md release runbook
+.github/workflows/release.yml  tag-to-draft release pipeline
 hooks/scripts/        repo policy checks run by pre-commit
 .context/             scratch and handoffs (gitignored)
 sample-data/          local inputs and sample archives (gitignored)

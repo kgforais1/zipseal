@@ -1,7 +1,8 @@
 # zipseal — plan and design specification
 
-Status: implemented and released as v0.1.0, 2026-10-08. Drafted 2026-10-07.
-Last reviewed: 2026-11-10
+Status: implemented; v0.2.0 released 2026-11-19. The Linux app lands in
+v0.3.0. Drafted 2026-10-07.
+Last reviewed: 2026-11-22
 
 `zipseal` is a CLI that takes files and folders and writes them into one
 password-protected zip, or into several zips that each stay under a size cap.
@@ -109,13 +110,20 @@ with `uv tool install .`. On macOS, `zipseal-gui.command` at the repo root
 runs `uv run --managed-python zipseal-gui` from the clone when double-clicked in Finder, and
 `scripts/set-icon.sh` gives it the `src/zipseal/icon.svg` icon.
 
-Frozen downloads, needing neither Python nor `uv`, are partly implemented. The
-macOS DMG path exists: a `v*` tag builds, signs and notarizes it and creates a
-draft release. That release stays draft-only, pending the M2 manual
-acceptance. The Windows zip and Linux AppImage and tarball remain planned. The
-CLI stays source-installable. `dev-docs/plans/2026-11-02-gui-executables.md` is
-the plan. Until its Phase 5 lands, this section describes the supported
-install.
+Frozen downloads need neither Python nor `uv`. A `v*` tag builds the macOS
+DMG and the Linux AppImage and tarball, smoke-tests them, and creates a draft
+release; the maintainer accepts the draft and publishes it. The CLI stays
+source-installable. The Windows zip is deferred until the core filesystem
+port lands (see `TODO.md`).
+
+| Platform | Artifact | Install |
+|---|---|---|
+| macOS (Apple silicon) | `zipseal-gui-<version>-macos-arm64.dmg` | Open the DMG and drag `zipseal-gui.app` to Applications. Signed and notarized; macOS 11 or later. |
+| Linux (x86_64) | `zipseal-gui-<version>-linux-x86_64.AppImage` and `.tar.gz` | `chmod +x` the AppImage; without FUSE use `--appimage-extract-and-run`. The tarball runs from any folder. glibc 2.35 or later. |
+| Windows (x64) | Deferred | No artifact until the core filesystem port lands. |
+
+`dev-docs/plans/2026-11-02-gui-executables.md` is the plan, and
+`dev-docs/releasing.md` is the operator's runbook.
 
 ### 5.1 The GUI
 

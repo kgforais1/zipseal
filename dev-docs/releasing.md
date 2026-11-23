@@ -1,6 +1,6 @@
 # Releasing zipseal-gui
 
-Last reviewed: 2026-11-16
+Last reviewed: 2026-11-22
 
 The operator's runbook for the frozen GUI apps. The design and the phase order
 are in
@@ -281,8 +281,8 @@ Blocking gate for publish: the drafted artifact for every platform the release
 contains is accepted on a machine with no **user-installed** Python on `PATH`
 (no uv-managed, pyenv or Homebrew interpreter) — launch it, create an archive
 with a generated password, open it. The Apple-provided `/usr/bin/python3` may
-be present on macOS; it ships with the OS and is not a user install. Windows
-and Linux use the M3 environments below.
+be present on macOS; it ships with the OS and is not a user install. Linux
+uses the M3 environment below; Windows is deferred.
 
 - **M1 (local macOS, done 2026-11-15, macOS 26 / darwin 25.6.0):** the unsigned
   app and DMG from `dist/0.1.0/` were opened; a synthetic quarantine xattr
@@ -306,11 +306,19 @@ and Linux use the M3 environments below.
     direct Mach-O dependencies, and no first-party external interpreter.
     Accepted by the maintainer as a deviation, not an unqualified M2 pass;
     the strict check remains open for a clean VM.
-- **M3 (Windows and Linux, from the draft release):** run the Windows zip on a
-  clean Windows 11 VM under Parallels/UTM, where the x64 build runs under
-  emulation on Windows-on-ARM, and the Linux artifacts in a VM with no system
-  Python. Create an archive with a generated password and open it in 7-Zip or
-  `bsdtar`. Record the date and OS here.
+- **M3 (Linux; Windows deferred, from the draft release):** run the Linux
+  artifacts in a clean Linux environment with no system Python (a VM, or the
+  accepted clean container); create an archive with a generated password and
+  open it in 7-Zip or `bsdtar`. Record the date and OS here. The Windows zip
+  is not part of a release until the core filesystem port lands.
+  - **v0.3.0 Linux deviation (2026-11-22, Ubuntu 22.04.5 LTS amd64
+    container on Docker/Colima, no system Python):** the maintainer accepts
+    the clean-container check as the Linux acceptance for v0.3.0 instead of a
+    literal VM. The rehearsal tarball from run 45077481075 added
+    `/work/input`, generated a password, and wrote a one-part AES-256 archive
+    (418 bytes); `7z l` listed `input/hello.txt` and `input/notes.txt`. The
+    AppImage launched via `qemu-user-static`. The literal clean-VM check
+    remains open. Repeat on the v0.3.0 draft artifacts.
 
 ## Runner images
 
