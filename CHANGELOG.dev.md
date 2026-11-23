@@ -130,6 +130,15 @@ edits and refactors. User-visible changes go in [`CHANGELOG.md`](CHANGELOG.md).
 
 ### Changed
 
+- The Linux GUI acceptance for v0.3.0 is recorded as an accepted
+  clean-container deviation: the rehearsal tarball added `/work/input`,
+  generated a password, wrote a one-part AES-256 archive, and `7z t` reported
+  `Everything is Ok` with the generated password (2 files, 48 bytes); `7z l`
+  listed both files. The AppImage launched via `qemu-user-static`. The strict
+  clean-VM check remains open.
+- Phase 5 app docs: a downloads table and Linux first-run/FUSE notes, a new
+  `user-docs/troubleshooting-app.md`, and `AGENTS.md`/`SPEC.md` updates. The
+  docs record the glibc 2.35 floor and the deferred Windows build.
 - The Linux rehearsal passed on 2026-11-22 (run 45077481075): `build-linux`
   built the AppImage and tarball, both smoke tests found the `zipseal` window,
   and `build-info-linux.json` reports `GLIBC_2.35`, Tk 9.0, Python 3.13.17

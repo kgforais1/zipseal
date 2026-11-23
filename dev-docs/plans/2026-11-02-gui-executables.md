@@ -655,27 +655,30 @@ second local build.
       `--appimage-extract-and-run` if FUSE is unavailable); create an archive
       with a generated password, and open it in 7-Zip or `bsdtar`. Record the
       date and distro here.
-- [ ] Docs: `chmod +x`, the FUSE fallback
+      **v0.3.0 deviation (2026-11-22):** accepted clean-container check; see
+      the review-log entry. The strict VM condition remains open.
+- [x] Docs: `chmod +x`, the FUSE fallback
       (`./zipseal-gui.AppImage --appimage-extract-and-run`), and that the
       `.tar.gz` runs from any folder.
 
 ## Phase 5 — Docs
 
-- [ ] `README.md` Install: a downloads table (macOS / Windows / Linux), the
-      measured Linux glibc floor from the release notes, and `uv tool install`
-      for the CLI.
-- [ ] `user-docs/gui.md` "Start it" → "Get the app": per-OS first-run notes
-      (macOS: nothing to do; Windows: SmartScreen; Linux: chmod +x).
-- [ ] New `user-docs/troubleshooting-app.md` (or a section): SmartScreen, Smart
-      App Control, AV false positives, AppImage FUSE, "where does it write?",
+- [x] `README.md` Install: a downloads table (macOS / Linux; the Windows row
+      records the deferral), the measured Linux glibc floor from the release
+      notes (2.35), and `uv tool install` for the CLI.
+- [x] `user-docs/gui.md` "Start it" → "Get the app": per-OS first-run notes
+      (macOS: nothing to do; Linux: `chmod +x` and the FUSE fallback; Windows:
+      no build yet).
+- [x] New `user-docs/troubleshooting-app.md`: SmartScreen/Smart App Control/AV
+      (Windows, when a build exists), AppImage FUSE, "where does it write?",
       and how to tell which version is installed (the download filename and
       the release page — the frozen window shows no version).
-- [ ] `AGENTS.md`: build command, `packaging/` in the layout, release workflow.
-- [ ] `SPEC.md`: replace the "planned, not implemented" note added with this
-      plan (`SPEC.md:112`, "Planned, not implemented") with the artifact table above; the GUI ships
-      frozen while the CLI stays source-installable.
+- [x] `AGENTS.md`: build command, `packaging/` in the layout, release workflow.
+- [x] `SPEC.md`: replace the "planned, not implemented" note with the artifact
+      table above; the GUI ships frozen while the CLI stays source-installable.
 - [ ] `CHANGELOG.md` (user-visible) and `CHANGELOG.dev.md` (workflow internals);
-      doc-gardening pass; bump `Last reviewed` dates after re-reading.
+      the internal changelog is updated; the v0.3.0 user entry and final
+      doc-gardening pass land with release prep.
 
 ## Phase 6 — CLI on PyPI (optional, decide after M3)
 
@@ -775,15 +778,13 @@ only if Phase 3 signing is approved. Linux needs no secrets, and
   Phase 0 tests green. No CI yet.
 - **M2**: tagged workflow produces a signed, notarized, stapled DMG as a draft
   release; manual acceptance recorded; maintainer publishes.
-- **M3**: Windows zip and Linux AppImage + tar.gz join the same workflow,
-  smoke-tested in CI and accepted on machines with no user-installed Python on
-  `PATH` (macOS: a clean VM or Standard second account, not the dev account
-  where `uv` and its managed interpreters live; Apple's `/usr/bin/python3` may
-  be present; Windows: a clean Windows 11 VM under Parallels/UTM, where the
-  x64 zip runs emulated on Windows-on-ARM; Linux: a VM with no system Python),
-  `SHA256SUMS` + attestations attached; the
-  Windows signing outcome is recorded per artifact (zip signed, or zip
-  unsigned with the Store MSIX signed separately).
+- **M3**: Linux AppImage + tar.gz join the same workflow, smoke-tested in CI
+  and accepted on a clean Linux environment with no system Python (a VM, or
+  the accepted clean container for v0.3.0), with `SHA256SUMS` and attestations
+  attached. The Windows zip is deferred until the core filesystem port lands;
+  it then joins the same workflow with a clean Windows 11 VM under
+  Parallels/UTM, where the x64 zip runs emulated on Windows-on-ARM. The
+  Windows signing outcome is recorded per artifact when that build returns.
 - **M4**: README, `user-docs/`, `AGENTS.md` and `SPEC.md` updated;
   `dev-docs/releasing.md` finalized (created and freshness-hooked in Phase 2);
   PyPI decision recorded.
@@ -1073,3 +1074,14 @@ only if Phase 3 signing is approved. Linux needs no secrets, and
   PyInstaller 6.22.3. The tag's `publish` job appends this file to the
   release notes. The Phase 4 build, AppDir and smoke boxes are ticked; the
   manual-acceptance and Linux-docs boxes remain.
+
+- 2026-11-22 (Linux acceptance pre-check / v0.3.0 deviation; 7z t verified
+  2026-11-23): The maintainer accepts the clean Ubuntu 22.04 amd64 container
+  check (Docker/Colima, no system Python) as the Linux acceptance for v0.3.0
+  instead of a literal VM. The rehearsal tarball from run 45077481075 added
+  `/work/input`, generated a password, and wrote a one-part AES-256 archive
+  (418 bytes); `7z t` reported `Everything is Ok` with the generated password
+  (2 files, 48 bytes), and `7z l` listed `input/hello.txt` and
+  `input/notes.txt`. The AppImage launched via `qemu-user-static`. The strict
+  clean-VM box stays unticked for a future VM; repeat the container check on
+  the v0.3.0 draft artifacts.

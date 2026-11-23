@@ -1,12 +1,32 @@
 # The zipseal window
 
-Last reviewed: 2026-10-18
+Last reviewed: 2026-11-23
 
 `zipseal-gui` opens a window that does the same job as the `zipseal` command.
 The archives are the same either way, and the same rules apply. Options the
 window does not show keep their usual defaults.
 
-## Start it
+## Get the app
+
+Download the files from the
+[latest release](https://github.com/kgforais1/zipseal/releases/latest). The
+frozen app needs no Python and no `uv`.
+
+| Platform | Download | First run |
+|---|---|---|
+| macOS (Apple silicon) | `zipseal-gui-<version>-macos-arm64.dmg` | Open the DMG, drag `zipseal-gui.app` to Applications, and launch it. The app is signed and notarized; macOS 11 or later. |
+| Linux (x86_64, v0.3.0 or later) | `zipseal-gui-<version>-linux-x86_64.AppImage` or `.tar.gz` | `chmod +x` the AppImage and run it. Without FUSE, run it with `--appimage-extract-and-run` (see [app troubleshooting](troubleshooting-app.md)). The tarball extracts to a `zipseal-gui/` folder and runs from anywhere. Needs glibc 2.35 or later. |
+| Windows (x64) | Not yet available. | The Windows build is deferred until the core filesystem port lands. See [`TODO.md`](../TODO.md). |
+
+The Linux artifacts are published starting with v0.3.0; the v0.2.0 release
+has macOS only. If the latest release is still v0.2.0, use the source install
+below until v0.3.0 is published.
+
+`<version>` is the release you downloaded, such as `0.3.0`. The frozen window
+does not show a version; the download filename and the release page do. See
+[app troubleshooting](troubleshooting-app.md) if a download will not start.
+
+### Run from a clone (macOS)
 
 On macOS, double-click `zipseal-gui.command` in a clone of the project. Finder
 opens Terminal, and Terminal opens the zipseal window. Leave the Terminal
@@ -135,4 +155,6 @@ last as long as the window does.
 
 - [Quick start](quick-start.md) for the same job from a terminal.
 - [CLI reference](cli.md) for every option.
+- [App troubleshooting](troubleshooting-app.md) for downloads, Linux FUSE and
+  missing versions.
 - [Security notes](security.md) for what is protected and what is visible.
