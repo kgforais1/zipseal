@@ -307,10 +307,10 @@ uses the M3 environment below; Windows is deferred.
     Accepted by the maintainer as a deviation, not an unqualified M2 pass;
     the strict check remains open for a clean VM.
 - **M3 (Linux; Windows deferred, from the draft release):** run the Linux
-  artifacts in a clean Linux environment with no system Python (a VM, or the
-  accepted clean container); create an archive with a generated password and
-  open it in 7-Zip or `bsdtar`. Record the date and OS here. The Windows zip
-  is not part of a release until the core filesystem port lands.
+  artifacts in a clean Linux VM with no system Python; create an archive with
+  a generated password and open it in 7-Zip or `bsdtar`. Record the date and
+  OS here. The Windows zip is not part of a release until the core filesystem
+  port lands.
   - **v0.3.0 Linux deviation (2026-11-22; 7z t verified 2026-11-23, Ubuntu
     22.04.5 LTS amd64 container on Docker/Colima, no system Python):** the
     maintainer accepts the clean-container check as the Linux acceptance for
@@ -319,8 +319,9 @@ uses the M3 environment below; Windows is deferred.
     one-part AES-256 archive (418 bytes); `7z t` reported `Everything is Ok`
     with the generated password (2 files, 48 bytes), and `7z l` listed
     `input/hello.txt` and `input/notes.txt`. The AppImage launched via
-    `qemu-user-static`. The literal clean-VM check remains open. Repeat on the
-    v0.3.0 draft artifacts.
+    `qemu-user-static`. This exception applies to v0.3.0 only; later releases
+    require a clean VM unless a new deviation is recorded. The literal
+    clean-VM check remains open. Repeat on the v0.3.0 draft artifacts.
 
 ## Runner images
 

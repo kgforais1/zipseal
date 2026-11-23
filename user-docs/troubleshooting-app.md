@@ -45,23 +45,25 @@ The Linux build is x86_64 only. Check the glibc version with `ldd --version`;
 the first line must be 2.35 or later. Older distributions will not run this
 build.
 
-For the AppImage, make it executable and run it:
+Set `VERSION` to the release you downloaded (for example, `0.3.0`), then run
+the AppImage:
 
 ```sh
-chmod +x zipseal-gui-<version>-linux-x86_64.AppImage
-./zipseal-gui-<version>-linux-x86_64.AppImage
+VERSION=0.3.0
+chmod +x "zipseal-gui-${VERSION}-linux-x86_64.AppImage"
+./"zipseal-gui-${VERSION}-linux-x86_64.AppImage"
 ```
 
 If FUSE is unavailable, use the extraction fallback:
 
 ```sh
-./zipseal-gui-<version>-linux-x86_64.AppImage --appimage-extract-and-run
+./"zipseal-gui-${VERSION}-linux-x86_64.AppImage" --appimage-extract-and-run
 ```
 
 For the tarball, extract it and run the binary from the extracted folder:
 
 ```sh
-tar -xzf zipseal-gui-<version>-linux-x86_64.tar.gz
+tar -xzf "zipseal-gui-${VERSION}-linux-x86_64.tar.gz"
 ./zipseal-gui/zipseal-gui
 ```
 
