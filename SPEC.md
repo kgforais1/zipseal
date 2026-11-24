@@ -123,7 +123,7 @@ port lands (see `TODO.md`).
 | Windows (x64) | Deferred | No artifact until the core filesystem port lands. |
 
 Linux artifacts are published starting with v0.3.0. The CLI remains
-source-installable on every platform.
+source-installable.
 
 `dev-docs/plans/2026-11-02-gui-executables.md` is the plan, and
 `dev-docs/releasing.md` is the operator's runbook.

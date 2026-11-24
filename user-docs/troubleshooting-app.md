@@ -20,8 +20,8 @@ The frozen window does not show a version. The download filename and the
 | Windows | Not yet available | The core filesystem port is still in progress |
 
 The Linux artifacts are published starting with v0.3.0. The
-[CLI source install](../README.md#install-the-cli) remains available on every
-platform.
+[CLI source install](../README.md#install-the-cli) remains available as a
+source install.
 
 ## macOS
 

@@ -132,8 +132,8 @@ edits and refactors. User-visible changes go in [`CHANGELOG.md`](CHANGELOG.md).
 
 - v0.3.0 published on 2026-11-24. Docs mark it released, replace the temporary
   "until v0.3.0 is published, use the CLI" wording with an explicit statement
-  that the CLI/source install remains available on every platform, and remove
-  the CHANGELOG draft note. The v0.3.0 draft acceptance repeat is recorded in
+  that the CLI/source install remains available, and remove the CHANGELOG
+  draft note. The v0.3.0 draft acceptance repeat is recorded in
   the plan and release runbook; the strict clean-VM check remains open.
 - Release prep for v0.3.0: version bump, Linux download docs/glibc 2.35,
   Windows deferral, and the Phase 5 close-out. The tagged draft acceptance

@@ -52,7 +52,7 @@ files from the [latest release](https://github.com/kgforais1/zipseal/releases/la
 | Windows (x64) | Not yet available. | The Windows build is deferred until the core filesystem port lands. See [`TODO.md`](TODO.md). |
 
 Linux artifacts are published starting with v0.3.0. The CLI remains available
-on every platform as a source install; see [Install the CLI](#install-the-cli).
+as a source install; see [Install the CLI](#install-the-cli).
 
 `<version>` is the release you downloaded, such as `0.3.0`. The release page
 lists the exact filenames. See [the zipseal window](user-docs/gui.md) for the
@@ -61,8 +61,8 @@ if a download will not start.
 
 ### Install the CLI
 
-The CLI is available on every platform and stays source-installable. It needs
-Python 3.11 or later and [`uv`](https://docs.astral.sh/uv/).
+The CLI stays source-installable. It needs Python 3.11 or later and
+[`uv`](https://docs.astral.sh/uv/).
 
 ```sh
 uv tool install git+https://github.com/kgforais1/zipseal.git

@@ -21,7 +21,7 @@ frozen app needs no Python and no `uv`.
 The Linux artifacts are published starting with v0.3.0. The
 [CLI source install](../README.md#install-the-cli)
 (`uv tool install git+https://github.com/kgforais1/zipseal.git`) remains
-available on every platform and also puts `zipseal-gui` on your `PATH`.
+available as a source install and also puts `zipseal-gui` on your `PATH`.
 
 `<version>` is the release you downloaded, such as `0.3.0`. The frozen window
 does not show a version; the download filename and the release page do. See
