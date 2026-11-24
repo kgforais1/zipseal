@@ -321,7 +321,15 @@ uses the M3 environment below; Windows is deferred.
     `input/hello.txt` and `input/notes.txt`. The AppImage launched via
     `qemu-user-static`. This exception applies to v0.3.0 only; later releases
     require a clean VM unless a new deviation is recorded. The literal
-    clean-VM check remains open. Repeat on the v0.3.0 draft artifacts.
+    clean-VM check remains open.
+  - **v0.3.0 draft repeat (2026-11-24, same container):** the draft tarball
+    and AppImage both added `/work/input`, generated a password, and wrote a
+    one-part AES-256 archive (418 bytes); `7z t` reported `Everything is Ok`
+    (2 files, 48 bytes), `7z l` listed `input/hello.txt` and
+    `input/notes.txt`, and both entries were `AES-256 Deflate`. The AppImage
+    needed `qemu-x86_64-static -cpu max` on the arm64 Colima host; qemu 6.2's
+    default CPU model segfaulted on the newer runtime. The draft was published
+    on 2026-11-24. The strict clean-VM check remains open.
 
 ## Runner images
 

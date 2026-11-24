@@ -18,10 +18,10 @@ frozen app needs no Python and no `uv`.
 | Linux (x86_64, v0.3.0 or later) | `zipseal-gui-<version>-linux-x86_64.AppImage` or `.tar.gz` | `chmod +x` the AppImage and run it. Without FUSE, run it with `--appimage-extract-and-run` (see [app troubleshooting](troubleshooting-app.md)). The tarball extracts to a `zipseal-gui/` folder and runs from anywhere. Needs glibc 2.35 or later. |
 | Windows (x64) | Not yet available. | The Windows build is deferred until the core filesystem port lands. See [`TODO.md`](../TODO.md). |
 
-The Linux artifacts are published starting with v0.3.0. Until v0.3.0 is
-published, use the [CLI source install](../README.md#install-the-cli)
-(`uv tool install git+https://github.com/kgforais1/zipseal.git`), which also
-puts `zipseal-gui` on your `PATH`.
+The Linux artifacts are published starting with v0.3.0. The
+[CLI source install](../README.md#install-the-cli)
+(`uv tool install git+https://github.com/kgforais1/zipseal.git`) remains
+available on every platform and also puts `zipseal-gui` on your `PATH`.
 
 `<version>` is the release you downloaded, such as `0.3.0`. The frozen window
 does not show a version; the download filename and the release page do. See

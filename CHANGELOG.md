@@ -6,10 +6,7 @@ All notable user-facing changes are documented here. The format follows
 
 ## [Unreleased]
 
-## [0.3.0] - 2026-11-23
-
-> The Linux artifacts in this entry are published with the v0.3.0 draft.
-> Until that release is published, use the CLI.
+## [0.3.0] - 2026-11-24
 
 ### Added
 
