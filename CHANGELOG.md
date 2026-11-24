@@ -6,6 +6,29 @@ All notable user-facing changes are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-11-23
+
+> The Linux artifacts in this entry are published with the v0.3.0 draft.
+> Until that release is published, use the CLI.
+
+### Added
+
+- A Linux app, `zipseal-gui-0.3.0-linux-x86_64.AppImage` and
+  `zipseal-gui-0.3.0-linux-x86_64.tar.gz`, needs no Python, no `uv` and no
+  terminal. It targets x86_64 and glibc 2.35 or later. The AppImage uses FUSE
+  and falls back to `--appimage-extract-and-run`; the tarball runs from any
+  folder.
+- macOS and Linux download, first-run and troubleshooting docs, including the
+  measured glibc floor, AppImage FUSE and generated-password recovery.
+- The tag-to-draft release workflow builds, smoke-tests and attaches the Linux
+  AppImage and tarball, with the measured glibc floor and build info in the
+  release notes.
+
+### Changed
+
+- The macOS app remains signed and notarized. The Windows app remains
+  deferred until the core filesystem port lands.
+
 ## [0.2.0] - 2026-11-19
 
 ### Added

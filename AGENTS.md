@@ -1,6 +1,6 @@
 # AGENTS.md
 
-Last reviewed: 2026-11-22
+Last reviewed: 2026-11-23
 
 Single source of truth for AI coding agents in this repository. `CLAUDE.md` is a
 thin pointer back here.
@@ -12,10 +12,11 @@ cap. `zipseal-gui` is a Tkinter window over the same core. The design lives in
 
 ## Status
 
-v0.2.0 is released. The v1 plan is complete and archived in
+v0.2.0 is the latest published release; v0.3.0 (macOS and Linux) is in
+preparation. The v1 plan is complete and archived in
 [`dev-docs/plans/archive/`](dev-docs/plans/archive/). The frozen GUI
-executables plan is active; Windows is deferred. Future work is in
-[`TODO.md`](TODO.md).
+executables plan covers macOS and Linux; Windows is deferred. Future work is
+in [`TODO.md`](TODO.md).
 
 ## Read this first
 
