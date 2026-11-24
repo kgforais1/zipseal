@@ -19,7 +19,8 @@ The frozen window does not show a version. The download filename and the
 | Linux (v0.3.0 or later) | `zipseal-gui-<version>-linux-x86_64.AppImage` or `.tar.gz` | x86_64; glibc 2.35 or later |
 | Windows | Not yet available | The core filesystem port is still in progress |
 
-The Linux artifacts are published starting with v0.3.0.
+The Linux artifacts are published starting with v0.3.0. Until v0.3.0 is
+published, use the source install.
 
 ## macOS
 

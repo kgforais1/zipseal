@@ -12,10 +12,11 @@ cap. `zipseal-gui` is a Tkinter window over the same core. The design lives in
 
 ## Status
 
-v0.3.0 is released with the macOS and Linux apps. The v1 plan is complete and
-archived in [`dev-docs/plans/archive/`](dev-docs/plans/archive/). The frozen
-GUI executables plan covers macOS and Linux; Windows is deferred. Future work
-is in [`TODO.md`](TODO.md).
+v0.2.0 is the latest published release; v0.3.0 (macOS and Linux) is in
+preparation. The v1 plan is complete and archived in
+[`dev-docs/plans/archive/`](dev-docs/plans/archive/). The frozen GUI
+executables plan covers macOS and Linux; Windows is deferred. Future work is
+in [`TODO.md`](TODO.md).
 
 ## Read this first
 

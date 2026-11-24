@@ -8,6 +8,9 @@ All notable user-facing changes are documented here. The format follows
 
 ## [0.3.0] - 2026-11-23
 
+> The Linux artifacts in this entry are published with the v0.3.0 draft.
+> Until that release is published, use the CLI.
+
 ### Added
 
 - A Linux app, `zipseal-gui-0.3.0-linux-x86_64.AppImage` and
