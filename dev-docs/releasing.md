@@ -306,6 +306,18 @@ uses the M3 environment below; Windows is deferred.
     direct Mach-O dependencies, and no first-party external interpreter.
     Accepted by the maintainer as a deviation, not an unqualified M2 pass;
     the strict check remains open for a clean VM.
+  - **v0.3.0 deviation (approved 2026-11-25; static checks 2026-11-24 on
+    macOS 27.2.1 / build 26B131; DMG SHA-256
+    `5010da06884ab13206dc4360a044913a4c7154421ab4551ba8819d68d3c326aa`):**
+    no new manual macOS launch was performed. The maintainer accepted the
+    v0.3.0 release without a new manual macOS acceptance because it rebuilds,
+    signs and notarizes the same app; the draft DMG passed static `hdiutil`,
+    `codesign`, `spctl` and `stapler` checks. The static-check shell's visible
+    `python3` was the pyenv shim 3.12.10, Homebrew
+    `/opt/homebrew/bin/python3` and `/usr/bin/python3`; the Finder-launched
+    app's PATH was not measured because it was not launched. The literal
+    no-user-installed-Python condition remains open; the strict M2 check
+    stays open for a clean VM.
 - **M3 (Linux; Windows deferred, from the draft release):** run the Linux
   artifacts in a clean Linux VM with no system Python; create an archive with
   a generated password and open it in 7-Zip or `bsdtar`. Record the date and
