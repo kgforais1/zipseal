@@ -130,6 +130,12 @@ edits and refactors. User-visible changes go in [`CHANGELOG.md`](CHANGELOG.md).
 
 ### Changed
 
+- PyPI Trusted Publishing: `.github/workflows/pypi.yml` builds `uv build`
+  on a published release or explicit dispatch (never on a tag push), gates
+  the upload behind the `pypi` environment, and publishes with PEP 740
+  attestations. `ci.yml` builds and smokes the wheel; `pyproject.toml` gains
+  the PyPI readme, URLs and classifiers. The first upload waits for the PyPI
+  pending publisher and the `pypi` environment.
 - v0.3.0 published on 2026-11-24. Docs mark it released, replace the temporary
   "until v0.3.0 is published, use the CLI" wording with an explicit statement
   that the CLI/source install remains available, and remove the CHANGELOG

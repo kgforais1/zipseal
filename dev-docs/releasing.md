@@ -258,6 +258,41 @@ disk through stdin, never argv, and are deleted after use.
 
 `v0.1.0` stays source-only; the first run is the next version bump.
 
+## PyPI CLI
+
+The CLI package is published by `.github/workflows/pypi.yml`, not by
+`release.yml`. It runs on a published GitHub release or an explicit
+`workflow_dispatch` with an existing `vX.Y.Z` tag. It never runs on a tag
+push: PyPI versions are immutable, so a re-cut tag cannot re-upload.
+
+Both triggers wait on the protected `pypi` environment; its required reviewer
+is the publish approval. The job checks the tag is on `main` and equals the
+`pyproject.toml` version, builds the sdist and wheel with `uv build`, smokes
+the wheel's CLI, and uploads with Trusted Publishing and PEP 740 attestations.
+The source install remains available.
+
+First upload (v0.3.0):
+
+1. In GitHub, create the `pypi` environment with at least one required
+   reviewer. The workflow's environment is the approval gate.
+2. In PyPI, add a pending trusted publisher for project `zipseal`, owner
+   `kgforais1`, repository `zipseal`, workflow `pypi.yml`, environment
+   `pypi`.
+3. Run the `PyPI` workflow from `main` with tag `v0.3.0`; approve the `pypi`
+   environment. The project is claimed on the first upload.
+4. Later releases: publish the GitHub release draft after acceptance; the
+   `release: published` event starts the workflow; approve the `pypi`
+   environment. Do not re-run a published version; bump the version and tag.
+
+The package is published as `zipseal`; users can run `uvx zipseal` or
+`uv tool install zipseal`. The GitHub source install remains documented in
+the README.
+
+The v0.3.0 tag predates the PyPI readme/URLs metadata in this PR; its package
+page will show the tag's simpler metadata. The new metadata applies to the
+next tagged version. Publish v0.3.0 from the tag, or cut v0.3.1 after this PR
+if the full PyPI page is wanted first; never reuse 0.3.0.
+
 ## Rollback
 
 A published release is immutable: its assets cannot be replaced, so a bad

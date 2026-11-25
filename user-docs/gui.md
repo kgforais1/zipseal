@@ -19,9 +19,9 @@ frozen app needs no Python and no `uv`.
 | Windows (x64) | Not yet available. | The Windows build is deferred until the core filesystem port lands. See [`TODO.md`](../TODO.md). |
 
 The Linux artifacts are published starting with v0.3.0. The
-[CLI source install](../README.md#install-the-cli)
-(`uv tool install git+https://github.com/kgforais1/zipseal.git`) remains
-available and also puts `zipseal-gui` on your `PATH`.
+[CLI](../README.md#install-the-cli) is published on PyPI (`uvx zipseal`) and
+can be installed with `uv tool install zipseal`, which also puts
+`zipseal-gui` on your `PATH`. The source install remains available.
 
 `<version>` is the release you downloaded, such as `0.3.0`. The frozen window
 does not show a version; the download filename and the release page do. See

@@ -1,6 +1,6 @@
 # AGENTS.md
 
-Last reviewed: 2026-11-24
+Last reviewed: 2026-11-25
 
 Single source of truth for AI coding agents in this repository. `CLAUDE.md` is a
 thin pointer back here.
@@ -12,8 +12,9 @@ cap. `zipseal-gui` is a Tkinter window over the same core. The design lives in
 
 ## Status
 
-v0.3.0 is the latest published release (macOS and Linux); the Windows app is
-deferred. The v1 plan is complete and archived in
+v0.3.0 is the latest published release (macOS and Linux); the CLI is
+published on PyPI and remains source-installable. The Windows app is deferred.
+The v1 plan is complete and archived in
 [`dev-docs/plans/archive/`](dev-docs/plans/archive/). The frozen GUI
 executables plan covers macOS and Linux; Windows is deferred. Future work is
 in [`TODO.md`](TODO.md).
@@ -40,6 +41,7 @@ uv run zipseal-gui             # open the window (needs a display)
 uv run pytest                  # fast tests (the gui and slow suites are deselected)
 uv run pytest -m slow          # Zip64 / 4 GiB tests
 uv run pytest -m gui           # tests that need a real Tk display
+uv build                       # sdist + wheel for PyPI
 # Local frozen-GUI build. --target must be this machine (macos here).
 # A bad --version stops first. PyInstaller writes dist/<version>.partial.
 # On macOS the disk image is written into that tree. It replaces
@@ -75,6 +77,7 @@ dev-docs/plans/       active plans; finished ones move to plans/archive/
 dev-docs/investigations/  dated research and spike write-ups
 dev-docs/releasing.md release runbook
 .github/workflows/release.yml  tag-to-draft release pipeline
+.github/workflows/pypi.yml     Trusted Publishing for the CLI
 hooks/scripts/        repo policy checks run by pre-commit
 .context/             scratch and handoffs (gitignored)
 sample-data/          local inputs and sample archives (gitignored)

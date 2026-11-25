@@ -51,8 +51,9 @@ files from the [latest release](https://github.com/kgforais1/zipseal/releases/la
 | Linux (x86_64, v0.3.0+) | `zipseal-gui-<version>-linux-x86_64.AppImage` or `.tar.gz` | `chmod +x` the AppImage and run it. Without FUSE, use `--appimage-extract-and-run`. The tarball extracts to a `zipseal-gui/` folder and runs from anywhere. Needs glibc 2.35 or later. |
 | Windows (x64) | Not yet available. | The Windows build is deferred until the core filesystem port lands. See [`TODO.md`](TODO.md). |
 
-Linux artifacts are published starting with v0.3.0. The CLI remains available
-as a source install; see [Install the CLI](#install-the-cli).
+Linux artifacts are published starting with v0.3.0. The CLI is published on
+PyPI and remains available as a source install; see
+[Install the CLI](#install-the-cli).
 
 `<version>` is the release you downloaded, such as `0.3.0`. The release page
 lists the exact filenames. See [the zipseal window](user-docs/gui.md) for the
@@ -61,15 +62,29 @@ if a download will not start.
 
 ### Install the CLI
 
-The CLI stays source-installable. It needs Python 3.11 or later and
-[`uv`](https://docs.astral.sh/uv/).
+The CLI is published on PyPI and remains source-installable. It needs Python
+3.11 or later and [`uv`](https://docs.astral.sh/uv/).
+
+Run it without installing:
+
+```sh
+uvx zipseal --help
+```
+
+Install it:
+
+```sh
+uv tool install zipseal
+```
+
+The source install remains available for unreleased code:
 
 ```sh
 uv tool install git+https://github.com/kgforais1/zipseal.git
 ```
 
-That puts two commands on your `PATH`: `zipseal` and `zipseal-gui`. From a
-clone, `scripts/install.sh` does the same as an editable install.
+Either install puts two commands on your `PATH`: `zipseal` and `zipseal-gui`.
+From a clone, `scripts/install.sh` does the same as an editable install.
 
 ### Run from a clone (macOS)
 
