@@ -130,9 +130,16 @@ edits and refactors. User-visible changes go in [`CHANGELOG.md`](CHANGELOG.md).
 
 ### Changed
 
+- v0.3.0 published on 2026-11-24. Docs mark it released, replace the temporary
+  "until v0.3.0 is published, use the CLI" wording with an explicit statement
+  that the CLI/source install remains available, and remove the CHANGELOG
+  draft note. The v0.3.0 draft acceptance repeat and the approved v0.3.0
+  macOS deviation (no new manual launch; DMG `5010da06…`) are recorded in the
+  plan and release runbook; the strict clean-VM and M2 manual checks remain
+  open.
 - Release prep for v0.3.0: version bump, Linux download docs/glibc 2.35,
-  Windows deferral, and the Phase 5 close-out. The Linux draft acceptance
-  remains to repeat on the tagged artifacts.
+  Windows deferral, and the Phase 5 close-out. The tagged draft acceptance
+  passed on 2026-11-24; the strict clean-VM check remains open.
 - The Linux GUI acceptance for v0.3.0 is recorded as an accepted
   clean-container deviation: the rehearsal tarball added `/work/input`,
   generated a password, wrote a one-part AES-256 archive, and `7z t` reported

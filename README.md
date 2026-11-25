@@ -51,8 +51,8 @@ files from the [latest release](https://github.com/kgforais1/zipseal/releases/la
 | Linux (x86_64, v0.3.0+) | `zipseal-gui-<version>-linux-x86_64.AppImage` or `.tar.gz` | `chmod +x` the AppImage and run it. Without FUSE, use `--appimage-extract-and-run`. The tarball extracts to a `zipseal-gui/` folder and runs from anywhere. Needs glibc 2.35 or later. |
 | Windows (x64) | Not yet available. | The Windows build is deferred until the core filesystem port lands. See [`TODO.md`](TODO.md). |
 
-Linux artifacts are published starting with v0.3.0. Until v0.3.0 is
-published, use the CLI.
+Linux artifacts are published starting with v0.3.0. The CLI remains available
+as a source install; see [Install the CLI](#install-the-cli).
 
 `<version>` is the release you downloaded, such as `0.3.0`. The release page
 lists the exact filenames. See [the zipseal window](user-docs/gui.md) for the

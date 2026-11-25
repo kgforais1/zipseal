@@ -1,8 +1,8 @@
 # zipseal — plan and design specification
 
-Status: implemented; v0.2.0 released 2026-11-19. v0.3.0 (macOS and Linux)
-is in preparation. The Windows app remains deferred. Drafted 2026-10-07.
-Last reviewed: 2026-11-23
+Status: implemented; v0.3.0 released 2026-11-24 (macOS and Linux). The
+Windows app remains deferred. Drafted 2026-10-07.
+Last reviewed: 2026-11-24
 
 `zipseal` is a CLI that takes files and folders and writes them into one
 password-protected zip, or into several zips that each stay under a size cap.
@@ -122,8 +122,8 @@ port lands (see `TODO.md`).
 | Linux (x86_64, v0.3.0+) | `zipseal-gui-<version>-linux-x86_64.AppImage` and `.tar.gz` | `chmod +x` the AppImage; without FUSE use `--appimage-extract-and-run`. The tarball runs from any folder. glibc 2.35 or later. |
 | Windows (x64) | Deferred | No artifact until the core filesystem port lands. |
 
-Linux artifacts are published starting with v0.3.0. Until v0.3.0 is
-published, the CLI remains source-installable.
+Linux artifacts are published starting with v0.3.0. The CLI remains
+source-installable.
 
 `dev-docs/plans/2026-11-02-gui-executables.md` is the plan, and
 `dev-docs/releasing.md` is the operator's runbook.

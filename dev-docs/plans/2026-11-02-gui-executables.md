@@ -538,6 +538,14 @@ second local build.
       dependencies, and no first-party external-interpreter invocation. The
       maintainer accepted this as a deviation for the v0.2.0 draft; the
       strict box stays unticked for a future clean-VM recheck.
+      **v0.3.0 deviation (approved 2026-11-25, macOS 27.2.1 / build 26B131,
+      DMG SHA-256
+      `5010da06884ab13206dc4360a044913a4c7154421ab4551ba8819d68d3c326aa`):**
+      no new manual launch; the maintainer accepted the v0.3.0 release
+      without a new manual macOS acceptance because it rebuilds, signs and
+      notarizes the same app; the draft DMG passed the static checks. See the
+      v0.3.0 review-log entry for the visible `python3` and evidence. The
+      strict box stays unticked.
 
 ## Phase 3 — Windows app
 
@@ -656,7 +664,8 @@ second local build.
       with a generated password, and open it in 7-Zip or `bsdtar`. Record the
       date and distro here.
       **v0.3.0 deviation (2026-11-22):** accepted clean-container check; see
-      the review-log entry. The strict VM condition remains open.
+      the review-log entry. The draft repeat passed 2026-11-24. The strict VM
+      condition remains open.
 - [x] Docs: `chmod +x`, the FUSE fallback
       (`./zipseal-gui.AppImage --appimage-extract-and-run`), and that the
       `.tar.gz` runs from any folder.
@@ -1083,10 +1092,36 @@ only if Phase 3 signing is approved. Linux needs no secrets, and
   (418 bytes); `7z t` reported `Everything is Ok` with the generated password
   (2 files, 48 bytes), and `7z l` listed `input/hello.txt` and
   `input/notes.txt`. The AppImage launched via `qemu-user-static`. The strict
-  clean-VM box stays unticked for a future VM; repeat the container check on
-  the v0.3.0 draft artifacts.
+  clean-VM box stays unticked for a future VM; the draft repeat on the v0.3.0
+  artifacts passed on 2026-11-24 (see below).
 
 - 2026-11-23 (v0.3.0 release prep): Version 0.3.0; the Phase 5 docs and the
   user-visible Linux entry are in. Linux artifacts are v0.3.0+; Windows is
   deferred. The manual acceptance remains the accepted clean-container
-  deviation, to repeat on the v0.3.0 draft artifacts.
+  deviation; the v0.3.0 draft repeat passed on 2026-11-24 (see below).
+
+- 2026-11-24 (v0.3.0 draft verification, deviations and publication): Release
+  run 45413600082 completed; `sign-macos` and `publish` succeeded after the
+  environment approval. The draft's macOS DMG, Linux AppImage and `.tar.gz`,
+  both build-info files and `SHA256SUMS` were present; every checksummed entry
+  matched, `hdiutil verify` passed, `codesign --verify --deep --strict`
+  passed, `spctl` accepted the app as Notarized Developer ID, and
+  `stapler validate` succeeded. **macOS deviation (approved 2026-11-25;
+  static checks 2026-11-24 on macOS 27.2.1 / build 26B131; DMG SHA-256
+  `5010da06884ab13206dc4360a044913a4c7154421ab4551ba8819d68d3c326aa`):**
+  no new manual launch was performed for v0.3.0. The maintainer accepted the
+  v0.3.0 release without a new manual macOS acceptance because it rebuilds,
+  signs and notarizes the same app; the static-check shell's visible
+  `python3` was the pyenv shim 3.12.10, Homebrew `/opt/homebrew/bin/python3`
+  and `/usr/bin/python3`. The Finder-launched app's PATH was not measured
+  because it was not launched. The M2 manual acceptance box remains open. The
+  draft tarball and AppImage were downloaded
+  and checked in the accepted Ubuntu 22.04.5 amd64 container (no system
+  Python): both added `/work/input`, generated a password, and wrote a
+  one-part AES-256 archive (418 bytes); `7z t` reported `Everything is Ok`
+  (2 files, 48 bytes), `7z l` listed `input/hello.txt` and `input/notes.txt`,
+  and both entries were `AES-256 Deflate`. The AppImage needed
+  `qemu-x86_64-static -cpu max` on the arm64 Colima host; qemu 6.2's default
+  CPU model segfaulted on the newer runtime. The draft was published on
+  2026-11-24. The strict Linux clean-VM and M2 manual macOS boxes remain
+  open.
