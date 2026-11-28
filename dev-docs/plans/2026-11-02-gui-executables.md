@@ -1138,3 +1138,11 @@ only if Phase 3 signing is approved. Linux needs no secrets, and
   still free (404). The v0.3.0 tag predates the readme/URLs metadata, so its
   PyPI page will use the tag's simpler metadata; the new metadata applies to
   the next tag, or cut 0.3.1 first if that page is required.
+
+- 2026-11-28 (PyPI review): Addressed the PR #39 findings. The README uses
+  absolute repository URLs, because PyPI renders `readme` relative links
+  against the project page. Each publish tag has its own concurrency group,
+  so an approval waiting for one version is not replaced by the next release,
+  and `skip-existing` lets a rerun upload only the sdist or wheel a partial
+  upload left out. The README and `user-docs/gui.md` name the window's Tk
+  requirement, and both changelog entries link this plan.

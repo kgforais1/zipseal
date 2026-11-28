@@ -135,7 +135,8 @@ edits and refactors. User-visible changes go in [`CHANGELOG.md`](CHANGELOG.md).
   the upload behind the `pypi` environment, and publishes with PEP 740
   attestations. `ci.yml` builds and smokes the wheel; `pyproject.toml` gains
   the PyPI readme, URLs and classifiers. The first upload waits for the PyPI
-  pending publisher and the `pypi` environment.
+  pending publisher and the `pypi` environment
+  ([plan](dev-docs/plans/2026-11-02-gui-executables.md)).
 - v0.3.0 published on 2026-11-24. Docs mark it released, replace the temporary
   "until v0.3.0 is published, use the CLI" wording with an explicit statement
   that the CLI/source install remains available, and remove the CHANGELOG

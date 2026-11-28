@@ -11,6 +11,10 @@
 # Actions are pinned by full SHA with the release tag as a comment; the
 # check-pins hook enforces it. `pypa/gh-action-pypi-publish` generates PEP 740
 # attestations for the sdist and wheel by default under Trusted Publishing.
+#
+# The concurrency group names the tag, so a run waiting for approval is not
+# replaced by a later release. `skip-existing` lets a rerun finish a version
+# whose sdist or wheel upload failed partway: only the missing files upload.
 
 name: PyPI
 
@@ -28,7 +32,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: pypi-publish
+  group: pypi-publish-${{ github.event.release.tag_name || inputs.tag }}
   cancel-in-progress: false
 
 jobs:
@@ -114,3 +118,4 @@ jobs:
           packages-dir: dist/
           print-hash: true
           attestations: true
+          skip-existing: true

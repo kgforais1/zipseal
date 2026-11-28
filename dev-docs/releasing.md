@@ -1,6 +1,6 @@
 # Releasing zipseal-gui
 
-Last reviewed: 2026-11-23
+Last reviewed: 2026-11-28
 
 The operator's runbook for the frozen GUI apps. The design and the phase order
 are in
@@ -263,13 +263,20 @@ disk through stdin, never argv, and are deleted after use.
 The CLI package is published by `.github/workflows/pypi.yml`, not by
 `release.yml`. It runs on a published GitHub release or an explicit
 `workflow_dispatch` with an existing `vX.Y.Z` tag. It never runs on a tag
-push: PyPI versions are immutable, so a re-cut tag cannot re-upload.
+push: PyPI files are immutable, so re-cutting a tag cannot replace files
+already uploaded.
 
 Both triggers wait on the protected `pypi` environment; its required reviewer
 is the publish approval. The job checks the tag is on `main` and equals the
 `pyproject.toml` version, builds the sdist and wheel with `uv build`, smokes
 the wheel's CLI, and uploads with Trusted Publishing and PEP 740 attestations.
 The source install remains available.
+
+Each tag has its own concurrency group, so a later release cannot replace a
+run that is waiting for approval. If an upload leaves the version with only
+one of its two files, rerun the workflow for the same tag: `skip-existing`
+uploads just the missing file. Never bump the version to recover a partial
+upload, because the files already on PyPI are immutable.
 
 First upload (v0.3.0):
 
@@ -282,7 +289,9 @@ First upload (v0.3.0):
    environment. The project is claimed on the first upload.
 4. Later releases: publish the GitHub release draft after acceptance; the
    `release: published` event starts the workflow; approve the `pypi`
-   environment. Do not re-run a published version; bump the version and tag.
+   environment. Do not re-run a fully published version; bump the version and
+   tag. The one exception is a partial upload: re-run the same unchanged tag
+   to add the missing file, as above, and never re-cut the tag.
 
 The package is published as `zipseal`; users can run `uvx zipseal` or
 `uv tool install zipseal`. The GitHub source install remains documented in
