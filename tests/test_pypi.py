@@ -23,11 +23,7 @@ def _link_targets(text: str) -> list[str]:
     """Every link, image, reference and HTML target outside code."""
     text = FENCE_RE.sub("", text)
     text = CODE_SPAN_RE.sub("", text)
-    return (
-        INLINE_RE.findall(text)
-        + REFERENCE_RE.findall(text)
-        + HTML_RE.findall(text)
-    )
+    return INLINE_RE.findall(text) + REFERENCE_RE.findall(text) + HTML_RE.findall(text)
 
 
 def test_link_guard_sees_nested_badges_references_and_html() -> None:
@@ -53,11 +49,7 @@ def test_readme_links_resolve_on_pypi() -> None:
     readme = (REPO_ROOT / "README.md").read_text(encoding="utf-8")
     targets = _link_targets(readme)
     assert targets
-    relative = [
-        target
-        for target in targets
-        if not target.startswith(("https://", "#", "mailto:"))
-    ]
+    relative = [target for target in targets if not target.startswith(("https://", "#", "mailto:"))]
     assert relative == []
 
 
