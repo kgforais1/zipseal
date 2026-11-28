@@ -1,14 +1,14 @@
 # zipseal
 
-![zipseal icon](src/zipseal/icon.svg)
+![zipseal icon](https://raw.githubusercontent.com/kgforais1/zipseal/main/src/zipseal/icon.svg)
 
 [![CI](https://github.com/kgforais1/zipseal/actions/workflows/ci.yml/badge.svg)](https://github.com/kgforais1/zipseal/actions/workflows/ci.yml)
 [![Dependency audit](https://github.com/kgforais1/zipseal/actions/workflows/dependency-audit.yml/badge.svg)](https://github.com/kgforais1/zipseal/actions/workflows/dependency-audit.yml)
 ![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-3776AB?logo=python&logoColor=white)
 ![AES-256](https://img.shields.io/badge/encryption-AES--256-2E7D32)
-[![MIT license](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
+[![MIT license](https://img.shields.io/badge/license-MIT-blue)](https://github.com/kgforais1/zipseal/blob/main/LICENSE)
 
-Last reviewed: 2026-11-23
+Last reviewed: 2026-11-28
 
 `zipseal` writes files and folders into AES-256 encrypted zips. It can split
 the output into parts that each stay under a size cap, such as an email
@@ -49,34 +49,55 @@ files from the [latest release](https://github.com/kgforais1/zipseal/releases/la
 |---|---|---|
 | macOS (Apple silicon) | `zipseal-gui-<version>-macos-arm64.dmg` | Open the DMG, drag `zipseal-gui.app` to Applications, and launch it. The app is signed and notarized. |
 | Linux (x86_64, v0.3.0+) | `zipseal-gui-<version>-linux-x86_64.AppImage` or `.tar.gz` | `chmod +x` the AppImage and run it. Without FUSE, use `--appimage-extract-and-run`. The tarball extracts to a `zipseal-gui/` folder and runs from anywhere. Needs glibc 2.35 or later. |
-| Windows (x64) | Not yet available. | The Windows build is deferred until the core filesystem port lands. See [`TODO.md`](TODO.md). |
+| Windows (x64) | Not yet available. | The Windows build is deferred until the core filesystem port lands. See [`TODO.md`](https://github.com/kgforais1/zipseal/blob/main/TODO.md). |
 
-Linux artifacts are published starting with v0.3.0. The CLI remains available
-as a source install; see [Install the CLI](#install-the-cli).
+Linux artifacts are published starting with v0.3.0. The CLI is published on
+PyPI and remains available as a source install; see
+[Install the CLI](#install-the-cli).
 
 `<version>` is the release you downloaded, such as `0.3.0`. The release page
-lists the exact filenames. See [the zipseal window](user-docs/gui.md) for the
-Linux first-run note and [troubleshooting](user-docs/troubleshooting-app.md)
+lists the exact filenames. See
+[the zipseal window](https://github.com/kgforais1/zipseal/blob/main/user-docs/gui.md)
+for the Linux first-run note and
+[troubleshooting](https://github.com/kgforais1/zipseal/blob/main/user-docs/troubleshooting-app.md)
 if a download will not start.
 
 ### Install the CLI
 
-The CLI stays source-installable. It needs Python 3.11 or later and
-[`uv`](https://docs.astral.sh/uv/).
+The CLI is published on PyPI and remains source-installable. It needs Python
+3.11 or later and [`uv`](https://docs.astral.sh/uv/).
+
+Run it without installing:
+
+```sh
+uvx zipseal --help
+```
+
+Install it:
+
+```sh
+uv tool install zipseal
+```
+
+The source install remains available for unreleased code:
 
 ```sh
 uv tool install git+https://github.com/kgforais1/zipseal.git
 ```
 
-That puts two commands on your `PATH`: `zipseal` and `zipseal-gui`. From a
-clone, `scripts/install.sh` does the same as an editable install.
+Either install puts two commands on your `PATH`: `zipseal` and `zipseal-gui`.
+The window also needs Tk. The frozen app bundles it, and uv's managed Pythons
+include it; a Linux distribution Python may need its Tk package, such as
+`python3-tk` on Debian and Ubuntu. The CLI never needs Tk. From a clone,
+`scripts/install.sh` does the same as an editable install.
 
 ### Run from a clone (macOS)
 
 In a clone, double-click `zipseal-gui.command` in Finder. It opens Terminal
 and then the zipseal window, with no install step. The first run gives the file
-its zipseal icon. See [the zipseal window](user-docs/gui.md) for what to do if
-macOS blocks a downloaded copy.
+its zipseal icon. See
+[the zipseal window](https://github.com/kgforais1/zipseal/blob/main/user-docs/gui.md)
+for what to do if macOS blocks a downloaded copy.
 
 ## Use
 
@@ -104,10 +125,11 @@ Run `zipseal --help` for every option.
 ## Opening the archives
 
 Double-click in Finder on macOS 11 or later, or use 7-Zip, Keka or
-`tar -xf FILE.zip`, which prompts for the password. macOS's `/usr/bin/unzip` cannot
-open AES zips. With `--hide-names`, Finder unpacks the inner `payload.zip`
-for you, while Keka and 7-Zip extract it as a second zip to open. See
-[opening the archives](user-docs/opening-archives.md).
+`tar -xf FILE.zip`, which prompts for the password. macOS's `/usr/bin/unzip`
+cannot open AES zips. With `--hide-names`, Finder unpacks the inner
+`payload.zip` for you, while Keka and 7-Zip extract it as a second zip to
+open. See
+[opening the archives](https://github.com/kgforais1/zipseal/blob/main/user-docs/opening-archives.md).
 
 ## Security in brief
 
@@ -119,17 +141,17 @@ is the password: the zip format derives its key with PBKDF2-SHA1 at only
 16+ characters drawn from the 62 letters and digits, or five unrelated words,
 letting a tool pick them rather than choosing them yourself. Without
 `--hide-names`, anyone can list file names, sizes and dates. See the
-[security notes](user-docs/security.md).
+[security notes](https://github.com/kgforais1/zipseal/blob/main/user-docs/security.md).
 
 ## Documentation
 
-- [Quick start](user-docs/quick-start.md)
-- [The zipseal window](user-docs/gui.md)
-- [App troubleshooting](user-docs/troubleshooting-app.md)
-- [CLI reference](user-docs/cli.md)
-- [Opening the archives](user-docs/opening-archives.md)
-- [Security notes](user-docs/security.md)
-- Design: [`SPEC.md`](SPEC.md)
+- [Quick start](https://github.com/kgforais1/zipseal/blob/main/user-docs/quick-start.md)
+- [The zipseal window](https://github.com/kgforais1/zipseal/blob/main/user-docs/gui.md)
+- [App troubleshooting](https://github.com/kgforais1/zipseal/blob/main/user-docs/troubleshooting-app.md)
+- [CLI reference](https://github.com/kgforais1/zipseal/blob/main/user-docs/cli.md)
+- [Opening the archives](https://github.com/kgforais1/zipseal/blob/main/user-docs/opening-archives.md)
+- [Security notes](https://github.com/kgforais1/zipseal/blob/main/user-docs/security.md)
+- Design: [`SPEC.md`](https://github.com/kgforais1/zipseal/blob/main/SPEC.md)
 
 ## Development
 
@@ -142,9 +164,9 @@ uv run pytest            # fast suite
 uv run pytest -m slow    # Zip64, 65,536 entries, 25 MB parts
 ```
 
-Contributors and AI agents start with [`AGENTS.md`](AGENTS.md).
+Contributors and AI agents start with [`AGENTS.md`](https://github.com/kgforais1/zipseal/blob/main/AGENTS.md).
 `dev-docs/` holds plans, investigations and the doc rules.
 
 ## License
 
-[MIT](LICENSE).
+[MIT](https://github.com/kgforais1/zipseal/blob/main/LICENSE).

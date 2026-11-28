@@ -1,0 +1,121 @@
+# Publishes the CLI package to PyPI with Trusted Publishing. PyPI versions
+# are immutable, so this workflow never runs on a tag push. A published GitHub
+# release (after the draft acceptance) or an explicit workflow_dispatch starts
+# the job; both wait on the protected `pypi` environment, whose required
+# reviewer is the publish approval. The build runs after that approval and is
+# uploaded from the selected release tag.
+#
+# First upload: v0.3.0. Configure the PyPI pending publisher and the `pypi`
+# environment before dispatching; see dev-docs/releasing.md#pypi-cli.
+#
+# Actions are pinned by full SHA with the release tag as a comment; the
+# check-pins hook enforces it. `pypa/gh-action-pypi-publish` generates PEP 740
+# attestations for the sdist and wheel by default under Trusted Publishing.
+#
+# The concurrency group names the tag, so a run waiting for approval is not
+# replaced by a later release. `skip-existing` lets a rerun finish a version
+# whose sdist or wheel upload failed partway: only the missing files upload.
+
+name: PyPI
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Existing release tag to publish (vX.Y.Z)"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pypi-publish-${{ github.event.release.tag_name || inputs.tag }}
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    name: Build and publish to PyPI
+    if: github.event_name != 'workflow_dispatch' || github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment:
+      name: pypi
+      url: https://pypi.org/p/zipseal
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Select release tag
+        env:
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+          DISPATCH_TAG: ${{ inputs.tag }}
+        run: |
+          tag="${RELEASE_TAG:-$DISPATCH_TAG}"
+          if [ -z "$tag" ]; then
+            echo "::error::no release tag selected"
+            exit 1
+          fi
+          printf 'PYPI_TAG=%s\n' "$tag" >> "$GITHUB_ENV"
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          ref: ${{ github.event.release.tag_name || inputs.tag }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Tag is on main
+        run: |
+          git fetch --no-tags origin main
+          if ! git merge-base --is-ancestor HEAD origin/main; then
+            echo "::error::tag $PYPI_TAG is not on main"
+            exit 1
+          fi
+
+      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2  # v10.3.3
+        with:
+          version-file: .github/uv.toml
+
+      - name: Tag equals the project version
+        run: |
+          uv run --locked --no-build --no-sync --no-project --python 3.13.17 \
+            python - "$PYPI_TAG" <<'PY'
+          import sys
+          import tomllib
+
+          tag = sys.argv[1]
+          with open("pyproject.toml", "rb") as handle:
+              version = tomllib.load(handle)["project"]["version"]
+          expected = "v" + version
+          if tag != expected:
+              raise SystemExit(
+                  f"tag {tag!r} is not {expected!r}: the whole tag must equal "
+                  "'v' plus the pyproject.toml version"
+              )
+          print(f"tag {tag} matches pyproject.toml version {version}")
+          PY
+
+      - name: Build distributions
+        run: uv build
+
+      - name: Check distributions
+        run: |
+          version="${PYPI_TAG#v}"
+          test -f "dist/zipseal-${version}-py3-none-any.whl"
+          test -f "dist/zipseal-${version}.tar.gz"
+          ls -l dist
+
+      - name: Smoke the wheel
+        run: |
+          wheel=$(ls dist/zipseal-*-py3-none-any.whl)
+          uvx --from "$wheel" zipseal --version
+
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@7245906fb61fa33a13554f9d5fb856fe61758086  # v1.14.3
+        with:
+          packages-dir: dist/
+          print-hash: true
+          attestations: true
+          skip-existing: true

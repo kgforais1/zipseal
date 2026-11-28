@@ -1,6 +1,6 @@
 # The zipseal window
 
-Last reviewed: 2026-11-23
+Last reviewed: 2026-11-28
 
 `zipseal-gui` opens a window that does the same job as the `zipseal` command.
 The archives are the same either way, and the same rules apply. Options the
@@ -19,9 +19,13 @@ frozen app needs no Python and no `uv`.
 | Windows (x64) | Not yet available. | The Windows build is deferred until the core filesystem port lands. See [`TODO.md`](../TODO.md). |
 
 The Linux artifacts are published starting with v0.3.0. The
-[CLI source install](../README.md#install-the-cli)
-(`uv tool install git+https://github.com/kgforais1/zipseal.git`) remains
-available and also puts `zipseal-gui` on your `PATH`.
+[CLI](../README.md#install-the-cli) is published on PyPI (`uvx zipseal`) and
+can be installed with `uv tool install zipseal`, which also puts
+`zipseal-gui` on your `PATH`. The source install remains available.
+
+The window needs Tk. The frozen app bundles it, and uv's managed Pythons
+include it; a Linux distribution Python may need its Tk package, such as
+`python3-tk` on Debian and Ubuntu. The CLI works without Tk.
 
 `<version>` is the release you downloaded, such as `0.3.0`. The frozen window
 does not show a version; the download filename and the release page do. See

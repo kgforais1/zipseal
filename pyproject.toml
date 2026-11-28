@@ -2,16 +2,37 @@
 name = "zipseal"
 version = "0.3.0"
 description = "Write files and folders into AES-256 zips, optionally split into self-contained parts under a size cap."
+readme = "README.md"
 authors = [
     { name = "kgrizz-git", email = "216068303+kgrizz-git@users.noreply.github.com" }
 ]
 requires-python = ">=3.11"
 license = "MIT"
 license-files = ["LICENSE"]
+keywords = ["zip", "encryption", "aes", "archive", "cli"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Environment :: Console",
+    "Intended Audience :: End Users/Desktop",
+    "Operating System :: MacOS",
+    "Operating System :: POSIX :: Linux",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Security :: Cryptography",
+    "Topic :: System :: Archiving :: Compression",
+]
 dependencies = [
     "stream-zip>=0.0.84,<0.1",
     "stream-unzip>=0.0.101,<0.1",
 ]
+
+[project.urls]
+Homepage = "https://github.com/kgforais1/zipseal"
+Documentation = "https://github.com/kgforais1/zipseal/tree/main/user-docs"
+Changelog = "https://github.com/kgforais1/zipseal/blob/main/CHANGELOG.md"
+Issues = "https://github.com/kgforais1/zipseal/issues"
 
 [project.scripts]
 zipseal = "zipseal.cli:main"
@@ -32,6 +53,9 @@ build = [
 [build-system]
 requires = ["uv_build>=0.12.10,<0.14.0"]
 build-backend = "uv_build"
+
+[tool.uv.build-backend]
+source-exclude = [".DS_Store", "**/.DS_Store"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

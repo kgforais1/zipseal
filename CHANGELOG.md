@@ -15,6 +15,10 @@ All notable user-facing changes are documented here. The format follows
   terminal. It targets x86_64 and glibc 2.35 or later. The AppImage uses FUSE
   and falls back to `--appimage-extract-and-run`; the tarball runs from any
   folder.
+- The CLI is published on PyPI as `zipseal`. `uvx zipseal` runs it without
+  an install; `uv tool install zipseal` adds `zipseal` and `zipseal-gui` to
+  `PATH`. The GitHub source install remains available
+  ([plan](dev-docs/plans/2026-11-02-gui-executables.md)).
 - macOS and Linux download, first-run and troubleshooting docs, including the
   measured glibc floor, AppImage FUSE and generated-password recovery.
 - The tag-to-draft release workflow builds, smoke-tests and attaches the Linux

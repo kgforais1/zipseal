@@ -691,14 +691,14 @@ second local build.
 
 ## Phase 6 — CLI on PyPI (optional, decide after M3)
 
-- [ ] `uv build` and publish via PyPI Trusted Publishing (`id-token: write`,
+- [x] `uv build` and publish via PyPI Trusted Publishing (`id-token: write`,
       `pypi` environment). The gate is that environment's required reviewer.
       `workflow_dispatch` only starts the job; it is not a second path that
       skips the approval. Never publish implicitly on a tag, because PyPI
       versions are immutable and a re-cut tag cannot re-upload. Name
-      `zipseal` is free (checked 2026-11-02).
-- [ ] README: `uvx zipseal` as the one-line CLI install.
-- [ ] Only worth doing if installing the CLI without a git URL is wanted; it
+      `zipseal` is free (checked 2026-11-02; still 404 on 2026-11-25).
+- [x] README: `uvx zipseal` as the one-line CLI install.
+- [x] Only worth doing if installing the CLI without a git URL is wanted; it
       changes nothing for GUI users.
 
 ## Test list
@@ -1125,3 +1125,24 @@ only if Phase 3 signing is approved. Linux needs no secrets, and
   CPU model segfaulted on the newer runtime. The draft was published on
   2026-11-24. The strict Linux clean-VM and M2 manual macOS boxes remain
   open.
+
+- 2026-11-25 (PyPI CLI): Added `.github/workflows/pypi.yml`, which builds
+  the sdist and wheel from a published release or an explicit dispatch, never
+  from a tag push, and uploads through PyPI Trusted Publishing; the `pypi`
+  environment's required reviewer is the approval gate. The job verifies the
+  tag is on `main` and equals `pyproject.toml`, smokes the wheel's CLI, and
+  uploads with `pypa/gh-action-pypi-publish` v1.14.3 (pinned SHA). `ci.yml`
+  builds and smokes the package on PRs. `pyproject.toml` gains the PyPI
+  readme, URLs, keywords and classifiers. The first `0.3.0` upload awaits the
+  PyPI pending publisher and `pypi` environment setup; the name `zipseal` is
+  still free (404). The v0.3.0 tag predates the readme/URLs metadata, so its
+  PyPI page will use the tag's simpler metadata; the new metadata applies to
+  the next tag, or cut 0.3.1 first if that page is required.
+
+- 2026-11-28 (PyPI review): Addressed the PR #39 findings. The README uses
+  absolute repository URLs, because PyPI renders `readme` relative links
+  against the project page. Each publish tag has its own concurrency group,
+  so an approval waiting for one version is not replaced by the next release,
+  and `skip-existing` lets a rerun upload only the sdist or wheel a partial
+  upload left out. The README and `user-docs/gui.md` name the window's Tk
+  requirement, and both changelog entries link this plan.

@@ -20,7 +20,8 @@ The frozen window does not show a version. The download filename and the
 | Windows | Not yet available | The core filesystem port is still in progress |
 
 The Linux artifacts are published starting with v0.3.0. The
-[CLI source install](../README.md#install-the-cli) remains available.
+[CLI](../README.md#install-the-cli) is published on PyPI and remains
+source-installable.
 
 ## macOS
 

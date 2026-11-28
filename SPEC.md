@@ -1,8 +1,8 @@
 # zipseal — plan and design specification
 
-Status: implemented; v0.3.0 released 2026-11-24 (macOS and Linux). The
-Windows app remains deferred. Drafted 2026-10-07.
-Last reviewed: 2026-11-24
+Status: implemented; v0.3.0 released 2026-11-24 (macOS and Linux); the CLI
+is published on PyPI. The Windows app remains deferred. Drafted 2026-10-07.
+Last reviewed: 2026-11-25
 
 `zipseal` is a CLI that takes files and folders and writes them into one
 password-protected zip, or into several zips that each stay under a size cap.
@@ -105,16 +105,17 @@ verify.py     re-reads each part with stream-unzip and checks names + CRCs
 ```
 
 Packaging: a `pyproject.toml` with `zipseal` and `zipseal-gui` console scripts.
-Run them with `uv run zipseal …` and `uv run zipseal-gui`, or install both
-with `uv tool install .`. On macOS, `zipseal-gui.command` at the repo root
+Run them with `uv run zipseal …` and `uv run zipseal-gui`; install the CLI
+from PyPI with `uvx zipseal` or `uv tool install zipseal`; from a clone,
+`uv tool install .` installs both. On macOS, `zipseal-gui.command` at the repo root
 runs `uv run --managed-python zipseal-gui` from the clone when double-clicked in Finder, and
 `scripts/set-icon.sh` gives it the `src/zipseal/icon.svg` icon.
 
 Frozen downloads need neither Python nor `uv`. A `v*` tag builds the macOS
 DMG and the Linux AppImage and tarball, smoke-tests them, and creates a draft
-release; the maintainer accepts the draft and publishes it. The CLI stays
-source-installable. The Windows zip is deferred until the core filesystem
-port lands (see `TODO.md`).
+release; the maintainer accepts the draft and publishes it. The CLI is
+published on PyPI and remains source-installable. The Windows zip is deferred
+until the core filesystem port lands (see `TODO.md`).
 
 | Platform | Artifact | Install |
 |---|---|---|
@@ -122,8 +123,8 @@ port lands (see `TODO.md`).
 | Linux (x86_64, v0.3.0+) | `zipseal-gui-<version>-linux-x86_64.AppImage` and `.tar.gz` | `chmod +x` the AppImage; without FUSE use `--appimage-extract-and-run`. The tarball runs from any folder. glibc 2.35 or later. |
 | Windows (x64) | Deferred | No artifact until the core filesystem port lands. |
 
-Linux artifacts are published starting with v0.3.0. The CLI remains
-source-installable.
+Linux artifacts are published starting with v0.3.0. The CLI is published on
+PyPI and remains source-installable.
 
 `dev-docs/plans/2026-11-02-gui-executables.md` is the plan, and
 `dev-docs/releasing.md` is the operator's runbook.

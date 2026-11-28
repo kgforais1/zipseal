@@ -1,17 +1,32 @@
 # Quick start
 
-Last reviewed: 2026-10-10
+Last reviewed: 2026-11-25
 
 ## Install
 
 zipseal needs Python 3.11 or later and [`uv`](https://docs.astral.sh/uv/).
 
+Run it without installing:
+
+```sh
+uvx zipseal --help
+```
+
+Install it:
+
+```sh
+uv tool install zipseal
+```
+
+The source install remains available for unreleased code:
+
 ```sh
 uv tool install git+https://github.com/kgforais1/zipseal.git
 ```
 
-This puts `zipseal` on your `PATH`. From a clone, `uv tool install .` does
-the same, and `uv run zipseal …` runs it without installing.
+`uvx` runs the CLI without an install; `uv tool install` puts `zipseal` on
+your `PATH`. From a clone, `uv tool install .` does the same, and
+`uv run zipseal …` runs it without installing.
 
 ## Make one encrypted zip
 

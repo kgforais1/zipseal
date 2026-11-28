@@ -1,6 +1,6 @@
 # Releasing zipseal-gui
 
-Last reviewed: 2026-11-23
+Last reviewed: 2026-11-28
 
 The operator's runbook for the frozen GUI apps. The design and the phase order
 are in
@@ -257,6 +257,50 @@ disk through stdin, never argv, and are deleted after use.
 8. Publish the draft. The workflow never publishes a final release.
 
 `v0.1.0` stays source-only; the first run is the next version bump.
+
+## PyPI CLI
+
+The CLI package is published by `.github/workflows/pypi.yml`, not by
+`release.yml`. It runs on a published GitHub release or an explicit
+`workflow_dispatch` with an existing `vX.Y.Z` tag. It never runs on a tag
+push: PyPI files are immutable, so re-cutting a tag cannot replace files
+already uploaded.
+
+Both triggers wait on the protected `pypi` environment; its required reviewer
+is the publish approval. The job checks the tag is on `main` and equals the
+`pyproject.toml` version, builds the sdist and wheel with `uv build`, smokes
+the wheel's CLI, and uploads with Trusted Publishing and PEP 740 attestations.
+The source install remains available.
+
+Each tag has its own concurrency group, so a later release cannot replace a
+run that is waiting for approval. If an upload leaves the version with only
+one of its two files, rerun the workflow for the same tag: `skip-existing`
+uploads just the missing file. Never bump the version to recover a partial
+upload, because the files already on PyPI are immutable.
+
+First upload (v0.3.0):
+
+1. In GitHub, create the `pypi` environment with at least one required
+   reviewer. The workflow's environment is the approval gate.
+2. In PyPI, add a pending trusted publisher for project `zipseal`, owner
+   `kgforais1`, repository `zipseal`, workflow `pypi.yml`, environment
+   `pypi`.
+3. Run the `PyPI` workflow from `main` with tag `v0.3.0`; approve the `pypi`
+   environment. The project is claimed on the first upload.
+4. Later releases: publish the GitHub release draft after acceptance; the
+   `release: published` event starts the workflow; approve the `pypi`
+   environment. Do not re-run a fully published version; bump the version and
+   tag. The one exception is a partial upload: re-run the same unchanged tag
+   to add the missing file, as above, and never re-cut the tag.
+
+The package is published as `zipseal`; users can run `uvx zipseal` or
+`uv tool install zipseal`. The GitHub source install remains documented in
+the README.
+
+The v0.3.0 tag predates the PyPI readme/URLs metadata in this PR; its package
+page will show the tag's simpler metadata. The new metadata applies to the
+next tagged version. Publish v0.3.0 from the tag, or cut v0.3.1 after this PR
+if the full PyPI page is wanted first; never reuse 0.3.0.
 
 ## Rollback
 

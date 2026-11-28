@@ -12,13 +12,25 @@ from zipseal import cli
 REPO_ROOT = Path(__file__).resolve().parent.parent
 
 
+def _project() -> dict:
+    return tomllib.loads((REPO_ROOT / "pyproject.toml").read_text(encoding="utf-8"))["project"]
+
+
 def _pyproject_version() -> str:
-    project = tomllib.loads((REPO_ROOT / "pyproject.toml").read_text(encoding="utf-8"))
-    return project["project"]["version"]
+    return _project()["version"]
 
 
 def test_package_version_matches_pyproject() -> None:
     assert zipseal.__version__ == _pyproject_version()
+
+
+def test_pypi_metadata_is_complete() -> None:
+    project = _project()
+    assert project["name"] == "zipseal"
+    assert project["readme"] == "README.md"
+    assert project["license"] == "MIT"
+    assert project["urls"]["Homepage"] == "https://github.com/kgforais1/zipseal"
+    assert set(project["scripts"]) == {"zipseal", "zipseal-gui"}
 
 
 def test_cli_version_prints_the_package_version(capsys, monkeypatch) -> None:
